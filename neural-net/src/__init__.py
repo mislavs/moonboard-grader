@@ -14,6 +14,7 @@ from . import grid_builder
 from . import data_processor
 from . import dataset
 from . import models
+from . import trainer
 
 # Import commonly used functions
 from .grade_encoder import (
@@ -58,6 +59,10 @@ from .models import (
     count_parameters
 )
 
+from .trainer import (
+    Trainer
+)
+
 __all__ = [
     # Modules
     'grade_encoder',
@@ -66,6 +71,7 @@ __all__ = [
     'data_processor',
     'dataset',
     'models',
+    'trainer',
     # Grade encoder functions
     'encode_grade',
     'decode_grade',
@@ -96,4 +102,6 @@ __all__ = [
     'ConvolutionalModel',
     'create_model',
     'count_parameters',
+    # Trainer functions
+    'Trainer',
 ]
