@@ -13,6 +13,7 @@ from . import position_parser
 from . import grid_builder
 from . import data_processor
 from . import dataset
+from . import augmentation
 from . import models
 from . import trainer
 from . import evaluator
@@ -54,6 +55,12 @@ from .dataset import (
     get_split_info
 )
 
+from .augmentation import (
+    MoonboardAugmentation,
+    create_augmentation,
+    no_augmentation
+)
+
 from .models import (
     FullyConnectedModel,
     ConvolutionalModel,
@@ -87,6 +94,7 @@ __all__ = [
     'grid_builder',
     'data_processor',
     'dataset',
+    'augmentation',
     'models',
     'trainer',
     'evaluator',
@@ -116,6 +124,10 @@ __all__ = [
     'MoonboardDataset',
     'create_data_splits',
     'get_split_info',
+    # Augmentation functions
+    'MoonboardAugmentation',
+    'create_augmentation',
+    'no_augmentation',
     # Model functions
     'FullyConnectedModel',
     'ConvolutionalModel',

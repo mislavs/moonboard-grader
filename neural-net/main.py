@@ -33,6 +33,8 @@ from src import (
     plot_confusion_matrix,
     decode_grade,
     get_all_grades,
+    create_augmentation,
+    MoonboardDataset,
 )
 
 
@@ -83,7 +85,7 @@ def train_command(args):
     for grade, count in sorted(stats['grade_distribution'].items()):
         print(f"      {grade}: {count}")
     
-    # Create data splits
+    # Create data splits with augmentation
     print(f"\n🔀 Creating train/val/test splits...")
     tensors = np.array([x[0] for x in dataset])
     labels = np.array([x[1] for x in dataset])
@@ -93,17 +95,48 @@ def train_command(args):
     test_ratio = config['data']['test_ratio']
     random_seed = config['data'].get('random_seed', 42)
     
-    train_dataset, val_dataset, test_dataset = create_data_splits(
-        tensors, labels,
-        train_ratio=train_ratio,
-        val_ratio=val_ratio,
-        test_ratio=test_ratio,
-        random_state=random_seed
+    # Create base splits without augmentation
+    from sklearn.model_selection import StratifiedShuffleSplit
+    
+    # First split: separate test set
+    test_size = test_ratio
+    splitter_test = StratifiedShuffleSplit(
+        n_splits=1, test_size=test_size, random_state=random_seed
     )
+    train_val_idx, test_idx = next(splitter_test.split(tensors, labels))
+    
+    # Second split: separate train and validation
+    val_ratio_adjusted = val_ratio / (train_ratio + val_ratio)
+    splitter_val = StratifiedShuffleSplit(
+        n_splits=1, test_size=val_ratio_adjusted, random_state=random_seed
+    )
+    train_idx, val_idx = next(
+        splitter_val.split(tensors[train_val_idx], labels[train_val_idx])
+    )
+    
+    # Map back to original indices
+    train_idx = train_val_idx[train_idx]
+    val_idx = train_val_idx[val_idx]
+    
+    # Create augmentation transforms
+    use_augmentation = config.get('data', {}).get('augmentation', True)
+    flip_prob = config.get('data', {}).get('flip_probability', 0.5)
+    
+    train_transform = create_augmentation(enabled=use_augmentation, flip_prob=flip_prob)
+    val_transform = create_augmentation(enabled=False)  # No augmentation for validation
+    test_transform = create_augmentation(enabled=False)  # No augmentation for test
+    
+    # Create datasets with augmentation
+    train_dataset = MoonboardDataset(tensors[train_idx], labels[train_idx], transform=train_transform)
+    val_dataset = MoonboardDataset(tensors[val_idx], labels[val_idx], transform=val_transform)
+    test_dataset = MoonboardDataset(tensors[test_idx], labels[test_idx], transform=test_transform)
     
     print(f"   Train: {len(train_dataset)} ({train_ratio*100:.0f}%)")
     print(f"   Val:   {len(val_dataset)} ({val_ratio*100:.0f}%)")
     print(f"   Test:  {len(test_dataset)} ({test_ratio*100:.0f}%)")
+    
+    if use_augmentation:
+        print(f"   Using data augmentation (flip_prob={flip_prob})")
     
     # Create data loaders
     batch_size = config['training']['batch_size']
@@ -136,6 +169,8 @@ def train_command(args):
     print(f"   Optimizer: {optimizer_type.upper()} (lr={learning_rate}, weight_decay={weight_decay})")
     
     # Calculate class weights for imbalanced dataset
+    label_smoothing = config['training'].get('label_smoothing', 0.0)
+    
     if config['training'].get('use_class_weights', True):
         # Count samples per class in training set
         class_counts = np.bincount(labels[:(len(train_dataset))], minlength=num_classes)
@@ -147,9 +182,12 @@ def train_command(args):
         class_weights = torch.FloatTensor(class_weights).to(device)
         
         print(f"   Using class weights to handle imbalance")
-        criterion = nn.CrossEntropyLoss(weight=class_weights)
+        criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)
     else:
-        criterion = nn.CrossEntropyLoss()
+        criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+    
+    if label_smoothing > 0:
+        print(f"   Using label smoothing: {label_smoothing}")
     
     # Create learning rate scheduler
     use_scheduler = config['training'].get('use_scheduler', True)
@@ -158,15 +196,19 @@ def train_command(args):
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
             mode='min',
-            factor=0.5,
-            patience=5,
-            min_lr=1e-6
+            factor=0.3,      # More aggressive reduction (was 0.5)
+            patience=3,      # Faster response to plateaus (was 5)
+            min_lr=1e-7,     # Lower minimum (was 1e-6)
+            verbose=True     # Print when LR changes
         )
-        print(f"   Using ReduceLROnPlateau scheduler (factor=0.5, patience=5)")
+        print(f"   Using ReduceLROnPlateau scheduler (factor=0.3, patience=3)")
     
     # Create checkpoint directory
     checkpoint_dir = Path(config['checkpoint']['dir'])
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Get gradient clipping value
+    gradient_clip = config['training'].get('gradient_clip', None)
     
     # Create trainer
     trainer = Trainer(
@@ -177,8 +219,12 @@ def train_command(args):
         criterion=criterion,
         device=device,
         checkpoint_dir=str(checkpoint_dir),
-        scheduler=scheduler
+        scheduler=scheduler,
+        gradient_clip=gradient_clip
     )
+    
+    if gradient_clip is not None:
+        print(f"   Using gradient clipping: max_norm={gradient_clip}")
     
     # Train model
     num_epochs = config['training']['num_epochs']

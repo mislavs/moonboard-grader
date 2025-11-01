@@ -8,14 +8,16 @@ model:
 
 # Training Configuration
 training:
-  learning_rate: 0.0005
+  learning_rate: 0.0003
   batch_size: 64
   num_epochs: 150
-  early_stopping_patience: 15
+  early_stopping_patience: 8
   optimizer: "adam"  # Options: "adam", "sgd"
-  weight_decay: 0.0001
+  weight_decay: 0.001
   use_class_weights: true
   use_scheduler: true
+  label_smoothing: 0.1
+  gradient_clip: 1.0
 
 # Data Configuration
 data:
@@ -24,6 +26,8 @@ data:
   val_ratio: 0.15
   test_ratio: 0.15
   random_seed: 42  # For reproducible splits
+  augmentation: true
+  flip_probability: 0.5
 
 # Checkpoint Configuration
 checkpoint:

@@ -4,6 +4,134 @@ All notable changes to the Moonboard Grade Prediction model will be documented i
 
 ---
 
+## [v0.3.0] - 2025-11-01 (Overfitting Fix)
+
+Major regularization and training improvements to address severe overfitting observed in v0.2.0.
+
+**v0.2.0 Results (Overfitting Issue):**
+- Training stopped at epoch 18 (best at epoch 3)
+- Validation loss increased from 2.18 → 3.11 (+43% degradation)
+- Train/Val gap: 1.72 (severe overfitting)
+- Exact Accuracy: 34.47%
+- ±1 Grade Accuracy: 68.53%
+- ±2 Grade Accuracy: 86.72%
+
+### Problem Diagnosis
+- Model was **memorizing training data** instead of learning generalizable patterns
+- Validation loss increased dramatically after epoch 3 while training loss decreased
+- Early stopping patience (15) was too long, wasting 12+ epochs on overfitting
+- Insufficient regularization for 391k parameter model
+
+### Added
+- **Data Augmentation** module (`src/augmentation.py`):
+  - Horizontal flip augmentation with configurable probability
+  - Effectively doubles training dataset diversity
+  - Simulates climbers with different dominant hands
+  - Applied only to training set, not validation/test
+- **Label Smoothing** (0.1) to prevent overconfident predictions
+- **Gradient Clipping** (max_norm=1.0) to prevent exploding gradients
+- Augmentation configuration options in `config.yaml`
+- Transform parameter support in `MoonboardDataset` class
+
+### Changed
+- **Regularization Strengthened**:
+  - Dropout: 0.4/0.3 → **0.5/0.5** (stronger regularization)
+  - Weight decay: 0.0001 → **0.001** (10x increase in L2 regularization)
+  - Added label smoothing: 0.0 → **0.1**
+- **Learning Rate Strategy**:
+  - Initial LR: 0.0005 → **0.0003** (more stable training)
+  - Scheduler factor: 0.5 → **0.3** (more aggressive reduction)
+  - Scheduler patience: 5 → **3** (faster response to plateaus)
+  - Min LR: 1e-6 → **1e-7** (allow finer tuning)
+  - Added verbose=True to scheduler
+- **Early Stopping**:
+  - Patience: 15 → **8** epochs (stop overfitting earlier)
+- **Training Configuration** (config.yaml):
+  - Added `label_smoothing: 0.1`
+  - Added `gradient_clip: 1.0`
+  - Added `augmentation: true`
+  - Added `flip_probability: 0.5`
+
+### Technical Details
+
+**Data Augmentation Implementation:**
+```python
+class MoonboardAugmentation:
+    def __init__(self, flip_prob=0.5):
+        self.flip_prob = flip_prob
+    
+    def __call__(self, grid):
+        if random.random() < self.flip_prob:
+            grid = torch.flip(grid, dims=[2])  # Mirror left-right
+        return grid
+```
+
+**Updated Loss Function:**
+```python
+criterion = nn.CrossEntropyLoss(
+    weight=class_weights,
+    label_smoothing=0.1  # NEW: prevents overconfidence
+)
+```
+
+**Gradient Clipping in Training Loop:**
+```python
+loss.backward()
+if self.gradient_clip is not None:
+    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
+self.optimizer.step()
+```
+
+### Expected Improvements
+Based on regularization changes:
+- Best model epoch: 3 → **8-12** (more training before convergence)
+- Validation loss trend: ↗️ Increasing → **➡️ Stable**
+- Train/Val gap: 1.72 → **< 0.5** (healthy generalization)
+- Exact Accuracy: 34.47% → **38-42%** (estimated)
+- ±1 Grade Accuracy: 68.53% → **72-76%** (estimated)
+- ±2 Grade Accuracy: 86.72% → **88-91%** (estimated)
+
+### Why These Changes Work
+1. **Stronger Dropout (0.5)** - Prevents neuron co-adaptation, forces redundancy
+2. **Higher Weight Decay (0.001)** - Penalizes complex models, prefers simpler solutions
+3. **Label Smoothing (0.1)** - Prevents 100% confidence, better calibration
+4. **Data Augmentation** - More diverse training samples, position invariance
+5. **Gradient Clipping** - Stabilizes training, prevents gradient explosion
+6. **Lower LR (0.0003)** - More careful weight updates, better convergence
+7. **Aggressive LR Schedule** - Adapts quickly to plateaus (factor=0.3, patience=3)
+8. **Earlier Stopping (patience=8)** - Prevents wasting epochs on overfitting
+
+All techniques work together to encourage **generalizable patterns** instead of **memorizing examples**.
+
+### Files Modified
+- `src/models.py` - Increased dropout from 0.4/0.3 to 0.5/0.5
+- `src/trainer.py` - Added gradient clipping support
+- `src/dataset.py` - Added transform parameter for augmentation
+- `src/augmentation.py` - **NEW**: Data augmentation module
+- `src/__init__.py` - Exported augmentation functions
+- `main.py` - Integrated label smoothing, gradient clipping, and augmentation
+- `config.yaml` - Updated all training hyperparameters
+
+Watch for these **good signs** during training:
+- Val loss decreases steadily for first 8-15 epochs
+- Train/val gap stays small (< 1.0 difference)
+- LR reductions happen 1-2 times during training
+- Best model saved around epoch 10-15, not epoch 3
+
+### Further Tuning Options
+
+**If Still Overfitting:**
+- Reduce model capacity (halve filter counts: 32→16, 64→32, 128→64)
+- Increase dropout to 0.6
+- Temporarily disable augmentation to isolate issues
+
+**If Underfitting (val loss > 2.5):**
+- Lower dropout to 0.3
+- Increase learning rate to 0.0005
+- Reduce weight decay to 0.0005
+
+---
+
 ## [v0.2.0] - 2025-11-01
 
 Major model architecture overhaul and training improvements to address baseline performance issues.

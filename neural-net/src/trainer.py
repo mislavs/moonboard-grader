@@ -43,7 +43,8 @@ class Trainer:
         criterion: nn.Module,
         device: str = 'cpu',
         checkpoint_dir: str = 'models',
-        scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None
+        scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
+        gradient_clip: Optional[float] = None
     ):
         """
         Initialize the Trainer.
@@ -57,6 +58,7 @@ class Trainer:
             device: Device to train on ('cpu' or 'cuda')
             checkpoint_dir: Directory to save model checkpoints
             scheduler: Optional learning rate scheduler
+            gradient_clip: Optional gradient clipping max norm value
             
         Raises:
             ValueError: If train_loader is None or empty
@@ -82,6 +84,7 @@ class Trainer:
         self.device = device
         self.checkpoint_dir = Path(checkpoint_dir)
         self.scheduler = scheduler
+        self.gradient_clip = gradient_clip
         
         # Create checkpoint directory if it doesn't exist
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -125,6 +128,11 @@ class Trainer:
             
             # Backward pass and optimization
             loss.backward()
+            
+            # Apply gradient clipping if specified
+            if self.gradient_clip is not None:
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
+            
             self.optimizer.step()
             
             # Track loss

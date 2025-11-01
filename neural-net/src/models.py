@@ -121,14 +121,14 @@ class ConvolutionalModel(nn.Module):
         # Calculate flattened size: 128 channels * 4 height * 2 width = 1024
         self.flattened_size = 128 * 4 * 2
         
-        # Fully connected layers with reduced dropout
+        # Fully connected layers with dropout for regularization
         self.fc1 = nn.Linear(self.flattened_size, 256)
         self.relu4 = nn.ReLU()
-        self.dropout1 = nn.Dropout(0.4)
+        self.dropout1 = nn.Dropout(0.5)  # Increased from 0.4 to combat overfitting
         
         self.fc2 = nn.Linear(256, 128)
         self.relu5 = nn.ReLU()
-        self.dropout2 = nn.Dropout(0.3)
+        self.dropout2 = nn.Dropout(0.5)  # Increased from 0.3 to combat overfitting
         
         self.fc3 = nn.Linear(128, num_classes)
     
