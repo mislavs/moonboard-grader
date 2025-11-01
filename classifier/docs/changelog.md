@@ -4,6 +4,29 @@ All notable changes to the Moonboard Grade Prediction model will be documented i
 
 ---
 
+## [v0.3.1] - 2025-11-01 (Critical Bugfix - Class Weights)
+
+### Fixed
+- **CRITICAL**: Fixed class weights calculation that caused extreme loss values and 0% accuracy
+  - **Root causes identified**:
+    1. Wrong label indexing: `labels[:(len(train_dataset))]` instead of `labels[train_idx]`
+    2. Tiny epsilon (`1e-6`) causing billion-scale weights for rare classes
+    3. Manual formula producing uncapped extreme weights even after fixes
+  - **Solution**: Replaced manual calculation with sklearn's `compute_class_weight('balanced')`
+    - Uses proper balanced weighting formula
+    - Added weight capping: `np.clip(weights, 0.1, max_weight)` with default max=5.0
+    - Prevents extreme weights while still helping with class imbalance
+  - **Results**:
+    - Before fix: Loss ~97, Val Acc 0%
+    - After fix: Loss ~2.2, Val Acc ~34% (normal behavior)
+  - Added `max_class_weight` config parameter (default: 5.0)
+
+### Changed
+- Added import: `from sklearn.utils.class_weight import compute_class_weight`
+- Improved debug output: Shows weight range instead of raw class counts
+
+---
+
 ## [v0.3.0] - 2025-11-01 (Overfitting Fix)
 
 Major regularization and training improvements to address severe overfitting observed in v0.2.0.

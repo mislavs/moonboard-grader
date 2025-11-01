@@ -17,6 +17,7 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 import numpy as np
+from sklearn.utils.class_weight import compute_class_weight
 
 # Import our modules
 from src import (
@@ -172,16 +173,28 @@ def train_command(args):
     label_smoothing = config['training'].get('label_smoothing', 0.0)
     
     if config['training'].get('use_class_weights', True):
-        # Count samples per class in training set
-        class_counts = np.bincount(labels[:(len(train_dataset))], minlength=num_classes)
-        total_samples = len(train_dataset)
+        # Calculate class weights using sklearn's balanced approach
+        # This handles class imbalance without extreme weights
+        unique_classes = np.unique(labels[train_idx])
+        class_weights_array = compute_class_weight(
+            class_weight='balanced',
+            classes=unique_classes,
+            y=labels[train_idx]
+        )
         
-        # Calculate weights: inversely proportional to class frequency
-        # weight = total_samples / (num_classes * class_count)
-        class_weights = total_samples / (num_classes * class_counts + 1e-6)
+        # Create full weight array for all classes (including those not in training set)
+        class_weights = np.ones(num_classes)
+        class_weights[unique_classes] = class_weights_array
+        
+        # Cap weights to reasonable range to prevent extreme values
+        # Max weight of 5.0 means rare classes get at most 5x importance
+        max_weight = config['training'].get('max_class_weight', 5.0)
+        class_weights = np.clip(class_weights, 0.1, max_weight)
+        
         class_weights = torch.FloatTensor(class_weights).to(device)
         
-        print(f"   Using class weights to handle imbalance")
+        print(f"   Using balanced class weights (capped at {max_weight})")
+        print(f"   Weight range: {class_weights.min():.2f} - {class_weights.max():.2f}")
         criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)
     else:
         criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
