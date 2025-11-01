@@ -29,6 +29,7 @@ from src import (
     Predictor,
     evaluate_model,
     get_metrics_summary,
+    generate_confusion_matrix,
     plot_confusion_matrix,
     decode_grade,
     get_all_grades,
@@ -186,13 +187,13 @@ def train_command(args):
         cm_path = Path(cm_path)
         cm_path.parent.mkdir(parents=True, exist_ok=True)
         
-        metrics_summary = get_metrics_summary(
+        cm = generate_confusion_matrix(
             test_metrics['predictions'],
             test_metrics['labels']
         )
         
         plot_confusion_matrix(
-            metrics_summary['confusion_matrix'],
+            cm,
             get_all_grades(),
             str(cm_path),
             normalize=True
@@ -260,7 +261,7 @@ def evaluate_command(args):
     print(f"   Exact Accuracy:     {metrics['exact_accuracy']*100:.2f}%")
     print(f"   ±1 Grade Accuracy:  {metrics['tolerance_1_accuracy']*100:.2f}%")
     print(f"   ±2 Grade Accuracy:  {metrics['tolerance_2_accuracy']*100:.2f}%")
-    print(f"   Loss:               {metrics['loss']:.4f}")
+    print(f"   Loss:               {metrics['avg_loss']:.4f}")
     
     # Get detailed metrics
     print(f"\n📊 Detailed Metrics:")
@@ -287,8 +288,13 @@ def evaluate_command(args):
         output_path = Path(args.output) if args.output else Path("confusion_matrix.png")
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
+        cm = generate_confusion_matrix(
+            metrics['predictions'],
+            metrics['labels']
+        )
+        
         plot_confusion_matrix(
-            metrics_summary['confusion_matrix'],
+            cm,
             get_all_grades(),
             str(output_path),
             normalize=True

@@ -250,6 +250,72 @@ class TestTrainCommand:
         assert 'val_loss' in history
         assert 'val_accuracy' in history
         assert len(history['train_loss']) == 2  # We trained for 2 epochs
+    
+    def test_train_command_with_confusion_matrix(self, tmp_path):
+        """Test that training saves confusion matrix when enabled."""
+        config_data = {
+            'model': {'type': 'fc', 'num_classes': 19},
+            'training': {
+                'learning_rate': 0.001,
+                'batch_size': 4,
+                'num_epochs': 1,
+                'early_stopping_patience': None,
+                'optimizer': 'adam'
+            },
+            'data': {
+                'path': str(tmp_path / 'problems.json'),
+                'train_ratio': 0.7,
+                'val_ratio': 0.15,
+                'test_ratio': 0.15,
+                'random_seed': 42
+            },
+            'checkpoint': {
+                'dir': str(tmp_path / 'models'),
+                'save_best': True
+            },
+            'evaluation': {
+                'save_confusion_matrix': True,
+                'confusion_matrix_path': str(tmp_path / 'confusion_matrix.png')
+            },
+            'device': 'cpu'
+        }
+        
+        config_file = tmp_path / "config.yaml"
+        with open(config_file, 'w') as f:
+            yaml.dump(config_data, f)
+        
+        # Create minimal dataset with at least 15 problems for splitting
+        problems = []
+        for i in range(20):
+            problems.append({
+                'grade': '6A' if i < 10 else '6B',
+                'moves': [
+                    {'description': 'A1', 'isStart': True, 'isEnd': False},
+                    {'description': 'B5', 'isStart': False, 'isEnd': False},
+                    {'description': 'C10', 'isStart': False, 'isEnd': True}
+                ]
+            })
+        
+        data_file = tmp_path / 'problems.json'
+        with open(data_file, 'w') as f:
+            json.dump({'data': problems}, f)
+        
+        # Mock argparse args
+        args = MagicMock()
+        args.config = str(config_file)
+        
+        # Run training
+        train_command(args)
+        
+        # Verify confusion matrix was saved
+        cm_path = tmp_path / 'confusion_matrix.png'
+        assert cm_path.exists(), f"Confusion matrix not found at {cm_path}"
+        
+        # Verify it's a valid PNG file (at least has PNG header)
+        with open(cm_path, 'rb') as f:
+            header = f.read(8)
+            # PNG files start with specific magic bytes
+            assert header[:4] == b'\x89PNG', "File is not a valid PNG"
 
 
 class TestEvaluateCommand:
@@ -285,6 +351,56 @@ class TestEvaluateCommand:
         
         with pytest.raises(SystemExit):
             evaluate_command(args)
+    
+    def test_evaluate_command_with_confusion_matrix(self, tmp_path):
+        """Test that evaluation saves confusion matrix when requested."""
+        from src.models import FullyConnectedModel
+        
+        # Create a trained model checkpoint
+        model = FullyConnectedModel(num_classes=19)
+        checkpoint_file = tmp_path / 'model.pth'
+        checkpoint = {
+            'model_state_dict': model.state_dict(),
+            'model_type': 'fc',
+            'num_classes': 19
+        }
+        torch.save(checkpoint, checkpoint_file)
+        
+        # Create test dataset
+        problems = []
+        for i in range(20):
+            problems.append({
+                'grade': '6A' if i < 10 else '6B',
+                'moves': [
+                    {'description': 'A1', 'isStart': True, 'isEnd': False},
+                    {'description': 'B5', 'isStart': False, 'isEnd': False},
+                    {'description': 'C10', 'isStart': False, 'isEnd': True}
+                ]
+            })
+        
+        data_file = tmp_path / 'problems.json'
+        with open(data_file, 'w') as f:
+            json.dump({'data': problems}, f)
+        
+        # Set up args with confusion matrix saving enabled
+        args = MagicMock()
+        args.checkpoint = str(checkpoint_file)
+        args.data = str(data_file)
+        args.cpu = True
+        args.save_confusion_matrix = True
+        args.output = str(tmp_path / 'eval_cm.png')
+        
+        # Run evaluation
+        evaluate_command(args)
+        
+        # Verify confusion matrix was saved
+        cm_path = tmp_path / 'eval_cm.png'
+        assert cm_path.exists(), f"Confusion matrix not found at {cm_path}"
+        
+        # Verify it's a valid PNG file
+        with open(cm_path, 'rb') as f:
+            header = f.read(8)
+            assert header[:4] == b'\x89PNG', "File is not a valid PNG"
 
 
 class TestPredictCommand:
