@@ -70,19 +70,22 @@ class ConvolutionalModel(nn.Module):
     
     Architecture:
         - Input: (batch, 3, 18, 11) tensor
-        - Conv2d(3 → 16, kernel=3, padding=1) → ReLU → MaxPool2d(2)
-        - Conv2d(16 → 32, kernel=3, padding=1) → ReLU → MaxPool2d(2)
-        - Flatten to (batch, 256)
-        - Linear(256 → 128) → ReLU → Dropout(0.5)
+        - Conv2d(3 → 32, kernel=3, padding=1) → BatchNorm → ReLU → MaxPool2d(2)
+        - Conv2d(32 → 64, kernel=3, padding=1) → BatchNorm → ReLU → MaxPool2d(2)
+        - Conv2d(64 → 128, kernel=3, padding=1) → BatchNorm → ReLU
+        - Flatten to (batch, 512)
+        - Linear(512 → 256) → ReLU → Dropout(0.4)
+        - Linear(256 → 128) → ReLU → Dropout(0.3)
         - Linear(128 → num_classes)
         - Output: (batch, num_classes) logits
         
     The spatial dimensions change as:
-        - After Conv1: (batch, 16, 18, 11)
-        - After Pool1: (batch, 16, 9, 5)
-        - After Conv2: (batch, 32, 9, 5)
-        - After Pool2: (batch, 32, 4, 2)
-        - After Flatten: (batch, 256)
+        - After Conv1: (batch, 32, 18, 11)
+        - After Pool1: (batch, 32, 9, 5)
+        - After Conv2: (batch, 64, 9, 5)
+        - After Pool2: (batch, 64, 4, 2)
+        - After Conv3: (batch, 128, 4, 2)
+        - After Flatten: (batch, 1024)
     """
     
     def __init__(self, num_classes: int = None):
@@ -100,23 +103,34 @@ class ConvolutionalModel(nn.Module):
         
         self.num_classes = num_classes
         
-        # Convolutional layers
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, padding=1)
+        # Convolutional layers with batch normalization
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
         self.relu1 = nn.ReLU()
         self.pool1 = nn.MaxPool2d(kernel_size=2)
         
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
         self.relu2 = nn.ReLU()
         self.pool2 = nn.MaxPool2d(kernel_size=2)
         
-        # Calculate flattened size: 32 channels * 4 height * 2 width = 256
-        self.flattened_size = 32 * 4 * 2
-        
-        # Fully connected layers
-        self.fc1 = nn.Linear(self.flattened_size, 128)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(128)
         self.relu3 = nn.ReLU()
-        self.dropout = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(128, num_classes)
+        
+        # Calculate flattened size: 128 channels * 4 height * 2 width = 1024
+        self.flattened_size = 128 * 4 * 2
+        
+        # Fully connected layers with reduced dropout
+        self.fc1 = nn.Linear(self.flattened_size, 256)
+        self.relu4 = nn.ReLU()
+        self.dropout1 = nn.Dropout(0.4)
+        
+        self.fc2 = nn.Linear(256, 128)
+        self.relu5 = nn.ReLU()
+        self.dropout2 = nn.Dropout(0.3)
+        
+        self.fc3 = nn.Linear(128, num_classes)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -130,21 +144,32 @@ class ConvolutionalModel(nn.Module):
         """
         # Convolutional layers
         x = self.conv1(x)
+        x = self.bn1(x)
         x = self.relu1(x)
         x = self.pool1(x)
         
         x = self.conv2(x)
+        x = self.bn2(x)
         x = self.relu2(x)
         x = self.pool2(x)
+        
+        x = self.conv3(x)
+        x = self.bn3(x)
+        x = self.relu3(x)
         
         # Flatten
         x = x.view(x.size(0), -1)
         
         # Fully connected layers
         x = self.fc1(x)
-        x = self.relu3(x)
-        x = self.dropout(x)
+        x = self.relu4(x)
+        x = self.dropout1(x)
+        
         x = self.fc2(x)
+        x = self.relu5(x)
+        x = self.dropout2(x)
+        
+        x = self.fc3(x)
         
         return x
 

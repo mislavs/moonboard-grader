@@ -124,18 +124,46 @@ def train_command(args):
     # Create optimizer
     optimizer_type = config['training'].get('optimizer', 'adam').lower()
     learning_rate = config['training']['learning_rate']
+    weight_decay = config['training'].get('weight_decay', 0.0001)
     
     if optimizer_type == 'adam':
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     elif optimizer_type == 'sgd':
-        optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
+        optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=weight_decay)
     else:
         raise ValueError(f"Unknown optimizer: {optimizer_type}")
     
-    print(f"   Optimizer: {optimizer_type.upper()} (lr={learning_rate})")
+    print(f"   Optimizer: {optimizer_type.upper()} (lr={learning_rate}, weight_decay={weight_decay})")
     
-    # Create loss criterion
-    criterion = nn.CrossEntropyLoss()
+    # Calculate class weights for imbalanced dataset
+    if config['training'].get('use_class_weights', True):
+        # Count samples per class in training set
+        class_counts = np.bincount(labels[:(len(train_dataset))])
+        total_samples = len(train_dataset)
+        
+        # Calculate weights: inversely proportional to class frequency
+        # weight = total_samples / (num_classes * class_count)
+        class_weights = total_samples / (num_classes * class_counts + 1e-6)
+        class_weights = torch.FloatTensor(class_weights).to(device)
+        
+        print(f"   Using class weights to handle imbalance")
+        criterion = nn.CrossEntropyLoss(weight=class_weights)
+    else:
+        criterion = nn.CrossEntropyLoss()
+    
+    # Create learning rate scheduler
+    use_scheduler = config['training'].get('use_scheduler', True)
+    scheduler = None
+    if use_scheduler:
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode='min',
+            factor=0.5,
+            patience=5,
+            verbose=True,
+            min_lr=1e-6
+        )
+        print(f"   Using ReduceLROnPlateau scheduler (factor=0.5, patience=5)")
     
     # Create checkpoint directory
     checkpoint_dir = Path(config['checkpoint']['dir'])
@@ -149,7 +177,8 @@ def train_command(args):
         optimizer=optimizer,
         criterion=criterion,
         device=device,
-        checkpoint_dir=str(checkpoint_dir)
+        checkpoint_dir=str(checkpoint_dir),
+        scheduler=scheduler
     )
     
     # Train model

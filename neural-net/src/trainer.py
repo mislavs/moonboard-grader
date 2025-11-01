@@ -42,7 +42,8 @@ class Trainer:
         optimizer: torch.optim.Optimizer,
         criterion: nn.Module,
         device: str = 'cpu',
-        checkpoint_dir: str = 'models'
+        checkpoint_dir: str = 'models',
+        scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None
     ):
         """
         Initialize the Trainer.
@@ -55,6 +56,7 @@ class Trainer:
             criterion: Loss function (e.g., nn.CrossEntropyLoss())
             device: Device to train on ('cpu' or 'cuda')
             checkpoint_dir: Directory to save model checkpoints
+            scheduler: Optional learning rate scheduler
             
         Raises:
             ValueError: If train_loader is None or empty
@@ -79,6 +81,7 @@ class Trainer:
         self.criterion = criterion
         self.device = device
         self.checkpoint_dir = Path(checkpoint_dir)
+        self.scheduler = scheduler
         
         # Create checkpoint directory if it doesn't exist
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -247,6 +250,10 @@ class Trainer:
                     print(f"  → New best validation loss: {val_loss:.4f} - Saved checkpoint")
             else:
                 self.epochs_without_improvement += 1
+            
+            # Step the learning rate scheduler if using one
+            if self.scheduler is not None and self.val_loader is not None:
+                self.scheduler.step(val_loss)
             
             # Early stopping check
             if early_stopping_patience is not None and self.val_loader is not None:
