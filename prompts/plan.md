@@ -187,7 +187,7 @@ Combine previous components into end-to-end processing. Load JSON file(s), proce
 
 ---
 
-### Step 6: PyTorch Dataset Class
+### Step 6: PyTorch Dataset Class ✅
 
 **Files**: `src/dataset.py`, `tests/test_dataset.py`
 
@@ -200,6 +200,39 @@ Create PyTorch Dataset class that wraps the processed data. Implement stratified
 - Use scikit-learn's `StratifiedShuffleSplit` for stratification
 
 **Unit Tests**: Test dataset length, test getitem returns (tensor, int), test DataLoader compatibility, verify split ratios, verify stratification
+
+**Status**: COMPLETED
+- Implemented dataset.py with 3 main classes/functions
+- `MoonboardDataset` class inherits from PyTorch Dataset
+  - Accepts numpy arrays of shape (N, 3, 18, 11) for data and (N,) for labels
+  - Handles both 3D single samples and 4D batches
+  - Returns (torch.FloatTensor, int) tuples from __getitem__
+  - Includes get_label_distribution() helper method
+  - Comprehensive validation for shapes, types, and data integrity
+- `create_data_splits()` function for stratified splitting
+  - Uses scikit-learn's StratifiedShuffleSplit for proper stratification
+  - Supports custom train/val/test ratios (default 0.7/0.15/0.15)
+  - Two-stage splitting to preserve grade distribution across all splits
+  - Validates ratios and minimum class counts for stratification
+  - Reproducible with random_state parameter
+- `get_split_info()` helper function for split analysis
+  - Returns total counts, sizes, ratios, and label distributions
+  - Useful for verifying stratification quality
+- Created test_dataset.py with 35 tests covering:
+  - Dataset initialization (numpy arrays, lists, single samples)
+  - __len__ and __getitem__ functionality
+  - PyTorch DataLoader compatibility and iteration
+  - Label distribution calculation
+  - Input validation (shapes, types, lengths)
+  - Data type conversions (float32 for data, int64 for labels)
+  - Stratified split creation with various ratios
+  - Reproducibility with random states
+  - Stratification verification
+  - Edge cases (small datasets, imbalanced classes)
+  - Complete integration workflows
+- All tests passing (35/35) ✓
+- Updated src/__init__.py to export dataset functions
+- Total test suite: 188 tests (188 passing) ✓
 
 ---
 

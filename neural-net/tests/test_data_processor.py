@@ -169,8 +169,8 @@ class TestLoadDataset:
     
     def test_load_example_json(self):
         """Test loading the example.json file"""
-        # This assumes example.json exists in the project root
-        example_path = Path("example.json")
+        # example.json is in the project root (parent directory of neural-net/)
+        example_path = Path(__file__).parent.parent.parent / "example.json"
         if not example_path.exists():
             pytest.skip("example.json not found")
         

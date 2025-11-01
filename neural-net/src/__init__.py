@@ -12,6 +12,7 @@ from . import grade_encoder
 from . import position_parser
 from . import grid_builder
 from . import data_processor
+from . import dataset
 
 # Import commonly used functions
 from .grade_encoder import (
@@ -43,12 +44,19 @@ from .data_processor import (
     load_processed_dataset
 )
 
+from .dataset import (
+    MoonboardDataset,
+    create_data_splits,
+    get_split_info
+)
+
 __all__ = [
     # Modules
     'grade_encoder',
     'position_parser',
     'grid_builder',
     'data_processor',
+    'dataset',
     # Grade encoder functions
     'encode_grade',
     'decode_grade',
@@ -70,4 +78,8 @@ __all__ = [
     'get_dataset_stats',
     'save_processed_dataset',
     'load_processed_dataset',
+    # Dataset functions
+    'MoonboardDataset',
+    'create_data_splits',
+    'get_split_info',
 ]
