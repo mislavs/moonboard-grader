@@ -176,9 +176,9 @@ def train_command(args):
     test_metrics = evaluate_model(model, test_loader, device)
     
     print(f"\n🎯 Test Set Results:")
-    print(f"   Exact Accuracy:  {test_metrics['exact_accuracy']*100:.2f}%")
-    print(f"   ±1 Grade Accuracy: {test_metrics['tolerance_1_accuracy']*100:.2f}%")
-    print(f"   ±2 Grade Accuracy: {test_metrics['tolerance_2_accuracy']*100:.2f}%")
+    print(f"   Exact Accuracy:  {test_metrics['exact_accuracy']:.2f}%")
+    print(f"   ±1 Grade Accuracy: {test_metrics['tolerance_1_accuracy']:.2f}%")
+    print(f"   ±2 Grade Accuracy: {test_metrics['tolerance_2_accuracy']:.2f}%")
     print(f"   Loss: {test_metrics['avg_loss']:.4f}")
     
     # Save confusion matrix if requested
@@ -258,9 +258,9 @@ def evaluate_command(args):
     metrics = evaluate_model(predictor.model, eval_loader, device)
     
     print(f"\n🎯 Evaluation Results:")
-    print(f"   Exact Accuracy:     {metrics['exact_accuracy']*100:.2f}%")
-    print(f"   ±1 Grade Accuracy:  {metrics['tolerance_1_accuracy']*100:.2f}%")
-    print(f"   ±2 Grade Accuracy:  {metrics['tolerance_2_accuracy']*100:.2f}%")
+    print(f"   Exact Accuracy:     {metrics['exact_accuracy']:.2f}%")
+    print(f"   ±1 Grade Accuracy:  {metrics['tolerance_1_accuracy']:.2f}%")
+    print(f"   ±2 Grade Accuracy:  {metrics['tolerance_2_accuracy']:.2f}%")
     print(f"   Loss:               {metrics['avg_loss']:.4f}")
     
     # Get detailed metrics
