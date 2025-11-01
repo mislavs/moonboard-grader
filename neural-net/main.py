@@ -198,8 +198,7 @@ def train_command(args):
             mode='min',
             factor=0.3,      # More aggressive reduction (was 0.5)
             patience=3,      # Faster response to plateaus (was 5)
-            min_lr=1e-7,     # Lower minimum (was 1e-6)
-            verbose=True     # Print when LR changes
+            min_lr=1e-7      # Lower minimum (was 1e-6)
         )
         print(f"   Using ReduceLROnPlateau scheduler (factor=0.3, patience=3)")
     
