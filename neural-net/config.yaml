@@ -1,0 +1,43 @@
+# Moonboard Grade Prediction - Configuration File
+# Adjust these parameters for training and evaluation
+
+# Model Configuration
+model:
+  type: "cnn"  # Options: "fc" (fully connected) or "cnn" (convolutional)
+  num_classes: 19  # Number of Font grade classes (5+ to 8C+)
+
+# Training Configuration
+training:
+  learning_rate: 0.001
+  batch_size: 32
+  num_epochs: 100
+  early_stopping_patience: 10  # Stop if no improvement for N epochs (null to disable)
+  optimizer: "adam"  # Options: "adam", "sgd"
+
+# Data Configuration
+data:
+  path: "data/problems.json"  # Path to training data JSON file
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  random_seed: 42  # For reproducible splits
+
+# Checkpoint Configuration
+checkpoint:
+  dir: "models"  # Directory to save model checkpoints
+  save_best: true  # Save best model based on validation loss
+  save_final: true  # Save final model after training
+
+# Device Configuration
+device: "cuda"  # Options: "cuda" (GPU) or "cpu"
+
+# Evaluation Configuration
+evaluation:
+  tolerance_levels: [1, 2]  # Calculate accuracy within ±N grades
+  save_confusion_matrix: true
+  confusion_matrix_path: "models/confusion_matrix.png"
+
+# Prediction Configuration
+prediction:
+  top_k: 3  # Return top K predictions with probabilities
+

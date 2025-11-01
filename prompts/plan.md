@@ -461,7 +461,7 @@ Create easy-to-use prediction interface that loads a trained model and makes pre
 
 ---
 
-### Step 11: Main CLI Script
+### Step 11: Main CLI Script ✅
 
 **Files**: `main.py`, `config.yaml`
 
@@ -474,6 +474,49 @@ Create command-line interface for training, evaluation, and prediction.
 - `python main.py predict --checkpoint path/to/model.pth --input problem.json`: predict single problem
 
 **config.yaml Should Include**: model type (fc/cnn), learning rate, batch size, epochs, early stopping patience, train/val/test ratios, data path, checkpoint directory
+
+**Status**: COMPLETED
+- Implemented main.py with comprehensive CLI interface
+- Three main commands: train, evaluate, predict
+- `train` command:
+  - Loads config from YAML file
+  - Creates train/val/test splits with stratification
+  - Trains model with early stopping
+  - Saves best and final checkpoints
+  - Saves training history and confusion matrix
+  - Supports both FC and CNN models
+  - Supports Adam and SGD optimizers
+  - Verbose output with emojis and progress tracking
+- `evaluate` command:
+  - Loads trained model from checkpoint
+  - Evaluates on provided dataset
+  - Shows exact, ±1, and ±2 grade accuracy
+  - Displays per-grade precision/recall/F1
+  - Optional confusion matrix visualization
+- `predict` command:
+  - Makes predictions on single or multiple problems
+  - Returns top-K predictions with probabilities
+  - Shows comparison with actual grade if available
+  - Optional JSON output export
+  - Supports both single problem and batch mode
+- Created config.yaml with sensible defaults
+  - Model configuration (type, num_classes)
+  - Training hyperparameters (lr, batch_size, epochs, optimizer)
+  - Data configuration (paths, split ratios, random seed)
+  - Checkpoint settings (directory, save options)
+  - Device configuration (cuda/cpu with auto-fallback)
+  - Evaluation settings (tolerance levels, confusion matrix)
+  - Prediction settings (top_k)
+- Created test_main.py with 18 comprehensive tests covering:
+  - Configuration loading (valid, missing, full config)
+  - Train command (config loading, missing data, actual training)
+  - Evaluate command (missing checkpoint, missing data)
+  - Predict command (missing files, invalid formats, actual predictions)
+  - CLI integration (help messages, subcommands, argument parsing)
+  - Device handling (CUDA fallback to CPU)
+  - Output generation (JSON export, file creation)
+- All tests passing (18/18) ✓
+- Total test suite: 364 tests (360 passing, 4 skipped for CUDA) ✓
 
 ---
 
