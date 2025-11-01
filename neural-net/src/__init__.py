@@ -16,6 +16,7 @@ from . import dataset
 from . import models
 from . import trainer
 from . import evaluator
+from . import predictor
 
 # Import commonly used functions
 from .grade_encoder import (
@@ -75,6 +76,10 @@ from .evaluator import (
     get_metrics_summary
 )
 
+from .predictor import (
+    Predictor
+)
+
 __all__ = [
     # Modules
     'grade_encoder',
@@ -85,6 +90,7 @@ __all__ = [
     'models',
     'trainer',
     'evaluator',
+    'predictor',
     # Grade encoder functions
     'encode_grade',
     'decode_grade',
@@ -126,4 +132,6 @@ __all__ = [
     'per_grade_metrics',
     'calculate_mean_absolute_error',
     'get_metrics_summary',
+    # Predictor functions
+    'Predictor',
 ]
