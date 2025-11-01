@@ -138,7 +138,7 @@ def train_command(args):
     # Calculate class weights for imbalanced dataset
     if config['training'].get('use_class_weights', True):
         # Count samples per class in training set
-        class_counts = np.bincount(labels[:(len(train_dataset))])
+        class_counts = np.bincount(labels[:(len(train_dataset))], minlength=num_classes)
         total_samples = len(train_dataset)
         
         # Calculate weights: inversely proportional to class frequency
