@@ -13,6 +13,7 @@ from . import position_parser
 from . import grid_builder
 from . import data_processor
 from . import dataset
+from . import models
 
 # Import commonly used functions
 from .grade_encoder import (
@@ -50,6 +51,13 @@ from .dataset import (
     get_split_info
 )
 
+from .models import (
+    FullyConnectedModel,
+    ConvolutionalModel,
+    create_model,
+    count_parameters
+)
+
 __all__ = [
     # Modules
     'grade_encoder',
@@ -57,6 +65,7 @@ __all__ = [
     'grid_builder',
     'data_processor',
     'dataset',
+    'models',
     # Grade encoder functions
     'encode_grade',
     'decode_grade',
@@ -82,4 +91,9 @@ __all__ = [
     'MoonboardDataset',
     'create_data_splits',
     'get_split_info',
+    # Model functions
+    'FullyConnectedModel',
+    'ConvolutionalModel',
+    'create_model',
+    'count_parameters',
 ]

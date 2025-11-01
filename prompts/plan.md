@@ -236,11 +236,11 @@ Create PyTorch Dataset class that wraps the processed data. Implement stratified
 
 ---
 
-### Step 7: Model Architectures
+### Step 7: Model Architectures ✅
 
 **Files**: `src/models.py`, `tests/test_models.py`
 
-Implement two PyTorch model architectures for comparison. Both should accept (batch, 3, 11, 18) input and output (batch, num_classes) logits.
+Implement two PyTorch model architectures for comparison. Both should accept (batch, 3, 18, 11) input and output (batch, num_classes) logits.
 
 **Model 1 - Fully Connected**:
 
@@ -248,9 +248,40 @@ Implement two PyTorch model architectures for comparison. Both should accept (ba
 
 **Model 2 - Convolutional**:
 
-- Conv2d(3→16, kernel=3, padding=1) → ReLU → MaxPool2d(2) → Conv2d(16→32, kernel=3, padding=1) → ReLU → MaxPool2d(2) → Flatten → Linear(→128) → ReLU → Dropout(0.5) → Linear(128, num_classes)
+- Conv2d(3→16, kernel=3, padding=1) → ReLU → MaxPool2d(2) → Conv2d(16→32, kernel=3, padding=1) → ReLU → MaxPool2d(2) → Flatten → Linear(256→128) → ReLU → Dropout(0.5) → Linear(128, num_classes)
 
 **Unit Tests**: Test initialization, test forward pass with dummy batch, verify output shape, test backward pass works, test save/load state dict
+
+**Status**: COMPLETED
+- Implemented models.py with two model architectures
+- `FullyConnectedModel` class with 3-layer MLP architecture
+  - Input flattening from (batch, 3, 18, 11) to (batch, 594)
+  - Hidden layers: 594→256→128→num_classes
+  - ReLU activations and 0.3 dropout between layers
+  - Total parameters: 187,667 (for 19 classes)
+- `ConvolutionalModel` class with CNN architecture
+  - Two conv layers with ReLU and max pooling
+  - Spatial dimensions: 18×11 → 9×5 → 4×2
+  - Flattened size: 32×4×2 = 256
+  - FC layers: 256→128→num_classes
+  - Total parameters: 40,435 (for 19 classes)
+- `create_model()` factory function for easy model creation
+- `count_parameters()` helper function for model analysis
+- Created test_models.py with 41 comprehensive tests covering:
+  - Model initialization (default and custom num_classes)
+  - Forward pass shapes (single, batch, large batch)
+  - Output properties (logits, not probabilities)
+  - Backward pass and gradient flow
+  - Model save/load (state_dict and entire model)
+  - Training vs eval modes (dropout behavior)
+  - Factory function and parameter counting
+  - Device movement (CPU/CUDA)
+  - Binary input (realistic hold positions)
+  - Deterministic behavior in eval mode
+  - Edge cases (all zeros, all ones)
+- All tests passing (39 passed, 2 skipped for CUDA) ✓
+- Updated src/__init__.py to export model functions
+- Total test suite: 229 tests (227 passing, 2 skipped) ✓
 
 ---
 
