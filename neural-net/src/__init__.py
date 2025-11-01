@@ -15,6 +15,7 @@ from . import data_processor
 from . import dataset
 from . import models
 from . import trainer
+from . import evaluator
 
 # Import commonly used functions
 from .grade_encoder import (
@@ -63,6 +64,17 @@ from .trainer import (
     Trainer
 )
 
+from .evaluator import (
+    evaluate_model,
+    calculate_exact_accuracy,
+    calculate_tolerance_accuracy,
+    generate_confusion_matrix,
+    plot_confusion_matrix,
+    per_grade_metrics,
+    calculate_mean_absolute_error,
+    get_metrics_summary
+)
+
 __all__ = [
     # Modules
     'grade_encoder',
@@ -72,6 +84,7 @@ __all__ = [
     'dataset',
     'models',
     'trainer',
+    'evaluator',
     # Grade encoder functions
     'encode_grade',
     'decode_grade',
@@ -104,4 +117,13 @@ __all__ = [
     'count_parameters',
     # Trainer functions
     'Trainer',
+    # Evaluator functions
+    'evaluate_model',
+    'calculate_exact_accuracy',
+    'calculate_tolerance_accuracy',
+    'generate_confusion_matrix',
+    'plot_confusion_matrix',
+    'per_grade_metrics',
+    'calculate_mean_absolute_error',
+    'get_metrics_summary',
 ]

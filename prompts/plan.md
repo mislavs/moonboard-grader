@@ -354,7 +354,7 @@ Create Trainer class to manage training loop, validation, checkpointing, and ear
 
 ---
 
-### Step 9: Evaluation Metrics
+### Step 9: Evaluation Metrics ✅
 
 **Files**: `src/evaluator.py`, `tests/test_evaluator.py`
 
@@ -370,6 +370,37 @@ Implement comprehensive evaluation metrics and visualization for model performan
 - `per_grade_metrics(predictions, labels)`: precision/recall/f1 per grade
 
 **Unit Tests**: Test metric calculations with known predictions/labels, test confusion matrix generation, test tolerance accuracy logic
+
+**Status**: COMPLETED
+- Implemented evaluator.py with 8 comprehensive evaluation functions
+- `evaluate_model()` performs full model evaluation on datasets
+  - Returns exact accuracy, tolerance accuracies (±1, ±2), loss, predictions, labels
+  - Automatically sets model to eval mode
+  - Works with any PyTorch DataLoader
+- `calculate_exact_accuracy()` measures perfect grade predictions
+- `calculate_tolerance_accuracy()` measures predictions within ±N grades
+  - Useful for climbing since ±1 grade is still very valuable
+- `calculate_mean_absolute_error()` shows average grade offset
+- `generate_confusion_matrix()` creates confusion matrices using sklearn
+- `plot_confusion_matrix()` generates beautiful visualizations
+  - Supports normalized (percentage) and count modes
+  - Customizable figure size and save paths
+  - Uses seaborn heatmaps for clarity
+- `per_grade_metrics()` calculates precision/recall/F1 per grade
+  - Uses sklearn's precision_recall_fscore_support
+  - Includes support counts for each grade
+- `get_metrics_summary()` provides comprehensive evaluation in one call
+- Created test_evaluator.py with 46 tests covering:
+  - Exact and tolerance accuracy calculations
+  - Confusion matrix generation and visualization
+  - Per-grade metrics (precision, recall, F1, support)
+  - Mean absolute error calculations
+  - Full model evaluation on PyTorch DataLoaders
+  - Edge cases (empty data, mismatched lengths, invalid inputs)
+  - Matplotlib plotting with non-interactive backend (Agg) for Windows compatibility
+- All tests passing (46/46) ✓
+- Updated src/__init__.py to export evaluator functions
+- Total test suite: 309 tests (307 passing, 2 skipped for CUDA) ✓
 
 ---
 
