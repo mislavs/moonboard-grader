@@ -166,8 +166,8 @@ def train_command(args):
     )
     
     # Save training history
+    trainer.save_history("training_history.json")
     history_path = checkpoint_dir / "training_history.json"
-    trainer.save_history(str(history_path))
     print(f"\n✓ Saved training history to: {history_path}")
     
     # Evaluate on test set
@@ -178,7 +178,7 @@ def train_command(args):
     print(f"   Exact Accuracy:  {test_metrics['exact_accuracy']*100:.2f}%")
     print(f"   ±1 Grade Accuracy: {test_metrics['tolerance_1_accuracy']*100:.2f}%")
     print(f"   ±2 Grade Accuracy: {test_metrics['tolerance_2_accuracy']*100:.2f}%")
-    print(f"   Loss: {test_metrics['loss']:.4f}")
+    print(f"   Loss: {test_metrics['avg_loss']:.4f}")
     
     # Save confusion matrix if requested
     if config.get('evaluation', {}).get('save_confusion_matrix', False):

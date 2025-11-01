@@ -181,6 +181,75 @@ class TestTrainCommand:
         # Should raise FileNotFoundError when data file not found
         with pytest.raises(FileNotFoundError):
             train_command(args)
+    
+    def test_train_command_saves_history(self, tmp_path):
+        """Test that training saves history to correct location without path duplication."""
+        config_data = {
+            'model': {'type': 'fc', 'num_classes': 19},
+            'training': {
+                'learning_rate': 0.001,
+                'batch_size': 4,
+                'num_epochs': 2,
+                'early_stopping_patience': None,
+                'optimizer': 'adam'
+            },
+            'data': {
+                'path': str(tmp_path / 'problems.json'),
+                'train_ratio': 0.7,
+                'val_ratio': 0.15,
+                'test_ratio': 0.15,
+                'random_seed': 42
+            },
+            'checkpoint': {
+                'dir': str(tmp_path / 'models'),
+                'save_best': True
+            },
+            'device': 'cpu'
+        }
+        
+        config_file = tmp_path / "config.yaml"
+        with open(config_file, 'w') as f:
+            yaml.dump(config_data, f)
+        
+        # Create minimal dataset with at least 15 problems for splitting
+        problems = []
+        for i in range(15):
+            problems.append({
+                'grade': '6A' if i < 8 else '6B',
+                'moves': [
+                    {'description': 'A1', 'isStart': True, 'isEnd': False},
+                    {'description': 'B5', 'isStart': False, 'isEnd': False},
+                    {'description': 'C10', 'isStart': False, 'isEnd': True}
+                ]
+            })
+        
+        data_file = tmp_path / 'problems.json'
+        with open(data_file, 'w') as f:
+            json.dump({'data': problems}, f)
+        
+        # Mock argparse args
+        args = MagicMock()
+        args.config = str(config_file)
+        
+        # Run training
+        train_command(args)
+        
+        # Verify history file exists in correct location (not duplicated path)
+        history_path = tmp_path / 'models' / 'training_history.json'
+        assert history_path.exists(), f"History file not found at {history_path}"
+        
+        # Verify it's NOT in a duplicated path
+        wrong_path = tmp_path / 'models' / 'models' / 'training_history.json'
+        assert not wrong_path.exists(), f"History file incorrectly saved to duplicated path {wrong_path}"
+        
+        # Verify history contents are valid
+        with open(history_path, 'r') as f:
+            history = json.load(f)
+        
+        assert 'train_loss' in history
+        assert 'val_loss' in history
+        assert 'val_accuracy' in history
+        assert len(history['train_loss']) == 2  # We trained for 2 epochs
 
 
 class TestEvaluateCommand:
