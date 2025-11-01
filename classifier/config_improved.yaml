@@ -1,0 +1,81 @@
+# Moonboard Grade Prediction - Improved Configuration
+# This config uses the new advanced features for better performance
+
+# Model Configuration
+model:
+  type: "residual_cnn"  # Options: "fc", "cnn", "residual_cnn", "deep_residual_cnn"
+  num_classes: 19
+  
+  # ResidualCNN specific parameters
+  use_attention: true  # Enable spatial and channel attention
+  dropout_conv: 0.1    # Dropout in convolutional layers
+  dropout_fc1: 0.3     # Dropout after first FC layer (reduced from 0.5)
+  dropout_fc2: 0.4     # Dropout after second FC layer (reduced from 0.5)
+
+# Training Configuration
+training:
+  learning_rate: 0.0003
+  batch_size: 64
+  num_epochs: 150
+  early_stopping_patience: 10  # Increased from 8
+  optimizer: "adam"
+  weight_decay: 0.0005  # Reduced from 0.001 to reduce overfitting
+  
+  # Loss function configuration (NEW)
+  loss_type: "focal_ordinal"  # Options: "ce", "focal", "ordinal", "focal_ordinal", "label_smoothing"
+  focal_gamma: 2.0             # Focusing parameter for focal loss (1.5-3.0)
+  ordinal_weight: 0.5          # Weight for ordinal component (0.0-1.0)
+  ordinal_alpha: 2.0           # Distance penalty for ordinal loss
+  
+  # Class weighting
+  use_class_weights: true
+  max_class_weight: 5.0
+  
+  # Learning rate scheduler
+  use_scheduler: true
+  scheduler_factor: 0.3      # LR reduction factor
+  scheduler_patience: 3      # Patience before reducing LR
+  
+  # Gradient clipping
+  gradient_clip: 1.0
+
+# Data Configuration
+data:
+  path: "data/problems.json"
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  random_seed: 42
+  
+  # Advanced augmentation (NEW)
+  augmentation: true
+  augmentation_type: "advanced"  # Options: "none", "basic", "advanced"
+  
+  # Advanced augmentation parameters
+  flip_probability: 0.5      # Probability of horizontal flip
+  noise_probability: 0.3     # Probability of adding Gaussian noise
+  noise_level: 0.05          # Standard deviation of noise
+  dropout_probability: 0.2   # Probability of hold dropout
+  dropout_rate: 0.1          # Fraction of holds to drop
+  jitter_probability: 0.3    # Probability of intensity jitter
+  jitter_range: 0.1          # Range of intensity variation
+
+# Checkpoint Configuration
+checkpoint:
+  dir: "models"
+  save_best: true
+  save_final: true
+
+# Device Configuration
+device: "cuda"  # Options: "cuda" (GPU) or "cpu"
+
+# Evaluation Configuration
+evaluation:
+  tolerance_levels: [1, 2]
+  save_confusion_matrix: true
+  confusion_matrix_path: "models/confusion_matrix.png"
+
+# Prediction Configuration
+prediction:
+  top_k: 3
+

@@ -14,7 +14,10 @@ from . import grid_builder
 from . import data_processor
 from . import dataset
 from . import augmentation
+from . import advanced_augmentation
 from . import models
+from . import advanced_models
+from . import losses
 from . import trainer
 from . import evaluator
 from . import predictor
@@ -61,6 +64,30 @@ from .augmentation import (
     no_augmentation
 )
 
+from .advanced_augmentation import (
+    AdvancedMoonboardAugmentation,
+    MixUpAugmentation,
+    CutMixAugmentation,
+    create_augmentation_pipeline
+)
+
+from .advanced_models import (
+    ResidualCNN,
+    DeepResidualCNN,
+    ResidualBlock,
+    SpatialAttention,
+    ChannelAttention,
+    create_advanced_model
+)
+
+from .losses import (
+    FocalLoss,
+    OrdinalCrossEntropyLoss,
+    FocalOrdinalLoss,
+    LabelSmoothingCrossEntropy,
+    create_loss_function
+)
+
 from .models import (
     FullyConnectedModel,
     ConvolutionalModel,
@@ -95,7 +122,10 @@ __all__ = [
     'data_processor',
     'dataset',
     'augmentation',
+    'advanced_augmentation',
     'models',
+    'advanced_models',
+    'losses',
     'trainer',
     'evaluator',
     'predictor',
@@ -128,11 +158,29 @@ __all__ = [
     'MoonboardAugmentation',
     'create_augmentation',
     'no_augmentation',
+    # Advanced augmentation functions
+    'AdvancedMoonboardAugmentation',
+    'MixUpAugmentation',
+    'CutMixAugmentation',
+    'create_augmentation_pipeline',
     # Model functions
     'FullyConnectedModel',
     'ConvolutionalModel',
     'create_model',
     'count_parameters',
+    # Advanced model functions
+    'ResidualCNN',
+    'DeepResidualCNN',
+    'ResidualBlock',
+    'SpatialAttention',
+    'ChannelAttention',
+    'create_advanced_model',
+    # Loss functions
+    'FocalLoss',
+    'OrdinalCrossEntropyLoss',
+    'FocalOrdinalLoss',
+    'LabelSmoothingCrossEntropy',
+    'create_loss_function',
     # Trainer functions
     'Trainer',
     # Evaluator functions

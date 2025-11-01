@@ -122,8 +122,24 @@ def train_command(args):
     # Create augmentation transforms
     use_augmentation = config.get('data', {}).get('augmentation', True)
     flip_prob = config.get('data', {}).get('flip_probability', 0.5)
+    aug_type = config.get('data', {}).get('augmentation_type', 'basic')
     
-    train_transform = create_augmentation(enabled=use_augmentation, flip_prob=flip_prob)
+    # Support advanced augmentation
+    if aug_type == 'advanced' and use_augmentation:
+        from src.advanced_augmentation import create_augmentation_pipeline
+        train_transform = create_augmentation_pipeline(
+            aug_type='advanced',
+            flip_prob=flip_prob,
+            noise_prob=config.get('data', {}).get('noise_probability', 0.3),
+            noise_level=config.get('data', {}).get('noise_level', 0.05),
+            dropout_prob=config.get('data', {}).get('dropout_probability', 0.2),
+            dropout_rate=config.get('data', {}).get('dropout_rate', 0.1),
+            jitter_prob=config.get('data', {}).get('jitter_probability', 0.3),
+            jitter_range=config.get('data', {}).get('jitter_range', 0.1)
+        )
+    else:
+        train_transform = create_augmentation(enabled=use_augmentation, flip_prob=flip_prob)
+    
     val_transform = create_augmentation(enabled=False)  # No augmentation for validation
     test_transform = create_augmentation(enabled=False)  # No augmentation for test
     
@@ -137,7 +153,10 @@ def train_command(args):
     print(f"   Test:  {len(test_dataset)} ({test_ratio*100:.0f}%)")
     
     if use_augmentation:
-        print(f"   Using data augmentation (flip_prob={flip_prob})")
+        if aug_type == 'advanced':
+            print(f"   Using ADVANCED data augmentation (flip, noise, dropout, jitter)")
+        else:
+            print(f"   Using basic data augmentation (flip_prob={flip_prob})")
     
     # Create data loaders
     batch_size = config['training']['batch_size']
@@ -149,7 +168,22 @@ def train_command(args):
     model_type = config['model']['type']
     num_classes = config['model']['num_classes']
     print(f"\n🧠 Creating model: {model_type.upper()}")
-    model = create_model(model_type, num_classes=num_classes)
+    
+    # Support both original and advanced models
+    if model_type in ['residual_cnn', 'deep_residual_cnn']:
+        from src.advanced_models import create_advanced_model
+        model = create_advanced_model(
+            model_type=model_type,
+            num_classes=num_classes,
+            use_attention=config['model'].get('use_attention', True),
+            dropout_conv=config['model'].get('dropout_conv', 0.1),
+            dropout_fc1=config['model'].get('dropout_fc1', 0.3),
+            dropout_fc2=config['model'].get('dropout_fc2', 0.4)
+        )
+        print(f"   Using advanced model with attention: {config['model'].get('use_attention', True)}")
+    else:
+        model = create_model(model_type, num_classes=num_classes)
+    
     model = model.to(device)
     
     num_params = count_parameters(model)
@@ -195,9 +229,29 @@ def train_command(args):
         
         print(f"   Using balanced class weights (capped at {max_weight})")
         print(f"   Weight range: {class_weights.min():.2f} - {class_weights.max():.2f}")
-        criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)
     else:
-        criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+        class_weights = None
+    
+    # Create loss function (support advanced loss functions)
+    loss_type = config['training'].get('loss_type', 'ce')
+    if loss_type != 'ce':
+        from src.losses import create_loss_function
+        criterion = create_loss_function(
+            loss_type=loss_type,
+            num_classes=num_classes,
+            class_weights=class_weights,
+            gamma=config['training'].get('focal_gamma', 2.0),
+            ordinal_weight=config['training'].get('ordinal_weight', 0.5),
+            ordinal_alpha=config['training'].get('ordinal_alpha', 2.0),
+            smoothing=label_smoothing
+        )
+        print(f"   Using {loss_type} loss")
+        if loss_type in ['focal', 'focal_ordinal']:
+            print(f"   Focal gamma: {config['training'].get('focal_gamma', 2.0)}")
+        if loss_type in ['ordinal', 'focal_ordinal']:
+            print(f"   Ordinal alpha: {config['training'].get('ordinal_alpha', 2.0)}")
+    else:
+        criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)
     
     if label_smoothing > 0:
         print(f"   Using label smoothing: {label_smoothing}")
