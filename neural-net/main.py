@@ -160,7 +160,6 @@ def train_command(args):
             mode='min',
             factor=0.5,
             patience=5,
-            verbose=True,
             min_lr=1e-6
         )
         print(f"   Using ReduceLROnPlateau scheduler (factor=0.5, patience=5)")
