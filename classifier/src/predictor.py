@@ -123,10 +123,10 @@ class Predictor:
             # network.7 is the final Linear layer
             num_classes = state_dict['network.7.weight'].shape[0]
             return FullyConnectedModel(num_classes=num_classes)
-        elif 'fc2.weight' in state_dict:
+        elif 'fc3.weight' in state_dict:
             # Convolutional Model
-            # fc2 is the final Linear layer
-            num_classes = state_dict['fc2.weight'].shape[0]
+            # fc3 is the final Linear layer
+            num_classes = state_dict['fc3.weight'].shape[0]
             return ConvolutionalModel(num_classes=num_classes)
         else:
             raise ValueError(
@@ -370,8 +370,8 @@ class Predictor:
             # Fully connected model - final layer is network[7]
             num_classes = self.model.network[7].out_features
         elif isinstance(self.model, ConvolutionalModel):
-            # Convolutional model - final layer is fc2
-            num_classes = self.model.fc2.out_features
+            # Convolutional model - final layer is fc3
+            num_classes = self.model.fc3.out_features
         else:
             num_classes = get_num_grades()
         

@@ -90,7 +90,6 @@ class PredictionResponse(BaseModel):
     predicted_grade: str = Field(..., description="Most likely grade")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in prediction")
     top_k_predictions: List[TopKPrediction] = Field(..., description="Top K most likely grades")
-    all_probabilities: Optional[Dict[str, float]] = Field(None, description="All grade probabilities")
     
     class Config:
         json_schema_extra = {
@@ -110,6 +109,9 @@ class HealthResponse(BaseModel):
     """Health check response"""
     status: str = Field(..., description="Service status")
     model_loaded: bool = Field(..., description="Whether the model is loaded")
+    
+    class Config:
+        protected_namespaces = ()
 
 
 class ModelInfoResponse(BaseModel):
@@ -117,6 +119,9 @@ class ModelInfoResponse(BaseModel):
     model_path: str = Field(..., description="Path to the loaded model")
     device: str = Field(..., description="Device used for inference (cpu/cuda)")
     model_exists: bool = Field(..., description="Whether the model file exists")
+    
+    class Config:
+        protected_namespaces = ()
 
 
 # Startup event - load the model
@@ -226,8 +231,7 @@ async def predict_grade(request: ProblemRequest):
         response = PredictionResponse(
             predicted_grade=result['predicted_grade'],
             confidence=result['confidence'],
-            top_k_predictions=top_k_formatted,
-            all_probabilities=result.get('all_probabilities')
+            top_k_predictions=top_k_formatted
         )
         
         return response
