@@ -1,4 +1,5 @@
 import type { GridPosition } from '../types/problem';
+import { BOARD_CONFIG } from '../constants/boardConfig';
 
 /**
  * Parse a move description (e.g., "J4", "A16") into grid coordinates
@@ -18,22 +19,17 @@ export function gridToPixel(
   boardWidth: number,
   boardHeight: number
 ): { x: number; y: number } {
-  const cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
-  const colIndex = cols.indexOf(position.col);
+  const { columns, rows, margins } = BOARD_CONFIG;
+  const colIndex = columns.indexOf(position.col as typeof columns[number]);
   
-  const leftMargin = 65;
-  const topMargin = 80;
-  const rightMargin = 30;
-  const bottomMargin = 55;
+  const gridWidth = boardWidth - margins.left - margins.right;
+  const gridHeight = boardHeight - margins.top - margins.bottom;
   
-  const gridWidth = boardWidth - leftMargin - rightMargin;
-  const gridHeight = boardHeight - topMargin - bottomMargin;
+  const colSpacing = gridWidth / (columns.length - 1);
+  const rowSpacing = gridHeight / (rows - 1);
   
-  const colSpacing = gridWidth / (cols.length - 1);
-  const rowSpacing = gridHeight / (18 - 1);
-  
-  const x = leftMargin + (colSpacing * colIndex);
-  const y = topMargin + gridHeight - (rowSpacing * (position.row - 1));
+  const x = margins.left + (colSpacing * colIndex);
+  const y = margins.top + gridHeight - (rowSpacing * (position.row - 1));
   
   return { x, y };
 }
