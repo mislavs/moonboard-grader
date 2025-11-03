@@ -15,6 +15,7 @@ import numpy as np
 from .grade_encoder import decode_grade, get_num_grades
 from .grid_builder import create_grid_tensor
 from .models import FullyConnectedModel, ConvolutionalModel
+from .advanced_models import ResidualCNN
 
 
 class Predictor:
@@ -106,8 +107,18 @@ class Predictor:
         Raises:
             ValueError: If architecture cannot be inferred
         """
+        # Check for advanced model (has residual blocks or attention)
+        if any(key.startswith('res') for key in state_dict.keys()) or \
+           any(key.startswith('att') for key in state_dict.keys()):
+            # Residual CNN with residual blocks and attention
+            # fc3 is the final Linear layer
+            if 'fc3.weight' in state_dict:
+                num_classes = state_dict['fc3.weight'].shape[0]
+            else:
+                num_classes = get_num_grades()
+            return ResidualCNN(num_classes=num_classes)
         # Get number of classes from final layer
-        if 'network.7.weight' in state_dict:
+        elif 'network.7.weight' in state_dict:
             # Fully Connected Model (Sequential container)
             # network.7 is the final Linear layer
             num_classes = state_dict['network.7.weight'].shape[0]
