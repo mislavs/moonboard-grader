@@ -8,19 +8,19 @@
 - ⏭️ Add moonboard image to `/assets` (will add when needed in Step 2)
 - ✅ Verify app runs with "Hello World"
 
-## Step 2: Display Hardcoded Problem
+## Step 2: Display Hardcoded Problem ✅ COMPLETED
 
-- Create TypeScript types for Problem, Move, etc. based on JSON structure
-- Create `MoonBoard` component:
-- Display moonboard image as background
-- Create absolute positioning overlay for holds
-- Calculate grid positions (11 cols × 18 rows, A-K, 1-18)
-- Hardcode a problem JSON in the component
-- Render colored circles over holds:
-- Green circle for start holds (isStart: true)
-- Red circle for end holds (isEnd: true)
-- Blue circle for intermediate holds
-- Display problem name and grade above the board
+- ✅ Create TypeScript types for Problem, Move, etc. based on JSON structure
+- ✅ Create `MoonBoard` component:
+  - ✅ Display moonboard grid as SVG background
+  - ✅ Create absolute positioning overlay for holds
+  - ✅ Calculate grid positions (11 cols × 18 rows, A-K, 1-18)
+  - ✅ Hardcode a problem JSON in the component (App.tsx)
+  - ✅ Render colored circles over holds:
+    - ✅ Green circle for start holds (isStart: true)
+    - ✅ Red circle for end holds (isEnd: true)
+    - ✅ Blue circle for intermediate holds
+  - ✅ Display problem name and grade above the board
 
 ## Step 3: Problem Creator
 
