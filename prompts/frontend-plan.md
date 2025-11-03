@@ -1,12 +1,12 @@
 # Moonboard Grader Frontend Plan
 
-## Step 1: Project Setup (Hello World)
+## Step 1: Project Setup (Hello World) ✅ COMPLETED
 
-- Create new Vite + React + TypeScript project in `/frontend` directory
-- Install and configure TailwindCSS
-- Create basic folder structure: `/components`, `/types`, `/utils`, `/assets`
-- Add moonboard image to `/assets`
-- Verify app runs with "Hello World"
+- ✅ Create new Vite + React + TypeScript project in `/frontend` directory
+- ✅ Install and configure TailwindCSS
+- ✅ Create basic folder structure: `/components`, `/types`, `/utils`, `/assets`
+- ⏭️ Add moonboard image to `/assets` (will add when needed in Step 2)
+- ✅ Verify app runs with "Hello World"
 
 ## Step 2: Display Hardcoded Problem
 
