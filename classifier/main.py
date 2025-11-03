@@ -169,20 +169,24 @@ def train_command(args):
     num_classes = config['model']['num_classes']
     print(f"\n🧠 Creating model: {model_type.upper()}")
     
-    # Support both original and advanced models
+    # Extract model-specific parameters from config
+    model_params = {
+        'use_attention': config['model'].get('use_attention', True),
+        'dropout_conv': config['model'].get('dropout_conv', 0.1),
+        'dropout_fc1': config['model'].get('dropout_fc1', 0.3),
+        'dropout_fc2': config['model'].get('dropout_fc2', 0.4)
+    }
+    
+    # Create model using unified factory (handles all model types)
+    model = create_model(
+        model_type=model_type,
+        num_classes=num_classes,
+        **model_params
+    )
+    
+    # Print model-specific info
     if model_type in ['residual_cnn', 'deep_residual_cnn']:
-        from src.advanced_models import create_advanced_model
-        model = create_advanced_model(
-            model_type=model_type,
-            num_classes=num_classes,
-            use_attention=config['model'].get('use_attention', True),
-            dropout_conv=config['model'].get('dropout_conv', 0.1),
-            dropout_fc1=config['model'].get('dropout_fc1', 0.3),
-            dropout_fc2=config['model'].get('dropout_fc2', 0.4)
-        )
-        print(f"   Using advanced model with attention: {config['model'].get('use_attention', True)}")
-    else:
-        model = create_model(model_type, num_classes=num_classes)
+        print(f"   Using advanced model with attention: {model_params['use_attention']}")
     
     model = model.to(device)
     

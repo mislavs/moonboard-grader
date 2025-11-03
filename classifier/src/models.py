@@ -176,33 +176,60 @@ class ConvolutionalModel(nn.Module):
 
 def create_model(
     model_type: Literal["fc", "cnn"] = "fc",
-    num_classes: int = None
+    num_classes: int = None,
+    **kwargs
 ) -> nn.Module:
     """
-    Factory function to create a model instance.
+    Unified factory function to create any model instance.
+    
+    This function creates both basic models (fc, cnn) and advanced models
+    (residual_cnn, deep_residual_cnn) based on the model_type parameter.
     
     Args:
-        model_type: Type of model to create. Either "fc" for fully connected
-                   or "cnn" for convolutional.
+        model_type: Type of model to create. Options:
+                   - "fc": Fully connected network
+                   - "cnn": Convolutional network
+                   - "residual_cnn": Residual CNN with attention
+                   - "deep_residual_cnn": Deeper residual CNN
         num_classes: Number of grade classes to predict.
                     If None, uses get_num_grades() (19 classes).
+        **kwargs: Additional model-specific parameters:
+                 - use_attention (bool): Enable attention mechanisms (for residual models)
+                 - dropout_conv (float): Dropout in conv layers (for residual models)
+                 - dropout_fc1 (float): Dropout after first FC layer (for residual models)
+                 - dropout_fc2 (float): Dropout after second FC layer (for residual models)
     
     Returns:
         Initialized PyTorch model.
         
     Raises:
-        ValueError: If model_type is not "fc" or "cnn".
+        ValueError: If model_type is not recognized.
         
     Examples:
+        >>> # Basic models
         >>> fc_model = create_model("fc")
         >>> cnn_model = create_model("cnn", num_classes=19)
+        
+        >>> # Advanced models
+        >>> res_model = create_model("residual_cnn", use_attention=True)
+        >>> deep_model = create_model("deep_residual_cnn", dropout_fc1=0.3)
     """
+    # Basic models
     if model_type == "fc":
         return FullyConnectedModel(num_classes)
     elif model_type == "cnn":
         return ConvolutionalModel(num_classes)
+    
+    # Advanced models - import lazily to avoid circular dependencies
+    elif model_type in ["residual_cnn", "deep_residual_cnn"]:
+        from .advanced_models import create_advanced_model
+        return create_advanced_model(model_type=model_type, num_classes=num_classes, **kwargs)
+    
     else:
-        raise ValueError(f"Invalid model_type '{model_type}'. Must be 'fc' or 'cnn'.")
+        raise ValueError(
+            f"Invalid model_type '{model_type}'. "
+            f"Must be one of: 'fc', 'cnn', 'residual_cnn', 'deep_residual_cnn'."
+        )
 
 
 def count_parameters(model: nn.Module) -> int:
