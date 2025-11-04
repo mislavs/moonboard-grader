@@ -6,7 +6,7 @@ Create two new FastAPI endpoints to serve problem data from a JSON file: a list 
 
 ## Implementation Steps
 
-### 1. Add Configuration and Schema Models
+### 1. Add Configuration and Schema Models ✅ COMPLETED
 
 **Files:**
 
@@ -22,6 +22,8 @@ Add new Pydantic models for problem data:
 - `ProblemDetail`: Complete problem data for the detail endpoint
 
 These schemas will mirror the structure in `classifier/data/problems.json` and the frontend's `problem.ts` types.
+
+**Status:** ✅ Added config setting and all three schema models
 
 ### 2. Create Problem Service with Tests
 

@@ -4,26 +4,26 @@ Pydantic models for request/response validation.
 Defines all data schemas used by the API endpoints.
 """
 
-from pydantic import BaseModel, Field
-from typing import List
+from pydantic import BaseModel, Field, ConfigDict
+from typing import List, Optional
 
 
 class Move(BaseModel):
-    """Represents a single climbing hold/move."""
+    """Represents a single climbing hold/move for prediction requests."""
     
     description: str = Field(..., description="Hold position (e.g., 'A1', 'B5')")
     isStart: bool = Field(default=False, description="Whether this is a starting hold")
     isEnd: bool = Field(default=False, description="Whether this is a finishing hold")
     
-    model_config = {
-        "json_schema_extra": {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "description": "A1",
                 "isStart": True,
                 "isEnd": False
             }
         }
-    }
+    )
 
 
 class ProblemRequest(BaseModel):
@@ -32,8 +32,8 @@ class ProblemRequest(BaseModel):
     moves: List[Move] = Field(..., description="List of holds/moves in the problem")
     top_k: int = Field(default=3, ge=1, le=10, description="Number of top predictions to return")
     
-    model_config = {
-        "json_schema_extra": {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "moves": [
                     {"description": "A1", "isStart": True, "isEnd": False},
@@ -43,7 +43,7 @@ class ProblemRequest(BaseModel):
                 "top_k": 3
             }
         }
-    }
+    )
 
 
 class TopKPrediction(BaseModel):
@@ -63,8 +63,8 @@ class PredictionResponse(BaseModel):
         description="Top K most likely grades"
     )
     
-    model_config = {
-        "json_schema_extra": {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "predicted_grade": "6B+",
                 "confidence": 0.87,
@@ -75,7 +75,7 @@ class PredictionResponse(BaseModel):
                 ]
             }
         }
-    }
+    )
 
 
 class HealthResponse(BaseModel):
@@ -84,9 +84,7 @@ class HealthResponse(BaseModel):
     status: str = Field(..., description="Service status")
     model_loaded: bool = Field(..., description="Whether the model is loaded")
     
-    model_config = {
-        "protected_namespaces": ()
-    }
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class ModelInfoResponse(BaseModel):
@@ -96,7 +94,80 @@ class ModelInfoResponse(BaseModel):
     device: str = Field(..., description="Device used for inference (cpu/cuda)")
     model_exists: bool = Field(..., description="Whether the model file exists")
     
-    model_config = {
-        "protected_namespaces": ()
-    }
+    model_config = ConfigDict(protected_namespaces=())
 
+
+# ============================================================================
+# Problem Data Schemas
+# ============================================================================
+
+
+class ProblemMove(BaseModel):
+    """Move data from the problems JSON file (read-only from database)."""
+    
+    problemId: int = Field(..., description="ID of the problem this move belongs to")
+    description: str = Field(..., description="Hold position (e.g., 'A1', 'B5')")
+    isStart: bool = Field(..., description="Whether this is a starting hold")
+    isEnd: bool = Field(..., description="Whether this is a finishing hold")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "problemId": 305445,
+                "description": "J4",
+                "isStart": True,
+                "isEnd": False
+            }
+        }
+    )
+
+
+class ProblemListItem(BaseModel):
+    """Basic problem information for list endpoint (lightweight response)."""
+    
+    apiId: int = Field(..., description="Unique identifier for the problem")
+    name: str = Field(..., description="Problem name")
+    grade: str = Field(..., description="Problem grade")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "apiId": 305445,
+                "name": "Fat Guy In A Little Suit",
+                "grade": "6B+"
+            }
+        }
+    )
+
+
+class ProblemDetail(BaseModel):
+    """Complete problem data for detail endpoint."""
+    
+    apiId: int = Field(..., description="Unique identifier for the problem")
+    name: str = Field(..., description="Problem name")
+    grade: str = Field(..., description="Problem grade")
+    moves: List[ProblemMove] = Field(..., description="List of moves in the problem")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "apiId": 305445,
+                "name": "Fat Guy In A Little Suit",
+                "grade": "6B+",
+                "moves": [
+                    {
+                        "problemId": 305445,
+                        "description": "J4",
+                        "isStart": True,
+                        "isEnd": False
+                    },
+                    {
+                        "problemId": 305445,
+                        "description": "F18",
+                        "isStart": False,
+                        "isEnd": True
+                    }
+                ]
+            }
+        }
+    )

@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     )
     device: str = Field(default="cpu", description="Device for inference (cpu/cuda)")
     
+    # Data Configuration
+    problems_data_path: Path = Field(
+        default=Path("../classifier/data/problems.json"),
+        description="Path to the problems data JSON file"
+    )
+    
     # Logging Configuration
     log_level: str = Field(default="INFO", description="Logging level")
     
