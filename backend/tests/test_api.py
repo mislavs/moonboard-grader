@@ -85,7 +85,7 @@ class TestPredictEndpoint:
         invalid_request = {"top_k": 3}
         response = client_with_loaded_model.post("/predict", json=invalid_request)
         
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     
     def test_predict_invalid_request_empty_moves(self, client_with_loaded_model, mock_predictor):
         """Test prediction with empty moves list."""
@@ -104,14 +104,14 @@ class TestPredictEndpoint:
         sample_problem_request["top_k"] = 0
         response = client_with_loaded_model.post("/predict", json=sample_problem_request)
         
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     
     def test_predict_invalid_top_k_too_large(self, client_with_loaded_model, sample_problem_request):
         """Test prediction with top_k too large."""
         sample_problem_request["top_k"] = 11
         response = client_with_loaded_model.post("/predict", json=sample_problem_request)
         
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     
     def test_predict_custom_top_k(self, client_with_loaded_model, sample_problem_request):
         """Test prediction with custom top_k value."""
@@ -133,7 +133,7 @@ class TestPredictEndpoint:
         }
         response = client_with_loaded_model.post("/predict", json=invalid_request)
         
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 class TestCORS:
