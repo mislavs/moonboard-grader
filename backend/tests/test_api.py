@@ -209,13 +209,13 @@ class TestProblemsEndpoint:
         assert len(items) == 2
         
         # Check first problem
-        assert items[0]["apiId"] == SAMPLE_PROBLEM_ID_1
+        assert items[0]["id"] == SAMPLE_PROBLEM_ID_1
         assert items[0]["name"] == "Fat Guy In A Little Suit"
         assert items[0]["grade"] == "6B+"
         assert "moves" not in items[0]  # List endpoint should not include moves
         
         # Check second problem
-        assert items[1]["apiId"] == SAMPLE_PROBLEM_ID_2
+        assert items[1]["id"] == SAMPLE_PROBLEM_ID_2
         assert items[1]["name"] == "Test Problem"
         assert items[1]["grade"] == "7A"
     
@@ -231,7 +231,7 @@ class TestProblemsEndpoint:
         assert data["page_size"] == 1
         assert data["total_pages"] == 2
         assert len(data["items"]) == 1
-        assert data["items"][0]["apiId"] == SAMPLE_PROBLEM_ID_1
+        assert data["items"][0]["id"] == SAMPLE_PROBLEM_ID_1
     
     def test_get_problems_list_second_page(self, client_with_problem_service):
         """Test GET /problems for second page."""
@@ -245,7 +245,7 @@ class TestProblemsEndpoint:
         assert data["page_size"] == 1
         assert data["total_pages"] == 2
         assert len(data["items"]) == 1
-        assert data["items"][0]["apiId"] == SAMPLE_PROBLEM_ID_2
+        assert data["items"][0]["id"] == SAMPLE_PROBLEM_ID_2
     
     def test_get_problems_list_page_beyond_range(self, client_with_problem_service):
         """Test GET /problems for page beyond available data."""
@@ -297,7 +297,7 @@ class TestProblemsEndpoint:
         
         # Verify each item has required fields with correct types
         for problem in data["items"]:
-            assert "apiId" in problem and isinstance(problem["apiId"], int)
+            assert "id" in problem and isinstance(problem["id"], int)
             assert "name" in problem and isinstance(problem["name"], str)
             assert "grade" in problem and isinstance(problem["grade"], str)
 
@@ -306,14 +306,14 @@ class TestProblemDetailEndpoint:
     """Test suite for problem detail endpoint."""
     
     def test_get_problem_by_id(self, client_with_problem_service):
-        """Test GET /problems/{api_id} returns full problem details."""
+        """Test GET /problems/{id} returns full problem details."""
         response = client_with_problem_service.get(f"/problems/{SAMPLE_PROBLEM_ID_1}")
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         
         # Check basic fields
-        assert data["apiId"] == SAMPLE_PROBLEM_ID_1
+        assert data["id"] == SAMPLE_PROBLEM_ID_1
         assert data["name"] == "Fat Guy In A Little Suit"
         assert data["grade"] == "6B+"
         
@@ -322,15 +322,15 @@ class TestProblemDetailEndpoint:
         assert isinstance(data["moves"], list)
         assert len(data["moves"]) == 2
         
-        # Check first move structure
+        # Check first move structure (problemId should be removed)
         move = data["moves"][0]
-        assert move["problemId"] == SAMPLE_PROBLEM_ID_1
+        assert "problemId" not in move
         assert move["description"] == "J4"
         assert move["isStart"] is True
         assert move["isEnd"] is False
     
     def test_get_problem_by_id_not_found(self, client_with_problem_service):
-        """Test GET /problems/{api_id} with invalid ID returns 404."""
+        """Test GET /problems/{id} with invalid ID returns 404."""
         response = client_with_problem_service.get("/problems/999999")
         
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -344,15 +344,15 @@ class TestProblemDetailEndpoint:
         data = response.json()
         
         # Verify required fields with correct types
-        assert "apiId" in data and isinstance(data["apiId"], int)
+        assert "id" in data and isinstance(data["id"], int)
         assert "name" in data and isinstance(data["name"], str)
         assert "grade" in data and isinstance(data["grade"], str)
         assert "moves" in data and isinstance(data["moves"], list)
         
-        # Verify move structure
+        # Verify move structure (problemId should be removed)
         for move in data["moves"]:
-            assert all(key in move for key in ["problemId", "description", "isStart", "isEnd"])
-            assert isinstance(move["problemId"], int)
+            assert "problemId" not in move
+            assert all(key in move for key in ["description", "isStart", "isEnd"])
             assert isinstance(move["description"], str)
             assert isinstance(move["isStart"], bool)
             assert isinstance(move["isEnd"], bool)

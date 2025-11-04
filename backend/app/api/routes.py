@@ -166,7 +166,7 @@ async def get_problems_list(
     """
     Get paginated list of problems with basic information.
     
-    Returns a paginated list of problems containing only apiId, name, and grade.
+    Returns a paginated list of problems containing only id, name, and grade.
     Useful for dropdowns and problem selection interfaces.
     
     Args:
@@ -195,9 +195,9 @@ async def get_problems_list(
         raise _handle_problem_service_error(e)
 
 
-@router.get("/problems/{api_id}", response_model=ProblemDetail, tags=["Problems"])
+@router.get("/problems/{id}", response_model=ProblemDetail, tags=["Problems"])
 async def get_problem_detail(
-    api_id: int,
+    id: int,
     problem_service: ProblemService = Depends(get_problem_service)
 ):
     """
@@ -206,7 +206,7 @@ async def get_problem_detail(
     Returns complete problem data including all moves for the specified problem.
     
     Args:
-        api_id: The unique identifier (apiId) of the problem
+        id: The unique identifier of the problem
         problem_service: Injected problem service (dependency)
         
     Returns:
@@ -216,13 +216,13 @@ async def get_problem_detail(
         HTTPException: 404 if problem not found, 500 for other errors
     """
     try:
-        problem = problem_service.get_problem_by_id(api_id)
+        problem = problem_service.get_problem_by_id(id)
         if problem is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Problem with apiId {api_id} not found"
+                detail=f"Problem with id {id} not found"
             )
         return problem
     except Exception as e:
-        raise _handle_problem_service_error(e, f"loading problem {api_id}")
+        raise _handle_problem_service_error(e, f"loading problem {id}")
 

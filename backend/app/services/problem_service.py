@@ -97,7 +97,6 @@ class ProblemService:
         """
         return [
             ProblemMove(
-                problemId=move.get('problemId', 0),
                 description=move.get('description', ''),
                 isStart=move.get('isStart', False),
                 isEnd=move.get('isEnd', False)
@@ -119,7 +118,7 @@ class ProblemService:
         moves = self._parse_problem_moves(problem.get('moves', []))
         
         return ProblemDetail(
-            apiId=api_id,
+            id=api_id,
             name=problem.get('name', 'Unnamed'),
             grade=problem.get('grade', 'Unknown'),
             moves=moves
@@ -151,7 +150,7 @@ class ProblemService:
                     continue
                 
                 result.append(ProblemListItem(
-                    apiId=api_id,
+                    id=api_id,
                     name=problem.get('name', 'Unnamed'),
                     grade=problem.get('grade', 'Unknown')
                 ))

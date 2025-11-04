@@ -162,12 +162,12 @@ class TestProblemService:
         assert all(isinstance(p, ProblemListItem) for p in problems)
         
         # Check first problem
-        assert problems[0].apiId == 1001
+        assert problems[0].id == 1001
         assert problems[0].name == "Test Problem 1"
         assert problems[0].grade == "6B+"
         
         # Check second problem
-        assert problems[1].apiId == 1002
+        assert problems[1].id == 1002
         assert problems[1].name == "Test Problem 2"
         assert problems[1].grade == "7A"
     
@@ -178,15 +178,15 @@ class TestProblemService:
         
         assert total == 3
         assert len(problems_page1) == 2
-        assert problems_page1[0].apiId == 1001
-        assert problems_page1[1].apiId == 1002
+        assert problems_page1[0].id == 1001
+        assert problems_page1[1].id == 1002
         
         # Get second page
         problems_page2, total = problem_service.get_all_problems(page=2, page_size=2)
         
         assert total == 3
         assert len(problems_page2) == 1
-        assert problems_page2[0].apiId == 1003
+        assert problems_page2[0].id == 1003
     
     def test_get_all_problems_page_beyond_range(self, problem_service: ProblemService):
         """Test getting a page beyond available data."""
@@ -201,7 +201,7 @@ class TestProblemService:
         
         assert total == 3
         assert len(problems) == 1
-        assert problems[0].apiId == 1001
+        assert problems[0].id == 1001
     
     def test_get_all_problems_with_missing_apiid(self, tmp_path: Path):
         """Test getting problems when some have missing apiId."""
@@ -234,7 +234,7 @@ class TestProblemService:
         # Should only return the problem with valid apiId
         assert total == 1
         assert len(problems) == 1
-        assert problems[0].apiId == 1001
+        assert problems[0].id == 1001
     
     def test_get_problem_by_id_found(self, problem_service: ProblemService):
         """Test getting a specific problem by ID."""
@@ -242,12 +242,13 @@ class TestProblemService:
         
         assert problem is not None
         assert isinstance(problem, ProblemDetail)
-        assert problem.apiId == 1001
+        assert problem.id == 1001
         assert problem.name == "Test Problem 1"
         assert problem.grade == "6B+"
         assert len(problem.moves) == 2
         
-        # Check moves
+        # Check moves (problemId should be removed)
+        assert "problemId" not in problem.moves[0].model_dump()
         assert problem.moves[0].description == "A1"
         assert problem.moves[0].isStart is True
         assert problem.moves[0].isEnd is False
@@ -266,7 +267,7 @@ class TestProblemService:
         problem = problem_service.get_problem_by_id(1003)
         
         assert problem is not None
-        assert problem.apiId == 1003
+        assert problem.id == 1003
         assert problem.name == "Test Problem 3"
         assert problem.grade == "6C"
         assert len(problem.moves) == 0
@@ -299,7 +300,7 @@ class TestProblemService:
         assert problem_service.problem_count == 1
         problems, total = problem_service.get_all_problems()
         assert total == 1
-        assert problems[0].apiId == 2001
+        assert problems[0].id == 2001
         assert problems[0].name == "New Problem"
     
     def test_ensure_loaded_lazy_loading(self, problem_service: ProblemService):

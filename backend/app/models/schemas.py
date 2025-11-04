@@ -105,7 +105,6 @@ class ModelInfoResponse(BaseModel):
 class ProblemMove(BaseModel):
     """Move data from the problems JSON file (read-only from database)."""
     
-    problemId: int = Field(..., description="ID of the problem this move belongs to")
     description: str = Field(..., description="Hold position (e.g., 'A1', 'B5')")
     isStart: bool = Field(..., description="Whether this is a starting hold")
     isEnd: bool = Field(..., description="Whether this is a finishing hold")
@@ -113,7 +112,6 @@ class ProblemMove(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "problemId": 305445,
                 "description": "J4",
                 "isStart": True,
                 "isEnd": False
@@ -125,14 +123,14 @@ class ProblemMove(BaseModel):
 class ProblemListItem(BaseModel):
     """Basic problem information for list endpoint (lightweight response)."""
     
-    apiId: int = Field(..., description="Unique identifier for the problem")
+    id: int = Field(..., description="Unique identifier for the problem")
     name: str = Field(..., description="Problem name")
     grade: str = Field(..., description="Problem grade")
     
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "apiId": 305445,
+                "id": 305445,
                 "name": "Fat Guy In A Little Suit",
                 "grade": "6B+"
             }
@@ -143,7 +141,7 @@ class ProblemListItem(BaseModel):
 class ProblemDetail(BaseModel):
     """Complete problem data for detail endpoint."""
     
-    apiId: int = Field(..., description="Unique identifier for the problem")
+    id: int = Field(..., description="Unique identifier for the problem")
     name: str = Field(..., description="Problem name")
     grade: str = Field(..., description="Problem grade")
     moves: List[ProblemMove] = Field(..., description="List of moves in the problem")
@@ -151,18 +149,16 @@ class ProblemDetail(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "apiId": 305445,
+                "id": 305445,
                 "name": "Fat Guy In A Little Suit",
                 "grade": "6B+",
                 "moves": [
                     {
-                        "problemId": 305445,
                         "description": "J4",
                         "isStart": True,
                         "isEnd": False
                     },
                     {
-                        "problemId": 305445,
                         "description": "F18",
                         "isStart": False,
                         "isEnd": True
@@ -187,12 +183,12 @@ class PaginatedProblemsResponse(BaseModel):
             "example": {
                 "items": [
                     {
-                        "apiId": 305445,
+                        "id": 305445,
                         "name": "Fat Guy In A Little Suit",
                         "grade": "6B+"
                     },
                     {
-                        "apiId": 305446,
+                        "id": 305446,
                         "name": "Another Problem",
                         "grade": "7A"
                     }
