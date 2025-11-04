@@ -1,15 +1,43 @@
 import type { Move } from '../types/problem';
-import { parsePosition, gridToPixel } from '../utils/gridParser';
+import { parsePosition, gridToPixel, pixelToGrid, formatPosition } from '../utils/gridParser';
 import { getHoldColor } from '../utils/holdUtils';
+import { getNextMoveState } from '../utils/moveStateManager';
 import { BOARD_CONFIG } from '../constants/boardConfig';
 import moonboardImage from '../assets/moonboard.jpg';
 
-interface BoardCanvasProps {
+interface BoardCanvasViewProps {
   moves: Move[];
+  mode: 'view';
+  onMovesChange?: never;
 }
 
-export default function BoardCanvas({ moves }: BoardCanvasProps) {
+interface BoardCanvasCreateProps {
+  moves: Move[];
+  mode: 'create';
+  onMovesChange: (moves: Move[]) => void;
+}
+
+type BoardCanvasProps = BoardCanvasViewProps | BoardCanvasCreateProps;
+
+export default function BoardCanvas(props: BoardCanvasProps) {
+  const { moves, mode, onMovesChange } = props;
   const { width, height, holdRadius } = BOARD_CONFIG;
+
+  const handleClick = (event: React.MouseEvent<SVGSVGElement>) => {
+    if (mode !== 'create' || !onMovesChange) return;
+
+    const svg = event.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    const gridPos = pixelToGrid(x, y, width, height);
+    if (!gridPos) return;
+
+    const description = formatPosition(gridPos);
+    const newMoves = getNextMoveState(moves, description);
+    onMovesChange(newMoves);
+  };
 
   return (
     <div className="relative border-4 border-gray-700 rounded overflow-hidden">
@@ -25,8 +53,9 @@ export default function BoardCanvas({ moves }: BoardCanvasProps) {
       <svg
         width={width}
         height={height}
-        className="relative"
+        className={`relative ${mode === 'create' ? 'cursor-crosshair' : ''}`}
         style={{ display: 'block' }}
+        onClick={handleClick}
       >
         {moves.map((move, index) => {
           const position = parsePosition(move.description);
@@ -39,9 +68,10 @@ export default function BoardCanvas({ moves }: BoardCanvasProps) {
               cx={x}
               cy={y}
               r={holdRadius}
-              fill="none"
+              fill={mode === 'create' ? 'transparent' : 'none'}
               stroke={color}
               strokeWidth={5}
+              style={mode === 'create' ? { cursor: 'pointer' } : undefined}
             />
           );
         })}
