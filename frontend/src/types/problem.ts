@@ -8,6 +8,8 @@ export interface Problem {
   id: number;
   name: string;
   grade: string;
+  setby: string;
+  repeats: number;
   moves: Move[];
 }
 
