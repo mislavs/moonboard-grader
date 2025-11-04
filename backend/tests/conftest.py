@@ -2,6 +2,7 @@
 Pytest configuration and shared fixtures.
 """
 
+import json
 import pytest
 from pathlib import Path
 from typing import Generator
@@ -11,7 +12,8 @@ from fastapi.testclient import TestClient
 
 from app.main import create_application
 from app.services.predictor_service import PredictorService
-from app.api.dependencies import set_predictor_service
+from app.services.problem_service import ProblemService
+from app.api.dependencies import set_predictor_service, set_problem_service
 
 
 @pytest.fixture
@@ -95,4 +97,90 @@ def sample_problem_request():
         ],
         "top_k": 3
     }
+
+
+# Test data constants
+SAMPLE_PROBLEM_ID_1 = 305445
+SAMPLE_PROBLEM_ID_2 = 123456
+
+
+@pytest.fixture
+def sample_problems_data():
+    """Sample problems data for testing."""
+    return {
+        "total": 2,
+        "data": [
+            {
+                "name": "Fat Guy In A Little Suit",
+                "grade": "6B+",
+                "holdsetup": {
+                    "apiId": SAMPLE_PROBLEM_ID_1
+                },
+                "moves": [
+                    {
+                        "problemId": SAMPLE_PROBLEM_ID_1,
+                        "description": "J4",
+                        "isStart": True,
+                        "isEnd": False
+                    },
+                    {
+                        "problemId": SAMPLE_PROBLEM_ID_1,
+                        "description": "F18",
+                        "isStart": False,
+                        "isEnd": True
+                    }
+                ]
+            },
+            {
+                "name": "Test Problem",
+                "grade": "7A",
+                "holdsetup": {
+                    "apiId": SAMPLE_PROBLEM_ID_2
+                },
+                "moves": [
+                    {
+                        "problemId": SAMPLE_PROBLEM_ID_2,
+                        "description": "A1",
+                        "isStart": True,
+                        "isEnd": False
+                    },
+                    {
+                        "problemId": SAMPLE_PROBLEM_ID_2,
+                        "description": "K18",
+                        "isStart": False,
+                        "isEnd": True
+                    }
+                ]
+            }
+        ]
+    }
+
+
+@pytest.fixture
+def problem_service(tmp_path: Path, sample_problems_data):
+    """Create a problem service with test data."""
+    # Create a test problems.json file
+    problems_file = tmp_path / "problems.json"
+    problems_file.write_text(json.dumps(sample_problems_data, indent=2))
+    
+    service = ProblemService(problems_path=problems_file)
+    return service
+
+
+@pytest.fixture
+def app_with_problem_service(predictor_service: PredictorService, problem_service: ProblemService) -> Generator:
+    """Create test app with both predictor and problem services."""
+    app = create_application()
+    set_predictor_service(predictor_service)
+    set_problem_service(problem_service)
+    yield app
+    # Cleanup
+    set_predictor_service(None)
+    set_problem_service(None)
+
+
+@pytest.fixture
+def client_with_problem_service(app_with_problem_service) -> TestClient:
+    """Test client with both predictor and problem services."""
+    return TestClient(app_with_problem_service)
 

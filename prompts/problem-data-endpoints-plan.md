@@ -57,7 +57,7 @@ Add `get_problem_service()` dependency function that returns the singleton `Prob
 
 **Status:** ✅ Added get_problem_service() and set_problem_service() functions following the existing pattern. Updated main.py to initialize ProblemService on startup.
 
-### 4. Add API Routes with Tests
+### 4. Add API Routes with Tests ✅ COMPLETED
 
 **Files:**
 
@@ -77,6 +77,8 @@ Add unit tests for the endpoints:
 - Test `GET /problems/{api_id}` returns full problem with correct schema
 - Test 404 error for invalid problem IDs
 - Use pytest fixtures for test data
+
+**Status:** ✅ Added both endpoints to routes.py with comprehensive error handling. Added 5 unit tests: 2 for list endpoint (test_get_problems_list, test_get_problems_list_schema) and 3 for detail endpoint (test_get_problem_by_id, test_get_problem_by_id_not_found, test_get_problem_detail_schema). All 21 API tests passing.
 
 ### 5. Verify Implementation
 

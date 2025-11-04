@@ -5,6 +5,8 @@ Tests for API endpoints.
 import pytest
 from fastapi import status
 
+from .conftest import SAMPLE_PROBLEM_ID_1, SAMPLE_PROBLEM_ID_2
+
 
 class TestRootEndpoint:
     """Test suite for root endpoint."""
@@ -177,3 +179,95 @@ class TestAPIDocumentation:
         
         assert response.status_code == status.HTTP_200_OK
 
+
+class TestProblemsEndpoint:
+    """Test suite for problems list endpoint."""
+    
+    def test_get_problems_list(self, client_with_problem_service):
+        """Test GET /problems returns list of problems."""
+        response = client_with_problem_service.get("/problems")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 2
+        
+        # Check first problem
+        assert data[0]["apiId"] == SAMPLE_PROBLEM_ID_1
+        assert data[0]["name"] == "Fat Guy In A Little Suit"
+        assert data[0]["grade"] == "6B+"
+        assert "moves" not in data[0]  # List endpoint should not include moves
+        
+        # Check second problem
+        assert data[1]["apiId"] == SAMPLE_PROBLEM_ID_2
+        assert data[1]["name"] == "Test Problem"
+        assert data[1]["grade"] == "7A"
+    
+    def test_get_problems_list_schema(self, client_with_problem_service):
+        """Test that problems list matches expected schema."""
+        response = client_with_problem_service.get("/problems")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        # Verify each item has required fields with correct types
+        for problem in data:
+            assert "apiId" in problem and isinstance(problem["apiId"], int)
+            assert "name" in problem and isinstance(problem["name"], str)
+            assert "grade" in problem and isinstance(problem["grade"], str)
+
+
+class TestProblemDetailEndpoint:
+    """Test suite for problem detail endpoint."""
+    
+    def test_get_problem_by_id(self, client_with_problem_service):
+        """Test GET /problems/{api_id} returns full problem details."""
+        response = client_with_problem_service.get(f"/problems/{SAMPLE_PROBLEM_ID_1}")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        # Check basic fields
+        assert data["apiId"] == SAMPLE_PROBLEM_ID_1
+        assert data["name"] == "Fat Guy In A Little Suit"
+        assert data["grade"] == "6B+"
+        
+        # Check moves array is included
+        assert "moves" in data
+        assert isinstance(data["moves"], list)
+        assert len(data["moves"]) == 2
+        
+        # Check first move structure
+        move = data["moves"][0]
+        assert move["problemId"] == SAMPLE_PROBLEM_ID_1
+        assert move["description"] == "J4"
+        assert move["isStart"] is True
+        assert move["isEnd"] is False
+    
+    def test_get_problem_by_id_not_found(self, client_with_problem_service):
+        """Test GET /problems/{api_id} with invalid ID returns 404."""
+        response = client_with_problem_service.get("/problems/999999")
+        
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.json()["detail"].lower()
+    
+    def test_get_problem_detail_schema(self, client_with_problem_service):
+        """Test that problem detail matches expected schema."""
+        response = client_with_problem_service.get(f"/problems/{SAMPLE_PROBLEM_ID_2}")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        # Verify required fields with correct types
+        assert "apiId" in data and isinstance(data["apiId"], int)
+        assert "name" in data and isinstance(data["name"], str)
+        assert "grade" in data and isinstance(data["grade"], str)
+        assert "moves" in data and isinstance(data["moves"], list)
+        
+        # Verify move structure
+        for move in data["moves"]:
+            assert all(key in move for key in ["problemId", "description", "isStart", "isEnd"])
+            assert isinstance(move["problemId"], int)
+            assert isinstance(move["description"], str)
+            assert isinstance(move["isStart"], bool)
+            assert isinstance(move["isEnd"], bool)
