@@ -36,18 +36,18 @@
   - ✅ "Predict Grade" button (initially just logs the moves)
   - ✅ Display current moves array as JSON for debugging
 
-## Step 4: Backend Integration for Predictions
+## Step 4: Backend Integration for Predictions ✅ COMPLETED
 
-- Create API service (`/utils/api.ts`) to call FastAPI backend at `http://localhost:8000`
-- Update "Predict Grade" button to:
-- Send moves to `/predict` endpoint
-- Handle loading state
-- Handle errors (backend not running, etc.)
-- Create `PredictionDisplay` component:
-- Show predicted grade prominently
-- Display confidence percentage
-- Show top-k predictions in a list with probabilities
-- Add API health check on app load to verify backend connection
+- ✅ Create API service (`/services/api.ts`) to call FastAPI backend at `http://localhost:8000`
+- ✅ Update "Predict Grade" button to:
+  - ✅ Send moves to `/predict` endpoint
+  - ✅ Handle loading state
+  - ✅ Handle errors (backend not running, etc.)
+- ✅ Create `PredictionDisplay` component:
+  - ✅ Show predicted grade prominently
+  - ✅ Display confidence percentage
+  - ✅ Show top-k predictions in a list with probabilities
+- ✅ Add API health check on app load to verify backend connection
 
 ## Step 5: Problem Navigator
 
