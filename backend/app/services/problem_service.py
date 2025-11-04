@@ -121,6 +121,8 @@ class ProblemService:
             id=api_id,
             name=problem.get('name', 'Unnamed'),
             grade=problem.get('grade', 'Unknown'),
+            setby=problem.get('setby', ''),
+            repeats=problem.get('repeats', 0),
             moves=moves
         )
     

@@ -144,6 +144,8 @@ class ProblemDetail(BaseModel):
     id: int = Field(..., description="Unique identifier for the problem")
     name: str = Field(..., description="Problem name")
     grade: str = Field(..., description="Problem grade")
+    setby: str = Field(..., description="Name of who set the problem")
+    repeats: int = Field(..., description="Number of times the problem has been repeated")
     moves: List[ProblemMove] = Field(..., description="List of moves in the problem")
     
     model_config = ConfigDict(
@@ -152,6 +154,8 @@ class ProblemDetail(BaseModel):
                 "id": 305445,
                 "name": "Fat Guy In A Little Suit",
                 "grade": "6B+",
+                "setby": "Kyle Knapp",
+                "repeats": 187,
                 "moves": [
                     {
                         "description": "J4",
