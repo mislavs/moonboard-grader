@@ -16,9 +16,6 @@ export default function ProblemInfo({ problem }: ProblemInfoProps) {
             {problem.grade}
           </span>
           <span>•</span>
-          <span>by {problem.setby}</span>
-          <span>•</span>
-          <span>{problem.repeats} repeats</span>
         </div>
       </div>
     </>
