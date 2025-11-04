@@ -8,9 +8,13 @@ from typing import Optional
 from fastapi import HTTPException, status
 
 from ..services.predictor_service import PredictorService
+from ..services.problem_service import ProblemService
 
 # Global predictor service instance
 _predictor_service: Optional[PredictorService] = None
+
+# Global problem service instance
+_problem_service: Optional[ProblemService] = None
 
 
 def get_predictor_service() -> PredictorService:
@@ -64,4 +68,33 @@ def get_loaded_predictor() -> PredictorService:
         )
     
     return service
+
+
+def get_problem_service() -> ProblemService:
+    """
+    Dependency that returns the problem service.
+    
+    Returns:
+        ProblemService instance
+        
+    Raises:
+        HTTPException: If service is not initialized
+    """
+    if _problem_service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Problem service not initialized"
+        )
+    return _problem_service
+
+
+def set_problem_service(service: ProblemService) -> None:
+    """
+    Set the global problem service instance.
+    
+    Args:
+        service: ProblemService instance to set
+    """
+    global _problem_service
+    _problem_service = service
 

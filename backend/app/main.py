@@ -12,7 +12,8 @@ import logging
 from .core.config import settings
 from .core.logging import setup_logging
 from .services.predictor_service import PredictorService
-from .api.dependencies import set_predictor_service
+from .services.problem_service import ProblemService
+from .api.dependencies import set_predictor_service, set_problem_service
 from .api import router
 
 # Setup logging
@@ -90,6 +91,13 @@ async def startup_handler():
     
     # Set the global predictor service
     set_predictor_service(predictor_service)
+    
+    # Create and set problem service
+    logger.info(f"Initializing problem service with data path: {settings.problems_data_path}")
+    problem_service = ProblemService()
+    set_problem_service(problem_service)
+    logger.info("Problem service initialized!")
+    
     logger.info("Application startup complete!")
 
 

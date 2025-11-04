@@ -49,11 +49,13 @@ Add unit tests for the service:
 
 **Status:** ✅ Created ProblemService with lazy loading and comprehensive tests (15 tests, all passing)
 
-### 3. Create Dependency Injection
+### 3. Create Dependency Injection ✅ COMPLETED
 
 **File:** `backend/app/api/dependencies.py`
 
 Add `get_problem_service()` dependency function that returns the singleton `ProblemService` instance, following the pattern used for `get_predictor_service()`.
+
+**Status:** ✅ Added get_problem_service() and set_problem_service() functions following the existing pattern. Updated main.py to initialize ProblemService on startup.
 
 ### 4. Add API Routes with Tests
 
