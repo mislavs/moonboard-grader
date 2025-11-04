@@ -125,12 +125,16 @@ class ProblemService:
             moves=moves
         )
     
-    def get_all_problems(self) -> List[ProblemListItem]:
+    def get_all_problems(self, page: int = 1, page_size: int = 20) -> tuple[List[ProblemListItem], int]:
         """
-        Get list of all problems with basic info (ID, name, grade).
+        Get list of all problems with basic info (ID, name, grade), with pagination support.
+        
+        Args:
+            page: Page number (1-indexed). Defaults to 1.
+            page_size: Number of items per page. Defaults to 20.
         
         Returns:
-            List of ProblemListItem objects
+            Tuple of (paginated list of ProblemListItem objects, total count)
             
         Raises:
             FileNotFoundError: If problems file doesn't exist
@@ -155,7 +159,12 @@ class ProblemService:
                 logger.warning(f"Error processing problem at index {idx}: {e}")
                 continue
         
-        return result
+        # Calculate pagination
+        total = len(result)
+        offset = (page - 1) * page_size
+        paginated_result = result[offset:offset + page_size]
+        
+        return paginated_result, total
     
     def get_problem_by_id(self, api_id: int) -> Optional[ProblemDetail]:
         """

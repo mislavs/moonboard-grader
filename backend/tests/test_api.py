@@ -183,25 +183,103 @@ class TestAPIDocumentation:
 class TestProblemsEndpoint:
     """Test suite for problems list endpoint."""
     
-    def test_get_problems_list(self, client_with_problem_service):
-        """Test GET /problems returns list of problems."""
+    def test_get_problems_list_default_pagination(self, client_with_problem_service):
+        """Test GET /problems returns paginated response with defaults."""
         response = client_with_problem_service.get("/problems")
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 2
+        
+        # Should return paginated response structure
+        assert "items" in data
+        assert "total" in data
+        assert "page" in data
+        assert "page_size" in data
+        assert "total_pages" in data
+        
+        # Check pagination metadata
+        assert data["total"] == 2
+        assert data["page"] == 1
+        assert data["page_size"] == 20
+        assert data["total_pages"] == 1
+        
+        # Check items
+        items = data["items"]
+        assert isinstance(items, list)
+        assert len(items) == 2
         
         # Check first problem
-        assert data[0]["apiId"] == SAMPLE_PROBLEM_ID_1
-        assert data[0]["name"] == "Fat Guy In A Little Suit"
-        assert data[0]["grade"] == "6B+"
-        assert "moves" not in data[0]  # List endpoint should not include moves
+        assert items[0]["apiId"] == SAMPLE_PROBLEM_ID_1
+        assert items[0]["name"] == "Fat Guy In A Little Suit"
+        assert items[0]["grade"] == "6B+"
+        assert "moves" not in items[0]  # List endpoint should not include moves
         
         # Check second problem
-        assert data[1]["apiId"] == SAMPLE_PROBLEM_ID_2
-        assert data[1]["name"] == "Test Problem"
-        assert data[1]["grade"] == "7A"
+        assert items[1]["apiId"] == SAMPLE_PROBLEM_ID_2
+        assert items[1]["name"] == "Test Problem"
+        assert items[1]["grade"] == "7A"
+    
+    def test_get_problems_list_custom_page_size(self, client_with_problem_service):
+        """Test GET /problems with custom page size."""
+        response = client_with_problem_service.get("/problems?page=1&page_size=1")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["total"] == 2
+        assert data["page"] == 1
+        assert data["page_size"] == 1
+        assert data["total_pages"] == 2
+        assert len(data["items"]) == 1
+        assert data["items"][0]["apiId"] == SAMPLE_PROBLEM_ID_1
+    
+    def test_get_problems_list_second_page(self, client_with_problem_service):
+        """Test GET /problems for second page."""
+        response = client_with_problem_service.get("/problems?page=2&page_size=1")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["total"] == 2
+        assert data["page"] == 2
+        assert data["page_size"] == 1
+        assert data["total_pages"] == 2
+        assert len(data["items"]) == 1
+        assert data["items"][0]["apiId"] == SAMPLE_PROBLEM_ID_2
+    
+    def test_get_problems_list_page_beyond_range(self, client_with_problem_service):
+        """Test GET /problems for page beyond available data."""
+        response = client_with_problem_service.get("/problems?page=10&page_size=20")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["total"] == 2
+        assert data["page"] == 10
+        assert data["page_size"] == 20
+        assert data["total_pages"] == 1
+        assert len(data["items"]) == 0  # Empty page
+    
+    def test_get_problems_list_invalid_page(self, client_with_problem_service):
+        """Test GET /problems with invalid page number."""
+        response = client_with_problem_service.get("/problems?page=0")
+        
+        # Should return 422 for validation error
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    
+    def test_get_problems_list_invalid_page_size(self, client_with_problem_service):
+        """Test GET /problems with invalid page size."""
+        response = client_with_problem_service.get("/problems?page_size=0")
+        
+        # Should return 422 for validation error
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    
+    def test_get_problems_list_page_size_too_large(self, client_with_problem_service):
+        """Test GET /problems with page size exceeding maximum."""
+        response = client_with_problem_service.get("/problems?page_size=101")
+        
+        # Should return 422 for validation error
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     
     def test_get_problems_list_schema(self, client_with_problem_service):
         """Test that problems list matches expected schema."""
@@ -210,8 +288,15 @@ class TestProblemsEndpoint:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         
+        # Verify paginated response structure
+        assert "items" in data
+        assert "total" in data and isinstance(data["total"], int)
+        assert "page" in data and isinstance(data["page"], int)
+        assert "page_size" in data and isinstance(data["page_size"], int)
+        assert "total_pages" in data and isinstance(data["total_pages"], int)
+        
         # Verify each item has required fields with correct types
-        for problem in data:
+        for problem in data["items"]:
             assert "apiId" in problem and isinstance(problem["apiId"], int)
             assert "name" in problem and isinstance(problem["name"], str)
             assert "grade" in problem and isinstance(problem["grade"], str)

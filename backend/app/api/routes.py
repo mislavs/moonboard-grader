@@ -4,8 +4,9 @@ API route handlers.
 Defines all HTTP endpoints for the application.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 import logging
+import math
 
 from ..models.schemas import (
     ProblemRequest,
@@ -13,8 +14,8 @@ from ..models.schemas import (
     TopKPrediction,
     HealthResponse,
     ModelInfoResponse,
-    ProblemListItem,
     ProblemDetail,
+    PaginatedProblemsResponse,
 )
 from ..services.predictor_service import PredictorService
 from ..services.problem_service import ProblemService
@@ -156,27 +157,40 @@ def _handle_problem_service_error(e: Exception, context: str = "loading problems
     )
 
 
-@router.get("/problems", response_model=list[ProblemListItem], tags=["Problems"])
+@router.get("/problems", response_model=PaginatedProblemsResponse, tags=["Problems"])
 async def get_problems_list(
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(20, ge=1, le=100, description="Number of items per page"),
     problem_service: ProblemService = Depends(get_problem_service)
 ):
     """
-    Get list of all problems with basic information.
+    Get paginated list of problems with basic information.
     
-    Returns a lightweight list of problems containing only apiId, name, and grade.
+    Returns a paginated list of problems containing only apiId, name, and grade.
     Useful for dropdowns and problem selection interfaces.
     
     Args:
+        page: Page number, starting from 1 (default: 1)
+        page_size: Number of items per page, max 100 (default: 20)
         problem_service: Injected problem service (dependency)
         
     Returns:
-        List of ProblemListItem with basic problem information
+        PaginatedProblemsResponse with items, pagination metadata, and total count
         
     Raises:
         HTTPException: If problems data cannot be loaded
     """
     try:
-        return problem_service.get_all_problems()
+        items, total = problem_service.get_all_problems(page=page, page_size=page_size)
+        total_pages = math.ceil(total / page_size) if total > 0 else 0
+        
+        return PaginatedProblemsResponse(
+            items=items,
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages
+        )
     except Exception as e:
         raise _handle_problem_service_error(e)
 

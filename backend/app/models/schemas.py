@@ -171,3 +171,36 @@ class ProblemDetail(BaseModel):
             }
         }
     )
+
+
+class PaginatedProblemsResponse(BaseModel):
+    """Paginated response for problems list endpoint."""
+    
+    items: List[ProblemListItem] = Field(..., description="List of problems for current page")
+    total: int = Field(..., description="Total number of problems across all pages")
+    page: int = Field(..., ge=1, description="Current page number (1-indexed)")
+    page_size: int = Field(..., ge=1, description="Number of items per page")
+    total_pages: int = Field(..., ge=0, description="Total number of pages")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "items": [
+                    {
+                        "apiId": 305445,
+                        "name": "Fat Guy In A Little Suit",
+                        "grade": "6B+"
+                    },
+                    {
+                        "apiId": 305446,
+                        "name": "Another Problem",
+                        "grade": "7A"
+                    }
+                ],
+                "total": 100,
+                "page": 1,
+                "page_size": 20,
+                "total_pages": 5
+            }
+        }
+    )

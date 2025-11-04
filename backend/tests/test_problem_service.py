@@ -150,11 +150,12 @@ class TestProblemService:
         assert problem_service.is_loaded
         assert problem_service.problem_count == 3
     
-    def test_get_all_problems(self, problem_service: ProblemService):
-        """Test getting all problems with basic info."""
-        problems = problem_service.get_all_problems()
+    def test_get_all_problems_default_pagination(self, problem_service: ProblemService):
+        """Test getting all problems with default pagination."""
+        problems, total = problem_service.get_all_problems()
         
-        assert len(problems) == 3
+        assert total == 3
+        assert len(problems) == 3  # All items fit on first page with default size
         assert all(isinstance(p, ProblemListItem) for p in problems)
         
         # Check first problem
@@ -166,6 +167,38 @@ class TestProblemService:
         assert problems[1].apiId == 1002
         assert problems[1].name == "Test Problem 2"
         assert problems[1].grade == "7A"
+    
+    def test_get_all_problems_with_pagination(self, problem_service: ProblemService):
+        """Test getting problems with pagination."""
+        # Get first page with 2 items per page
+        problems_page1, total = problem_service.get_all_problems(page=1, page_size=2)
+        
+        assert total == 3
+        assert len(problems_page1) == 2
+        assert problems_page1[0].apiId == 1001
+        assert problems_page1[1].apiId == 1002
+        
+        # Get second page
+        problems_page2, total = problem_service.get_all_problems(page=2, page_size=2)
+        
+        assert total == 3
+        assert len(problems_page2) == 1
+        assert problems_page2[0].apiId == 1003
+    
+    def test_get_all_problems_page_beyond_range(self, problem_service: ProblemService):
+        """Test getting a page beyond available data."""
+        problems, total = problem_service.get_all_problems(page=10, page_size=20)
+        
+        assert total == 3
+        assert len(problems) == 0  # Empty page
+    
+    def test_get_all_problems_custom_page_size(self, problem_service: ProblemService):
+        """Test getting problems with custom page size."""
+        problems, total = problem_service.get_all_problems(page=1, page_size=1)
+        
+        assert total == 3
+        assert len(problems) == 1
+        assert problems[0].apiId == 1001
     
     def test_get_all_problems_with_missing_apiid(self, tmp_path: Path):
         """Test getting problems when some have missing apiId."""
@@ -192,9 +225,10 @@ class TestProblemService:
             json.dump(data, f)
         
         service = ProblemService(problems_path=json_file)
-        problems = service.get_all_problems()
+        problems, total = service.get_all_problems()
         
         # Should only return the problem with valid apiId
+        assert total == 1
         assert len(problems) == 1
         assert problems[0].apiId == 1001
     
@@ -258,7 +292,8 @@ class TestProblemService:
         problem_service.reload()
         
         assert problem_service.problem_count == 1
-        problems = problem_service.get_all_problems()
+        problems, total = problem_service.get_all_problems()
+        assert total == 1
         assert problems[0].apiId == 2001
         assert problems[0].name == "New Problem"
     
@@ -267,9 +302,10 @@ class TestProblemService:
         assert not problem_service.is_loaded
         
         # Access problems - should trigger loading
-        problems = problem_service.get_all_problems()
+        problems, total = problem_service.get_all_problems()
         
         assert problem_service.is_loaded
+        assert total > 0
         assert len(problems) > 0
     
     def test_is_loaded_property(self, problem_service: ProblemService):
