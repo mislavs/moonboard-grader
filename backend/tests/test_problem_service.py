@@ -20,9 +20,10 @@ def sample_problems_data() -> Dict[str, Any]:
             {
                 "name": "Test Problem 1",
                 "grade": "6B+",
+                "apiId": 1001,
                 "holdsetup": {
                     "description": "MoonBoard Masters 2017",
-                    "apiId": 1001
+                    "apiId": 15
                 },
                 "moves": [
                     {
@@ -42,9 +43,10 @@ def sample_problems_data() -> Dict[str, Any]:
             {
                 "name": "Test Problem 2",
                 "grade": "7A",
+                "apiId": 1002,
                 "holdsetup": {
                     "description": "MoonBoard Masters 2017",
-                    "apiId": 1002
+                    "apiId": 15
                 },
                 "moves": [
                     {
@@ -64,9 +66,10 @@ def sample_problems_data() -> Dict[str, Any]:
             {
                 "name": "Test Problem 3",
                 "grade": "6C",
+                "apiId": 1003,
                 "holdsetup": {
                     "description": "MoonBoard Masters 2017",
-                    "apiId": 1003
+                    "apiId": 15
                 },
                 "moves": []
             }
@@ -208,13 +211,14 @@ class TestProblemService:
                 {
                     "name": "Good Problem",
                     "grade": "6B+",
-                    "holdsetup": {"apiId": 1001},
+                    "apiId": 1001,
+                    "holdsetup": {"apiId": 15},
                     "moves": []
                 },
                 {
                     "name": "Bad Problem",
                     "grade": "7A",
-                    "holdsetup": {},  # Missing apiId
+                    "holdsetup": {"apiId": 15},  # Has holdsetup.apiId but missing problem.apiId
                     "moves": []
                 }
             ]
@@ -280,7 +284,8 @@ class TestProblemService:
                 {
                     "name": "New Problem",
                     "grade": "8A",
-                    "holdsetup": {"apiId": 2001},
+                    "apiId": 2001,
+                    "holdsetup": {"apiId": 15},
                     "moves": []
                 }
             ]

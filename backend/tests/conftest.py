@@ -113,8 +113,9 @@ def sample_problems_data():
             {
                 "name": "Fat Guy In A Little Suit",
                 "grade": "6B+",
+                "apiId": SAMPLE_PROBLEM_ID_1,
                 "holdsetup": {
-                    "apiId": SAMPLE_PROBLEM_ID_1
+                    "apiId": 15
                 },
                 "moves": [
                     {
@@ -134,8 +135,9 @@ def sample_problems_data():
             {
                 "name": "Test Problem",
                 "grade": "7A",
+                "apiId": SAMPLE_PROBLEM_ID_2,
                 "holdsetup": {
-                    "apiId": SAMPLE_PROBLEM_ID_2
+                    "apiId": 15
                 },
                 "moves": [
                     {

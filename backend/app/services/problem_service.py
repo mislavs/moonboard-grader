@@ -82,7 +82,7 @@ class ProblemService:
         Returns:
             API ID if present, None otherwise
         """
-        return problem.get('holdsetup', {}).get('apiId')
+        return problem.get('apiId')
     
     @staticmethod
     def _parse_problem_moves(moves_data: List[Dict[str, Any]]) -> List[ProblemMove]:
@@ -147,7 +147,7 @@ class ProblemService:
             try:
                 api_id = self._extract_api_id(problem)
                 if api_id is None:
-                    logger.warning(f"Problem at index {idx} missing holdsetup.apiId, skipping")
+                    logger.warning(f"Problem at index {idx} missing apiId, skipping")
                     continue
                 
                 result.append(ProblemListItem(
@@ -171,7 +171,7 @@ class ProblemService:
         Get complete problem details by API ID.
         
         Args:
-            api_id: The API ID (holdsetup.apiId) to search for
+            api_id: The API ID (problem.apiId) to search for
             
         Returns:
             ProblemDetail object if found, None otherwise
@@ -182,7 +182,7 @@ class ProblemService:
         """
         self._ensure_loaded()
         
-        # Find problem by holdsetup.apiId
+        # Find problem by problem.apiId
         for problem in self._problems_cache:
             if self._extract_api_id(problem) == api_id:
                 try:
