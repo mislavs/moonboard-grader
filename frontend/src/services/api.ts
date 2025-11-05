@@ -122,3 +122,24 @@ export async function fetchProblems(
   );
 }
 
+/**
+ * Duplicate check response
+ */
+export interface DuplicateCheckResponse {
+  exists: boolean;
+  problem_id: number | null;
+}
+
+/**
+ * Check if a problem with the same moves already exists
+ */
+export async function checkDuplicate(moves: Move[]): Promise<DuplicateCheckResponse> {
+  return apiFetch<DuplicateCheckResponse>(`${API_BASE_URL}/problems/check-duplicate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ moves }),
+  });
+}
+

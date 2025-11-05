@@ -4,14 +4,18 @@ interface CreateModeControlsProps {
   movesCount: number;
   onClearAll: () => void;
   onPredictGrade: () => void;
+  onCheckDuplicate: () => void;
   isLoading?: boolean;
+  isCheckingDuplicate?: boolean;
 }
 
 export default function CreateModeControls({ 
   movesCount, 
   onClearAll, 
   onPredictGrade,
-  isLoading = false
+  onCheckDuplicate,
+  isLoading = false,
+  isCheckingDuplicate = false
 }: CreateModeControlsProps) {
   return (
     <div className="flex flex-col gap-4 w-full">
@@ -63,8 +67,22 @@ export default function CreateModeControls({
           )}
         </button>
         <button
+          onClick={onCheckDuplicate}
+          disabled={movesCount === 0 || isCheckingDuplicate}
+          className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-lg transition-colors duration-200"
+        >
+          {isCheckingDuplicate ? (
+            <span className="flex items-center justify-center gap-2">
+              <SpinnerIcon />
+              Checking...
+            </span>
+          ) : (
+            'Check Duplicate'
+          )}
+        </button>
+        <button
           onClick={onClearAll}
-          disabled={isLoading}
+          disabled={isLoading || isCheckingDuplicate}
           className="w-full px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-lg transition-colors duration-200"
         >
           Clear All

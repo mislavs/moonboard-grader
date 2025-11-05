@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import MoonBoard from './MoonBoard';
 import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
 import CreateModeControls from './CreateModeControls';
 import PredictionDisplay from './PredictionDisplay';
+import DuplicateCheckResult from './DuplicateCheckResult';
 import { usePrediction } from '../hooks/usePrediction';
+import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { useBackendHealth } from '../hooks/useBackendHealth';
 import type { Move } from '../types/problem';
 import { ERROR_MESSAGES } from '../config/api';
@@ -12,15 +14,27 @@ import { ERROR_MESSAGES } from '../config/api';
 export default function CreateMode() {
   const [createdMoves, setCreatedMoves] = useState<Move[]>([]);
   const { prediction, predicting, error, predict, reset } = usePrediction();
+  const { duplicate, checking, error: duplicateError, checkForDuplicate, reset: resetDuplicate } = useDuplicateCheck();
   const backendHealthy = useBackendHealth();
+
+  // Clear duplicate result when moves change
+  useEffect(() => {
+    resetDuplicate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createdMoves]);
 
   const handleClearAll = () => {
     setCreatedMoves([]);
     reset();
+    resetDuplicate();
   };
 
   const handlePredictGrade = async () => {
     await predict(createdMoves);
+  };
+
+  const handleCheckDuplicate = async () => {
+    await checkForDuplicate(createdMoves);
   };
 
   return (
@@ -38,8 +52,26 @@ export default function CreateMode() {
             movesCount={createdMoves.length}
             onClearAll={handleClearAll}
             onPredictGrade={handlePredictGrade}
+            onCheckDuplicate={handleCheckDuplicate}
             isLoading={predicting}
+            isCheckingDuplicate={checking}
           />
+
+          {duplicateError && !checking && (
+            <ErrorMessage message={duplicateError} />
+          )}
+
+          {duplicate && !checking && (
+            <DuplicateCheckResult
+              exists={duplicate.exists}
+              problemName={duplicate.problemName}
+              problemGrade={duplicate.problemGrade}
+            />
+          )}
+
+          {checking && (
+            <LoadingSpinner message="Checking for duplicates..." />
+          )}
 
           {/* Prediction Error */}
           {error && !predicting && (
