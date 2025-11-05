@@ -204,3 +204,27 @@ class PaginatedProblemsResponse(BaseModel):
             }
         }
     )
+
+
+class DuplicateCheckRequest(BaseModel):
+    """Request body for checking duplicate problems."""
+    
+    moves: List[ProblemMove] = Field(..., description="List of moves to check for duplicates")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "moves": [
+                    {"description": "J4", "isStart": True, "isEnd": False},
+                    {"description": "F18", "isStart": False, "isEnd": True}
+                ]
+            }
+        }
+    )
+
+
+class DuplicateCheckResponse(BaseModel):
+    """Response for duplicate check endpoint."""
+    
+    exists: bool = Field(..., description="Whether a problem with these moves exists")
+    problem_id: Optional[int] = Field(None, description="ID of the matching problem if found")

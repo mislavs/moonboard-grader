@@ -356,3 +356,97 @@ class TestProblemDetailEndpoint:
             assert isinstance(move["description"], str)
             assert isinstance(move["isStart"], bool)
             assert isinstance(move["isEnd"], bool)
+
+
+class TestCheckDuplicateEndpoint:
+    """Test suite for duplicate check endpoint."""
+    
+    def test_check_duplicate_exists(self, client_with_problem_service):
+        """Test checking for duplicate when problem exists."""
+        # Use moves from the first test problem (ID 305445)
+        response = client_with_problem_service.post("/problems/check-duplicate", json={
+            "moves": [
+                {"description": "J4", "isStart": True, "isEnd": False},
+                {"description": "F18", "isStart": False, "isEnd": True}
+            ]
+        })
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["exists"] is True
+        assert data["problem_id"] == SAMPLE_PROBLEM_ID_1
+    
+    def test_check_duplicate_not_exists(self, client_with_problem_service):
+        """Test checking for duplicate when problem doesn't exist."""
+        response = client_with_problem_service.post("/problems/check-duplicate", json={
+            "moves": [
+                {"description": "Z99", "isStart": True, "isEnd": False},
+                {"description": "Y88", "isStart": False, "isEnd": True}
+            ]
+        })
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["exists"] is False
+        assert data["problem_id"] is None
+    
+    def test_check_duplicate_order_independent(self, client_with_problem_service):
+        """Test that move order doesn't affect duplicate check."""
+        # Same moves as problem 305445 but in reversed order
+        response = client_with_problem_service.post("/problems/check-duplicate", json={
+            "moves": [
+                {"description": "F18", "isStart": False, "isEnd": True},
+                {"description": "J4", "isStart": True, "isEnd": False}
+            ]
+        })
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["exists"] is True
+        assert data["problem_id"] == SAMPLE_PROBLEM_ID_1
+    
+    def test_check_duplicate_empty_moves(self, client_with_problem_service):
+        """Test checking duplicate with empty moves list."""
+        response = client_with_problem_service.post("/problems/check-duplicate", json={
+            "moves": []
+        })
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        # Empty moves should not match anything (or match empty problems if any)
+        assert "exists" in data
+        assert "problem_id" in data
+    
+    def test_check_duplicate_invalid_request_missing_moves(self, client_with_problem_service):
+        """Test checking duplicate without moves field."""
+        response = client_with_problem_service.post("/problems/check-duplicate", json={})
+        
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    
+    def test_check_duplicate_invalid_move_structure(self, client_with_problem_service):
+        """Test checking duplicate with invalid move structure."""
+        response = client_with_problem_service.post("/problems/check-duplicate", json={
+            "moves": [
+                {"invalid_field": "A1"}
+            ]
+        })
+        
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    
+    def test_check_duplicate_response_schema(self, client_with_problem_service):
+        """Test that duplicate check response matches expected schema."""
+        response = client_with_problem_service.post("/problems/check-duplicate", json={
+            "moves": [
+                {"description": "J4", "isStart": True, "isEnd": False},
+                {"description": "F18", "isStart": False, "isEnd": True}
+            ]
+        })
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        # Verify response structure
+        assert "exists" in data and isinstance(data["exists"], bool)
+        assert "problem_id" in data
+        if data["problem_id"] is not None:
+            assert isinstance(data["problem_id"], int)

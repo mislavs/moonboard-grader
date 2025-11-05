@@ -16,6 +16,8 @@ from ..models.schemas import (
     ModelInfoResponse,
     ProblemDetail,
     PaginatedProblemsResponse,
+    DuplicateCheckRequest,
+    DuplicateCheckResponse,
 )
 from ..services.predictor_service import PredictorService
 from ..services.problem_service import ProblemService
@@ -225,4 +227,37 @@ async def get_problem_detail(
         return problem
     except Exception as e:
         raise _handle_problem_service_error(e, f"loading problem {id}")
+
+
+@router.post("/problems/check-duplicate", response_model=DuplicateCheckResponse, tags=["Problems"])
+async def check_duplicate_problem(
+    request: DuplicateCheckRequest,
+    problem_service: ProblemService = Depends(get_problem_service)
+):
+    """
+    Check if a problem with the exact same moves already exists.
+    
+    Compares moves in an order-independent manner (sorting by hold position).
+    Both hold positions and start/end flags must match.
+    
+    Args:
+        request: Request containing list of moves to check
+        problem_service: Injected problem service
+        
+    Returns:
+        Response indicating if duplicate exists and the problem ID if found
+        
+    Raises:
+        HTTPException: If problems data cannot be loaded
+    """
+    try:
+        duplicate_id = problem_service.find_duplicate_by_moves(request.moves)
+        
+        return DuplicateCheckResponse(
+            exists=duplicate_id is not None,
+            problem_id=duplicate_id
+        )
+            
+    except Exception as e:
+        raise _handle_problem_service_error(e, "checking for duplicate problem")
 

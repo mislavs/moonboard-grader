@@ -329,4 +329,45 @@ class TestProblemService:
         problem_service._load_problems()
         
         assert problem_service.problem_count == 3
+    
+    def test_moves_to_key_normalization(self, problem_service: ProblemService):
+        """Test that moves are normalized correctly for comparison."""
+        from app.models.schemas import ProblemMove
+        
+        moves1 = [
+            ProblemMove(description="A1", isStart=True, isEnd=False),
+            ProblemMove(description="K18", isStart=False, isEnd=True)
+        ]
+        moves2 = [
+            ProblemMove(description="K18", isStart=False, isEnd=True),
+            ProblemMove(description="A1", isStart=True, isEnd=False)
+        ]
+        
+        key1 = problem_service._moves_to_key(moves1)
+        key2 = problem_service._moves_to_key(moves2)
+        assert key1 == key2
+    
+    def test_find_duplicate_by_moves_exists(self, problem_service: ProblemService):
+        """Test finding a duplicate problem that exists."""
+        from app.models.schemas import ProblemMove
+        
+        moves = [
+            ProblemMove(description="A1", isStart=True, isEnd=False),
+            ProblemMove(description="K18", isStart=False, isEnd=True)
+        ]
+        
+        result = problem_service.find_duplicate_by_moves(moves)
+        assert result == 1001
+    
+    def test_find_duplicate_by_moves_not_found(self, problem_service: ProblemService):
+        """Test that non-existent moves return None."""
+        from app.models.schemas import ProblemMove
+        
+        moves = [
+            ProblemMove(description="Z99", isStart=True, isEnd=False),
+            ProblemMove(description="Y88", isStart=False, isEnd=True)
+        ]
+        
+        result = problem_service.find_duplicate_by_moves(moves)
+        assert result is None
 

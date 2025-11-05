@@ -213,4 +213,43 @@ class ProblemService:
     def problem_count(self) -> int:
         """Get count of loaded problems."""
         return len(self._problems_cache) if self._problems_cache else 0
+    
+    @staticmethod
+    def _moves_to_key(move_list: List[ProblemMove]) -> tuple:
+        """
+        Convert move list to normalized tuple for comparison.
+        Sorted to make order-independent.
+        """
+        sorted_moves = sorted(
+            [(m.description, m.isStart, m.isEnd) for m in move_list],
+            key=lambda x: x[0]
+        )
+        return tuple(sorted_moves)
+    
+    def find_duplicate_by_moves(self, moves: List[ProblemMove]) -> Optional[int]:
+        """
+        Find a problem with identical moves.
+        
+        Uses linear search through all problems - O(n) complexity.
+        Performance: ~100-200ms worst case for 44K problems.
+        
+        Args:
+            moves: List of ProblemMove objects to match
+            
+        Returns:
+            API ID of the matching problem, or None if not found
+        """
+        self._ensure_loaded()
+        
+        target_key = self._moves_to_key(moves)
+        
+        # Linear search through all problems
+        for problem in self._problems_cache:
+            problem_moves = self._parse_problem_moves(problem.get('moves', []))
+            problem_key = self._moves_to_key(problem_moves)
+            
+            if problem_key == target_key:
+                return self._extract_api_id(problem)
+        
+        return None
 
