@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="moonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4F46E5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7C3AED;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="48" fill="url(#moonGradient)"/>
+  
+  <!-- Climbing hold grid (simplified moonboard representation) -->
+  <g fill="#FFF" opacity="0.9">
+    <!-- Top holds -->
+    <circle cx="30" cy="25" r="4"/>
+    <circle cx="50" cy="20" r="4"/>
+    <circle cx="70" cy="25" r="4"/>
+    
+    <!-- Middle holds -->
+    <circle cx="25" cy="45" r="4.5"/>
+    <circle cx="50" cy="42" r="4.5"/>
+    <circle cx="75" cy="45" r="4.5"/>
+    
+    <!-- Bottom holds -->
+    <circle cx="35" cy="65" r="5"/>
+    <circle cx="55" cy="70" r="5"/>
+    <circle cx="70" cy="65" r="5"/>
+  </g>
+  
+  <!-- Climber figure (stylized) -->
+  <g fill="#FFF" stroke="#FFF" stroke-width="2">
+    <!-- Head -->
+    <circle cx="50" cy="52" r="6" fill="none"/>
+    
+    <!-- Body -->
+    <line x1="50" y1="58" x2="50" y2="75" stroke-linecap="round"/>
+    
+    <!-- Arms reaching -->
+    <line x1="50" y1="62" x2="42" y2="48" stroke-linecap="round"/>
+    <line x1="50" y1="62" x2="58" y2="55" stroke-linecap="round"/>
+    
+    <!-- Legs -->
+    <line x1="50" y1="75" x2="45" y2="85" stroke-linecap="round"/>
+    <line x1="50" y1="75" x2="55" y2="85" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Grade indicator (V-grade style) -->
+  <text x="50" y="92" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#FFF" text-anchor="middle">V</text>
+</svg>
+
