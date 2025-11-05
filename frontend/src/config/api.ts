@@ -1,5 +1,5 @@
 /**
- * Application configuration constants
+ * API and application configuration constants
  */
 
 export const API_BASE_URL = '/api';

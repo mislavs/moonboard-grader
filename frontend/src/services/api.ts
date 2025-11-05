@@ -4,7 +4,7 @@
 
 import type { Problem, Move } from '../types/problem';
 import type { PredictionResponse, PredictionRequest } from '../types/prediction';
-import { API_BASE_URL, ERROR_MESSAGES } from '../config/constants';
+import { API_BASE_URL, ERROR_MESSAGES } from '../config/api';
 
 export class ApiError extends Error {
   statusCode?: number;
@@ -91,9 +91,9 @@ export async function healthCheck(): Promise<{ status: string; model_loaded: boo
 }
 
 /**
- * Problem list item (basic info for navigation)
+ * Problem summary (basic info for navigation)
  */
-export interface ProblemListItem {
+export interface ProblemSummary {
   id: number;
   name: string;
   grade: string;
@@ -103,7 +103,7 @@ export interface ProblemListItem {
  * Paginated problems response
  */
 export interface PaginatedProblemsResponse {
-  items: ProblemListItem[];
+  items: ProblemSummary[];
   total: number;
   page: number;
   page_size: number;

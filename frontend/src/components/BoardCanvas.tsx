@@ -2,7 +2,7 @@ import type { Move } from '../types/problem';
 import { parsePosition, gridToPixel, pixelToGrid, formatPosition } from '../utils/gridParser';
 import { getHoldColor } from '../utils/holdUtils';
 import { getNextMoveState } from '../utils/moveStateManager';
-import { BOARD_CONFIG } from '../constants/boardConfig';
+import { BOARD_CONFIG } from '../config/board';
 import moonboardImage from '../assets/moonboard.jpg';
 
 interface BoardCanvasViewProps {

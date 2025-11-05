@@ -7,7 +7,7 @@ import PredictionDisplay from './PredictionDisplay';
 import { usePrediction } from '../hooks/usePrediction';
 import { useBackendHealth } from '../hooks/useBackendHealth';
 import type { Move } from '../types/problem';
-import { ERROR_MESSAGES } from '../config/constants';
+import { ERROR_MESSAGES } from '../config/api';
 
 export default function CreateMode() {
   const [createdMoves, setCreatedMoves] = useState<Move[]>([]);

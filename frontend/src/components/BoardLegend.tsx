@@ -1,4 +1,4 @@
-import { HOLD_COLORS } from '../constants/boardConfig';
+import { HOLD_COLORS } from '../config/board';
 
 interface LegendItemProps {
   color: string;

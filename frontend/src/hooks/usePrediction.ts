@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { predictGrade, ApiError } from '../services/api';
 import type { Move } from '../types/problem';
 import type { PredictionResponse } from '../types/prediction';
-import { PREDICTION_TOP_K, ERROR_MESSAGES } from '../config/constants';
+import { PREDICTION_TOP_K, ERROR_MESSAGES } from '../config/api';
 
 export function usePrediction() {
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null);

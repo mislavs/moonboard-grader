@@ -1,5 +1,5 @@
 import type { Move } from '../types/problem';
-import { HOLD_COLORS } from '../constants/boardConfig';
+import { HOLD_COLORS } from '../config/board';
 
 /**
  * Determine the color of a hold based on its properties

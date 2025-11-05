@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
-import { fetchProblems, type ProblemListItem, ApiError } from '../services/api';
+import { fetchProblems, type ProblemSummary, ApiError } from '../services/api';
 
 const DEFAULT_PAGE_SIZE = 20;
 
 interface UseProblemsReturn {
-  problems: ProblemListItem[];
+  problems: ProblemSummary[];
   loading: boolean;
   error: string | null;
   page: number;
@@ -18,7 +18,7 @@ interface UseProblemsReturn {
 export function useProblems(
   onFirstLoad?: (firstProblemId: number) => void
 ): UseProblemsReturn {
-  const [problems, setProblems] = useState<ProblemListItem[]>([]);
+  const [problems, setProblems] = useState<ProblemSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);

@@ -1,7 +1,7 @@
-import type { ProblemListItem as ProblemData } from '../services/api';
+import type { ProblemSummary } from '../services/api';
 
 interface ProblemListItemProps {
-  problem: ProblemData;
+  problem: ProblemSummary;
   isSelected: boolean;
   onSelect: (id: number) => void;
 }

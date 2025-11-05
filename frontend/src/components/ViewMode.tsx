@@ -5,7 +5,7 @@ import ErrorMessage from './ErrorMessage';
 import ProblemNavigator from './ProblemNavigator';
 import { fetchProblem, ApiError } from '../services/api';
 import type { Problem } from '../types/problem';
-import { ERROR_MESSAGES } from '../config/constants';
+import { ERROR_MESSAGES } from '../config/api';
 
 export default function ViewMode() {
   const [selectedProblemId, setSelectedProblemId] = useState<number | null>(null);

@@ -1,5 +1,5 @@
 import type { GridPosition } from '../types/problem';
-import { BOARD_CONFIG } from '../constants/boardConfig';
+import { BOARD_CONFIG } from '../config/board';
 
 /**
  * Parse a move description (e.g., "J4", "A16") into grid coordinates
