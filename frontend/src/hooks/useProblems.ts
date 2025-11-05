@@ -49,7 +49,8 @@ export function useProblems(
     }
 
     loadProblems();
-  }, [page, onFirstLoad]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   const goToNextPage = useCallback(() => {
     setPage((prev) => Math.min(prev + 1, totalPages));
