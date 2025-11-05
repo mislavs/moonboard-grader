@@ -90,3 +90,35 @@ export async function healthCheck(): Promise<{ status: string; model_loaded: boo
   return apiFetch<{ status: string; model_loaded: boolean }>(`${API_BASE_URL}/health`);
 }
 
+/**
+ * Problem list item (basic info for navigation)
+ */
+export interface ProblemListItem {
+  id: number;
+  name: string;
+  grade: string;
+}
+
+/**
+ * Paginated problems response
+ */
+export interface PaginatedProblemsResponse {
+  items: ProblemListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+/**
+ * Fetch a paginated list of problems
+ */
+export async function fetchProblems(
+  page: number = 1,
+  pageSize: number = 20
+): Promise<PaginatedProblemsResponse> {
+  return apiFetch<PaginatedProblemsResponse>(
+    `${API_BASE_URL}/problems?page=${page}&page_size=${pageSize}`
+  );
+}
+

@@ -4,8 +4,6 @@
 
 export const API_BASE_URL = '/api';
 
-export const DEFAULT_PROBLEM_ID = 305461;
-
 export const PREDICTION_TOP_K = 4;
 
 export const ERROR_MESSAGES = {

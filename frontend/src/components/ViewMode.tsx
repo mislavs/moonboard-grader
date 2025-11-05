@@ -2,21 +2,27 @@ import { useEffect, useState } from 'react';
 import MoonBoard from './MoonBoard';
 import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
+import ProblemNavigator from './ProblemNavigator';
 import { fetchProblem, ApiError } from '../services/api';
 import type { Problem } from '../types/problem';
-import { DEFAULT_PROBLEM_ID, ERROR_MESSAGES } from '../config/constants';
+import { ERROR_MESSAGES } from '../config/constants';
 
 export default function ViewMode() {
+  const [selectedProblemId, setSelectedProblemId] = useState<number | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadProblem() {
+      if (selectedProblemId === null) {
+        return;
+      }
+      
       try {
         setLoading(true);
         setError(null);
-        const problem = await fetchProblem(DEFAULT_PROBLEM_ID);
+        const problem = await fetchProblem(selectedProblemId);
         setProblem(problem);
       } catch (err) {
         const errorMessage = err instanceof ApiError 
@@ -30,16 +36,41 @@ export default function ViewMode() {
     }
 
     loadProblem();
-  }, []);
+  }, [selectedProblemId]);
+
+  const handleProblemSelect = (problemId: number) => {
+    setSelectedProblemId(problemId);
+  };
+
+  const handleFirstProblemLoaded = (problemId: number) => {
+    if (selectedProblemId === null) {
+      setSelectedProblemId(problemId);
+    }
+  };
 
   return (
-    <>
-      {loading && <LoadingSpinner message="Loading problem..." />}
-      {error && <ErrorMessage message={error} />}
-      {problem && !loading && !error && (
-        <MoonBoard problem={problem} mode="view" />
-      )}
-    </>
+    <div className="flex flex-col items-center gap-6">
+      {/* Main Content: Navigator on Left, MoonBoard on Right */}
+      <div className="flex flex-row gap-8 items-start justify-center w-full px-4">
+        {/* Left Panel: Problem Navigator */}
+        <div className="w-96">
+          <ProblemNavigator
+            selectedProblemId={selectedProblemId}
+            onProblemSelect={handleProblemSelect}
+            onFirstProblemLoaded={handleFirstProblemLoaded}
+          />
+        </div>
+
+        {/* Right Panel: MoonBoard */}
+        <div>
+          {loading && <LoadingSpinner message="Loading problem..." />}
+          {error && <ErrorMessage message={error} />}
+          {problem && !loading && !error && (
+            <MoonBoard problem={problem} mode="view" />
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
