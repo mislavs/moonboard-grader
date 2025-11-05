@@ -53,7 +53,7 @@ export default function ViewMode() {
       {/* Main Content: Navigator on Left, MoonBoard on Right */}
       <div className="flex flex-row gap-8 items-start justify-center w-full px-4">
         {/* Left Panel: Problem Navigator */}
-        <div className="w-96">
+        <div className="w-96 flex">
           <ProblemNavigator
             selectedProblemId={selectedProblemId}
             onProblemSelect={handleProblemSelect}
@@ -62,7 +62,7 @@ export default function ViewMode() {
         </div>
 
         {/* Right Panel: MoonBoard */}
-        <div>
+        <div className="flex flex-col">
           {loading && <LoadingSpinner message="Loading problem..." />}
           {error && <ErrorMessage message={error} />}
           {problem && !loading && !error && (

@@ -28,13 +28,13 @@ export default function ProblemNavigator({
   } = useProblems(onFirstProblemLoaded);
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 shadow-lg">
+    <div className="bg-gray-800 rounded-lg p-4 shadow-lg flex flex-col" style={{ height: '976px' }}>
       {loading && <LoadingSpinner message="Loading problems..." />}
       {error && <ErrorMessage message={error} />}
 
       {!loading && !error && (
         <>
-          <div className="space-y-2 max-h-96 overflow-y-auto mb-4">
+          <div className="space-y-2 overflow-y-auto mb-4 flex-1 min-h-0">
             {problems.map((problem) => (
               <ProblemListItem
                 key={problem.id}
