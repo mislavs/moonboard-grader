@@ -14,6 +14,20 @@ from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Import grade encoder from classifier for consistent grade ordering
+try:
+    import sys
+    # Add classifier to path if not already there
+    classifier_path = Path(__file__).parent.parent.parent.parent / "classifier"
+    if classifier_path.exists() and str(classifier_path) not in sys.path:
+        sys.path.insert(0, str(classifier_path))
+    from src.grade_encoder import encode_grade  # type: ignore
+except ImportError as e:
+    logger.warning(f"Failed to import grade_encoder: {e}")
+    # Fallback if classifier not installed
+    def encode_grade(grade: str) -> int:
+        raise NotImplementedError("Grade encoder not available")
+
 
 class ProblemService:
     """
@@ -104,6 +118,37 @@ class ProblemService:
             for move in moves_data
         ]
     
+    @staticmethod
+    def _is_grade_in_range(grade: str, grade_from: Optional[str], grade_to: Optional[str]) -> bool:
+        """
+        Check if a grade falls within the specified range.
+        
+        Args:
+            grade: The grade to check
+            grade_from: Minimum grade (inclusive), None for no lower bound
+            grade_to: Maximum grade (inclusive), None for no upper bound
+            
+        Returns:
+            True if grade is in range, False otherwise
+        """
+        try:
+            grade_value = encode_grade(grade)
+            
+            if grade_from is not None:
+                min_value = encode_grade(grade_from)
+                if grade_value < min_value:
+                    return False
+            
+            if grade_to is not None:
+                max_value = encode_grade(grade_to)
+                if grade_value > max_value:
+                    return False
+            
+            return True
+        except (ValueError, NotImplementedError):
+            # Invalid grade, exclude from results
+            return False
+    
     def _create_problem_detail(self, problem: Dict[str, Any]) -> ProblemDetail:
         """
         Create ProblemDetail from raw problem data.
@@ -127,7 +172,14 @@ class ProblemService:
             moves=moves
         )
     
-    def get_all_problems(self, page: int = 1, page_size: int = 20, benchmarks_only: Optional[bool] = None) -> tuple[List[ProblemListItem], int]:
+    def get_all_problems(
+        self, 
+        page: int = 1, 
+        page_size: int = 20, 
+        benchmarks_only: Optional[bool] = None,
+        grade_from: Optional[str] = None,
+        grade_to: Optional[str] = None
+    ) -> tuple[List[ProblemListItem], int]:
         """
         Get list of all problems with basic info (ID, name, grade), with pagination support.
         
@@ -135,6 +187,8 @@ class ProblemService:
             page: Page number (1-indexed). Defaults to 1.
             page_size: Number of items per page. Defaults to 20.
             benchmarks_only: Optional filter - True for only benchmarks, False for only non-benchmarks, None for all.
+            grade_from: Minimum grade (inclusive). Defaults to None (no lower bound).
+            grade_to: Maximum grade (inclusive). Defaults to None (no upper bound).
         
         Returns:
             Tuple of (paginated list of ProblemListItem objects, total count)
@@ -161,10 +215,16 @@ class ProblemService:
                     if not benchmarks_only and is_benchmark:
                         continue
                 
+                # Apply grade range filter if specified
+                problem_grade = problem.get('grade', 'Unknown')
+                if grade_from is not None or grade_to is not None:
+                    if not self._is_grade_in_range(problem_grade, grade_from, grade_to):
+                        continue
+                
                 result.append(ProblemListItem(
                     id=api_id,
                     name=problem.get('name', 'Unnamed'),
-                    grade=problem.get('grade', 'Unknown'),
+                    grade=problem_grade,
                     isBenchmark=is_benchmark
                 ))
             except Exception as e:

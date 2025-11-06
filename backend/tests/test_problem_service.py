@@ -446,3 +446,242 @@ class TestBenchmarkFiltering:
         assert problem2 is not None
         assert problem2.isBenchmark is False
 
+
+class TestGradeFiltering:
+    """Test suite for grade range filtering functionality."""
+    
+    def test_grade_from_filter_only(self, problem_service: ProblemService):
+        """Test filtering by minimum grade only."""
+        # Test data has: 6B+, 7A, 6C
+        # grade_from=6C should return 6C and 7A (grades >= 6C)
+        problems, total = problem_service.get_all_problems(grade_from="6C")
+        
+        assert total == 2
+        assert len(problems) == 2
+        grades = {p.grade for p in problems}
+        assert grades == {"6C", "7A"}
+    
+    def test_grade_to_filter_only(self, problem_service: ProblemService):
+        """Test filtering by maximum grade only."""
+        # Test data has: 6B+, 7A, 6C
+        # grade_to=6C should return 6B+ and 6C (grades <= 6C)
+        problems, total = problem_service.get_all_problems(grade_to="6C")
+        
+        assert total == 2
+        assert len(problems) == 2
+        grades = {p.grade for p in problems}
+        assert grades == {"6B+", "6C"}
+    
+    def test_grade_range_filter(self, problem_service: ProblemService):
+        """Test filtering by both minimum and maximum grade."""
+        # Test data has: 6B+, 7A, 6C
+        # grade_from=6B+, grade_to=6C should return 6B+ and 6C
+        problems, total = problem_service.get_all_problems(grade_from="6B+", grade_to="6C")
+        
+        assert total == 2
+        assert len(problems) == 2
+        grades = {p.grade for p in problems}
+        assert grades == {"6B+", "6C"}
+    
+    def test_grade_equal_range(self, problem_service: ProblemService):
+        """Test filtering when grade_from equals grade_to."""
+        # Should return only problems with exact grade match
+        problems, total = problem_service.get_all_problems(grade_from="6B+", grade_to="6B+")
+        
+        assert total == 1
+        assert len(problems) == 1
+        assert problems[0].grade == "6B+"
+    
+    def test_grade_filter_no_matches(self, problem_service: ProblemService):
+        """Test filtering with grade range that has no matches."""
+        # Test data has: 6B+, 7A, 6C (lowest=6B+, highest=7A)
+        # grade_from=7B should return no results
+        problems, total = problem_service.get_all_problems(grade_from="7B")
+        
+        assert total == 0
+        assert len(problems) == 0
+    
+    def test_grade_filter_case_insensitive(self, problem_service: ProblemService):
+        """Test that grade filtering is case-insensitive."""
+        # Test with lowercase grades
+        problems_lower, total_lower = problem_service.get_all_problems(grade_from="6b+", grade_to="6c")
+        problems_upper, total_upper = problem_service.get_all_problems(grade_from="6B+", grade_to="6C")
+        
+        assert total_lower == total_upper
+        assert len(problems_lower) == len(problems_upper)
+    
+    def test_grade_and_benchmark_filters_combined(self, problem_service: ProblemService):
+        """Test combining grade filter with benchmark filter."""
+        # Test data: 
+        # - 6B+ (benchmark)
+        # - 7A (non-benchmark)
+        # - 6C (benchmark)
+        
+        # Get benchmarks in grade range 6B+ to 6C
+        problems, total = problem_service.get_all_problems(
+            grade_from="6B+",
+            grade_to="6C",
+            benchmarks_only=True
+        )
+        
+        assert total == 2  # 6B+ and 6C are both benchmarks
+        assert len(problems) == 2
+        assert all(p.isBenchmark for p in problems)
+        grades = {p.grade for p in problems}
+        assert grades == {"6B+", "6C"}
+    
+    def test_grade_filter_with_pagination(self, problem_service: ProblemService):
+        """Test that grade filtering works correctly with pagination."""
+        # Get first page with page_size=1
+        page1, total = problem_service.get_all_problems(
+            grade_from="6B+",
+            grade_to="6C",
+            page=1,
+            page_size=1
+        )
+        
+        assert total == 2  # Total in range
+        assert len(page1) == 1  # Items on page
+        assert page1[0].grade in {"6B+", "6C"}
+        
+        # Get second page
+        page2, total = problem_service.get_all_problems(
+            grade_from="6B+",
+            grade_to="6C",
+            page=2,
+            page_size=1
+        )
+        
+        assert total == 2  # Total in range
+        assert len(page2) == 1  # Items on page
+        assert page2[0].grade in {"6B+", "6C"}
+    
+    def test_invalid_grade_handled_gracefully(self, problem_service: ProblemService):
+        """Test that invalid grades in problems data are excluded."""
+        # The _is_grade_in_range method should handle invalid grades
+        # by returning False, effectively excluding them
+        # This is tested implicitly by other tests, but we verify the behavior
+        problems, total = problem_service.get_all_problems(grade_from="5+", grade_to="8C+")
+        
+        # Should return all valid problems
+        assert total == 3
+    
+    def test_inverted_grade_range(self, problem_service: ProblemService):
+        """Test filtering when grade_from is greater than grade_to (inverted range)."""
+        # Test data has: 6B+, 7A, 6C
+        # grade_from=7A, grade_to=6B+ is inverted - should return no results
+        problems, total = problem_service.get_all_problems(grade_from="7A", grade_to="6B+")
+        
+        assert total == 0
+        assert len(problems) == 0
+
+
+@pytest.fixture
+def extended_problems_data() -> Dict[str, Any]:
+    """Extended sample problems data with more grades for comprehensive testing."""
+    return {
+        "total": 7,
+        "data": [
+            {
+                "name": "Easy Problem",
+                "grade": "6A",
+                "apiId": 2001,
+                "isBenchmark": False,
+                "moves": []
+            },
+            {
+                "name": "Medium Problem 1",
+                "grade": "6B+",
+                "apiId": 2002,
+                "isBenchmark": True,
+                "moves": []
+            },
+            {
+                "name": "Medium Problem 2",
+                "grade": "6C",
+                "apiId": 2003,
+                "isBenchmark": False,
+                "moves": []
+            },
+            {
+                "name": "Medium Problem 3",
+                "grade": "7A",
+                "apiId": 2004,
+                "isBenchmark": True,
+                "moves": []
+            },
+            {
+                "name": "Hard Problem 1",
+                "grade": "7B",
+                "apiId": 2005,
+                "isBenchmark": False,
+                "moves": []
+            },
+            {
+                "name": "Hard Problem 2",
+                "grade": "7C",
+                "apiId": 2006,
+                "isBenchmark": True,
+                "moves": []
+            },
+            {
+                "name": "Very Hard Problem",
+                "grade": "8A",
+                "apiId": 2007,
+                "isBenchmark": False,
+                "moves": []
+            }
+        ]
+    }
+
+
+class TestGradeFilteringExtended:
+    """Extended grade filtering tests with more comprehensive data."""
+    
+    @pytest.fixture
+    def extended_service(self, tmp_path: Path, extended_problems_data: Dict[str, Any]) -> ProblemService:
+        """Create a problem service with extended test data."""
+        json_file = tmp_path / "extended_problems.json"
+        with open(json_file, 'w', encoding='utf-8') as f:
+            json.dump(extended_problems_data, f)
+        return ProblemService(problems_path=json_file)
+    
+    def test_wide_grade_range(self, extended_service: ProblemService):
+        """Test filtering with a wide grade range."""
+        problems, total = extended_service.get_all_problems(grade_from="6B+", grade_to="7B")
+        
+        assert total == 4
+        grades = {p.grade for p in problems}
+        assert grades == {"6B+", "6C", "7A", "7B"}
+    
+    def test_narrow_grade_range(self, extended_service: ProblemService):
+        """Test filtering with a narrow grade range."""
+        problems, total = extended_service.get_all_problems(grade_from="7A", grade_to="7B")
+        
+        assert total == 2
+        grades = {p.grade for p in problems}
+        assert grades == {"7A", "7B"}
+    
+    def test_grade_from_at_minimum(self, extended_service: ProblemService):
+        """Test grade_from at the minimum available grade."""
+        problems, total = extended_service.get_all_problems(grade_from="6A")
+        
+        assert total == 7  # All problems
+    
+    def test_grade_to_at_maximum(self, extended_service: ProblemService):
+        """Test grade_to at the maximum available grade."""
+        problems, total = extended_service.get_all_problems(grade_to="8A")
+        
+        assert total == 7  # All problems
+    
+    def test_grade_from_beyond_maximum(self, extended_service: ProblemService):
+        """Test grade_from beyond all available grades."""
+        problems, total = extended_service.get_all_problems(grade_from="8B")
+        
+        assert total == 0  # No problems
+    
+    def test_grade_to_below_minimum(self, extended_service: ProblemService):
+        """Test grade_to below all available grades."""
+        problems, total = extended_service.get_all_problems(grade_to="5+")
+        
+        assert total == 0  # No problems

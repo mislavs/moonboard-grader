@@ -532,3 +532,153 @@ class TestBenchmarkFilteringAPI:
         assert response2.status_code == status.HTTP_200_OK
         data2 = response2.json()
         assert data2["isBenchmark"] is False
+
+
+class TestGradeFilteringAPI:
+    """Test suite for grade range filtering in problems endpoint."""
+    
+    def test_get_problems_grade_from_filter(self, client_with_problem_service):
+        """Test GET /problems with grade_from parameter."""
+        # Test data has 6B+ and 7A. grade_from=7A should return only 7A
+        response = client_with_problem_service.get("/problems?grade_from=7A")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["total"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["grade"] == "7A"
+    
+    def test_get_problems_grade_to_filter(self, client_with_problem_service):
+        """Test GET /problems with grade_to parameter."""
+        # Test data has 6B+ and 7A. grade_to=6B+ should return only 6B+
+        response = client_with_problem_service.get("/problems?grade_to=6B%2B")  # URL encoded +
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["total"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["grade"] == "6B+"
+    
+    def test_get_problems_grade_range_filter(self, client_with_problem_service):
+        """Test GET /problems with both grade_from and grade_to parameters."""
+        # Test data has 6B+ and 7A. Range 6B+ to 7A should return both
+        response = client_with_problem_service.get("/problems?grade_from=6B%2B&grade_to=7A")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["total"] == 2
+        assert len(data["items"]) == 2
+        grades = {item["grade"] for item in data["items"]}
+        assert grades == {"6B+", "7A"}
+    
+    def test_get_problems_grade_filter_no_matches(self, client_with_problem_service):
+        """Test GET /problems with grade range that has no matches."""
+        # Test data has 6B+ and 7A. grade_from=8A should return nothing
+        response = client_with_problem_service.get("/problems?grade_from=8A")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["total"] == 0
+        assert len(data["items"]) == 0
+    
+    def test_get_problems_invalid_grade_from(self, client_with_problem_service):
+        """Test GET /problems with invalid grade_from returns 400."""
+        response = client_with_problem_service.get("/problems?grade_from=INVALID")
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Invalid grade parameter" in response.json()["detail"]
+    
+    def test_get_problems_invalid_grade_to(self, client_with_problem_service):
+        """Test GET /problems with invalid grade_to returns 400."""
+        response = client_with_problem_service.get("/problems?grade_to=9Z")
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Invalid grade parameter" in response.json()["detail"]
+    
+    def test_grade_filter_case_insensitive(self, client_with_problem_service):
+        """Test that grade filtering is case-insensitive."""
+        # Test with lowercase grades
+        response_lower = client_with_problem_service.get("/problems?grade_from=6b%2B&grade_to=7a")
+        response_upper = client_with_problem_service.get("/problems?grade_from=6B%2B&grade_to=7A")
+        
+        assert response_lower.status_code == status.HTTP_200_OK
+        assert response_upper.status_code == status.HTTP_200_OK
+        
+        data_lower = response_lower.json()
+        data_upper = response_upper.json()
+        
+        assert data_lower["total"] == data_upper["total"]
+        assert len(data_lower["items"]) == len(data_upper["items"])
+    
+    def test_grade_and_benchmark_filters_combined(self, client_with_problem_service):
+        """Test combining grade filter with benchmark filter."""
+        # Test data: 6B+ (benchmark), 7A (non-benchmark)
+        # Get benchmarks with grade_from=6B+ should return only 6B+
+        response = client_with_problem_service.get("/problems?grade_from=6B%2B&benchmarks_only=true")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["total"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["grade"] == "6B+"
+        assert data["items"][0]["isBenchmark"] is True
+    
+    def test_grade_filter_with_pagination(self, client_with_problem_service):
+        """Test that grade filtering works with pagination."""
+        # Request with grade range and page_size=1
+        response = client_with_problem_service.get("/problems?grade_from=6B%2B&grade_to=7A&page_size=1")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["total"] == 2  # Total in range
+        assert data["page_size"] == 1
+        assert data["total_pages"] == 2
+        assert len(data["items"]) == 1
+        
+        # Get second page
+        response_page2 = client_with_problem_service.get("/problems?grade_from=6B%2B&grade_to=7A&page_size=1&page=2")
+        assert response_page2.status_code == status.HTTP_200_OK
+        data_page2 = response_page2.json()
+        
+        assert data_page2["total"] == 2
+        assert data_page2["page"] == 2
+        assert len(data_page2["items"]) == 1
+    
+    def test_grade_filter_preserves_response_schema(self, client_with_problem_service):
+        """Test that grade filtering preserves the expected response schema."""
+        response = client_with_problem_service.get("/problems?grade_from=6B%2B")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        # Verify paginated response structure
+        assert "items" in data
+        assert "total" in data and isinstance(data["total"], int)
+        assert "page" in data and isinstance(data["page"], int)
+        assert "page_size" in data and isinstance(data["page_size"], int)
+        assert "total_pages" in data and isinstance(data["total_pages"], int)
+        
+        # Verify item structure
+        for item in data["items"]:
+            assert "id" in item and isinstance(item["id"], int)
+            assert "name" in item and isinstance(item["name"], str)
+            assert "grade" in item and isinstance(item["grade"], str)
+            assert "isBenchmark" in item and isinstance(item["isBenchmark"], bool)
+    
+    def test_inverted_grade_range(self, client_with_problem_service):
+        """Test GET /problems with inverted grade range (grade_from > grade_to)."""
+        # Test data has 6B+ and 7A. grade_from=7A, grade_to=6B+ is inverted
+        response = client_with_problem_service.get("/problems?grade_from=7A&grade_to=6B%2B")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        # Should return no results for inverted range
+        assert data["total"] == 0
+        assert len(data["items"]) == 0

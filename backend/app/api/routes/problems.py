@@ -56,6 +56,8 @@ async def get_problems_list(
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(20, ge=1, le=100, description="Number of items per page"),
     benchmarks_only: Optional[bool] = Query(None, description="Filter by benchmark status (true for benchmarks only, false for non-benchmarks only, null for all)"),
+    grade_from: Optional[str] = Query(None, description="Minimum grade (inclusive, e.g., '6B+')"),
+    grade_to: Optional[str] = Query(None, description="Maximum grade (inclusive, e.g., '7A')"),
     problem_service: ProblemService = Depends(get_problem_service)
 ):
     """
@@ -68,16 +70,52 @@ async def get_problems_list(
         page: Page number, starting from 1 (default: 1)
         page_size: Number of items per page, max 100 (default: 20)
         benchmarks_only: Optional filter - true for benchmarks only, false for non-benchmarks only, null for all
+        grade_from: Minimum grade filter (inclusive), e.g., '6B+'. Case-insensitive. (default: None)
+        grade_to: Maximum grade filter (inclusive), e.g., '7A'. Case-insensitive. (default: None)
         problem_service: Injected problem service (dependency)
         
     Returns:
         PaginatedProblemsResponse with items, pagination metadata, and total count
         
     Raises:
-        HTTPException: If problems data cannot be loaded
+        HTTPException: If problems data cannot be loaded or if invalid grade is provided
     """
+    # Validate grade parameters if provided
+    if grade_from is not None or grade_to is not None:
+        try:
+            # Import here to avoid circular dependency issues
+            import sys
+            from pathlib import Path as PathLib
+            # Add classifier to path if not already there
+            classifier_path = PathLib(__file__).parent.parent.parent.parent.parent / "classifier"
+            if classifier_path.exists() and str(classifier_path) not in sys.path:
+                sys.path.insert(0, str(classifier_path))
+            from src.grade_encoder import encode_grade  # type: ignore
+            
+            if grade_from is not None:
+                encode_grade(grade_from)  # Will raise ValueError if invalid
+            if grade_to is not None:
+                encode_grade(grade_to)  # Will raise ValueError if invalid
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid grade parameter: {str(e)}"
+            )
+        except ImportError as e:
+            logger.error(f"Failed to import grade_encoder: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Grade encoder not available"
+            )
+    
     try:
-        items, total = problem_service.get_all_problems(page=page, page_size=page_size, benchmarks_only=benchmarks_only)
+        items, total = problem_service.get_all_problems(
+            page=page, 
+            page_size=page_size, 
+            benchmarks_only=benchmarks_only,
+            grade_from=grade_from,
+            grade_to=grade_to
+        )
         total_pages = math.ceil(total / page_size) if total > 0 else 0
         
         return PaginatedProblemsResponse(
