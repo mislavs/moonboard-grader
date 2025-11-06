@@ -83,8 +83,9 @@ def train_command(args):
     print(f"\n📊 Dataset Statistics:")
     print(f"   Total problems: {stats['total_problems']}")
     print(f"   Grade distribution:")
-    for grade, count in sorted(stats['grade_distribution'].items()):
-        print(f"      {grade}: {count}")
+    for grade_label, count in sorted(stats['grade_distribution'].items()):
+        grade_name = decode_grade(grade_label)
+        print(f"      {grade_name}: {count}")
     
     # Create data splits with augmentation
     print(f"\n🔀 Creating train/val/test splits...")
