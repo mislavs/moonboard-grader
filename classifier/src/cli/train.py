@@ -1,0 +1,307 @@
+"""
+Train Command
+
+Handles model training workflow including data loading, model creation,
+training loop execution, and evaluation.
+"""
+
+import sys
+from pathlib import Path
+import torch
+from torch import nn, optim
+import numpy as np
+from sklearn.utils.class_weight import compute_class_weight
+
+from .utils import load_config, setup_device, print_section_header, print_completion_message
+from src import (
+    load_dataset,
+    get_dataset_stats,
+    create_datasets_with_augmentation,
+    create_data_loaders,
+    create_model,
+    count_parameters,
+    Trainer,
+    evaluate_model,
+    generate_confusion_matrix,
+    plot_confusion_matrix,
+    decode_grade,
+    get_all_grades,
+)
+
+
+def setup_train_parser(subparsers):
+    """
+    Setup argument parser for train command.
+    
+    Args:
+        subparsers: ArgumentParser subparsers object
+        
+    Returns:
+        Configured train parser
+    """
+    train_parser = subparsers.add_parser('train', help='Train a new model')
+    train_parser.add_argument(
+        '--config',
+        type=str,
+        default='config.yaml',
+        help='Path to configuration YAML file (default: config.yaml)'
+    )
+    train_parser.set_defaults(func=train_command)
+    return train_parser
+
+
+def train_command(args):
+    """
+    Execute training command.
+    
+    Args:
+        args: Parsed command-line arguments
+    """
+    print_section_header("MOONBOARD GRADE PREDICTION - TRAINING")
+    
+    # Load configuration
+    config = load_config(args.config)
+    print(f"\n✓ Loaded configuration from: {args.config}")
+    
+    # Set device
+    device_name = config.get('device', 'cpu')
+    device, device_name = setup_device(device_name)
+    print(f"✓ Using device: {device}")
+    
+    # Load dataset
+    data_path = config['data']['path']
+    print(f"\n📂 Loading dataset from: {data_path}")
+    dataset = load_dataset(data_path)
+    
+    if len(dataset) == 0:
+        print("❌ Error: No problems found in dataset")
+        sys.exit(1)
+    
+    # Get dataset statistics
+    stats = get_dataset_stats(dataset)
+    print(f"\n📊 Dataset Statistics:")
+    print(f"   Total problems: {stats['total_problems']}")
+    print(f"   Grade distribution:")
+    for grade_label, count in sorted(stats['grade_distribution'].items()):
+        grade_name = decode_grade(grade_label)
+        print(f"      {grade_name}: {count}")
+    
+    # Create data splits with augmentation
+    print(f"\n🔀 Creating train/val/test splits...")
+    tensors = np.array([x[0] for x in dataset])
+    labels = np.array([x[1] for x in dataset])
+    
+    train_ratio = config['data']['train_ratio']
+    val_ratio = config['data']['val_ratio']
+    test_ratio = config['data']['test_ratio']
+    random_seed = config['data'].get('random_seed', 42)
+    
+    # Create datasets with augmentation using new module
+    train_dataset, val_dataset, test_dataset = create_datasets_with_augmentation(
+        tensors, labels, config, train_ratio, val_ratio, test_ratio, random_seed
+    )
+    
+    print(f"   Train: {len(train_dataset)} ({train_ratio*100:.0f}%)")
+    print(f"   Val:   {len(val_dataset)} ({val_ratio*100:.0f}%)")
+    print(f"   Test:  {len(test_dataset)} ({test_ratio*100:.0f}%)")
+    
+    # Display augmentation info
+    use_augmentation = config.get('data', {}).get('augmentation', True)
+    aug_type = config.get('data', {}).get('augmentation_type', 'basic')
+    if use_augmentation:
+        if aug_type == 'advanced':
+            print(f"   Using ADVANCED data augmentation (flip, noise, dropout, jitter)")
+        else:
+            flip_prob = config.get('data', {}).get('flip_probability', 0.5)
+            print(f"   Using basic data augmentation (flip_prob={flip_prob})")
+    
+    # Create data loaders
+    batch_size = config['training']['batch_size']
+    train_loader, val_loader, test_loader = create_data_loaders(
+        train_dataset, val_dataset, test_dataset, batch_size
+    )
+    
+    # Create model
+    model_type = config['model']['type']
+    num_classes = config['model']['num_classes']
+    print(f"\n🧠 Creating model: {model_type.upper()}")
+    
+    # Extract model-specific parameters from config
+    model_params = {
+        'use_attention': config['model'].get('use_attention', True),
+        'dropout_conv': config['model'].get('dropout_conv', 0.1),
+        'dropout_fc1': config['model'].get('dropout_fc1', 0.3),
+        'dropout_fc2': config['model'].get('dropout_fc2', 0.4)
+    }
+    
+    # Create model using unified factory (handles all model types)
+    model = create_model(
+        model_type=model_type,
+        num_classes=num_classes,
+        **model_params
+    )
+    
+    # Print model-specific info
+    if model_type in ['residual_cnn', 'deep_residual_cnn']:
+        print(f"   Using advanced model with attention: {model_params['use_attention']}")
+    
+    model = model.to(device)
+    
+    num_params = count_parameters(model)
+    print(f"   Parameters: {num_params:,}")
+    
+    # Create optimizer
+    optimizer_type = config['training'].get('optimizer', 'adam').lower()
+    learning_rate = config['training']['learning_rate']
+    weight_decay = config['training'].get('weight_decay', 0.0001)
+    
+    if optimizer_type == 'adam':
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    elif optimizer_type == 'sgd':
+        optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=weight_decay)
+    else:
+        raise ValueError(f"Unknown optimizer: {optimizer_type}")
+    
+    print(f"   Optimizer: {optimizer_type.upper()} (lr={learning_rate}, weight_decay={weight_decay})")
+    
+    # Calculate class weights for imbalanced dataset
+    label_smoothing = config['training'].get('label_smoothing', 0.0)
+    
+    if config['training'].get('use_class_weights', True):
+        # Calculate class weights using sklearn's balanced approach
+        # This handles class imbalance without extreme weights
+        # Get labels from training dataset
+        train_labels = train_dataset.labels
+        unique_classes = np.unique(train_labels)
+        class_weights_array = compute_class_weight(
+            class_weight='balanced',
+            classes=unique_classes,
+            y=train_labels
+        )
+        
+        # Create full weight array for all classes (including those not in training set)
+        class_weights = np.ones(num_classes)
+        class_weights[unique_classes] = class_weights_array
+        
+        # Cap weights to reasonable range to prevent extreme values
+        # Max weight of 5.0 means rare classes get at most 5x importance
+        max_weight = config['training'].get('max_class_weight', 5.0)
+        class_weights = np.clip(class_weights, 0.1, max_weight)
+        
+        class_weights = torch.FloatTensor(class_weights).to(device)
+        
+        print(f"   Using balanced class weights (capped at {max_weight})")
+        print(f"   Weight range: {class_weights.min():.2f} - {class_weights.max():.2f}")
+    else:
+        class_weights = None
+    
+    # Create loss function (support advanced loss functions)
+    loss_type = config['training'].get('loss_type', 'ce')
+    if loss_type != 'ce':
+        from src.losses import create_loss_function
+        criterion = create_loss_function(
+            loss_type=loss_type,
+            num_classes=num_classes,
+            class_weights=class_weights,
+            gamma=config['training'].get('focal_gamma', 2.0),
+            ordinal_weight=config['training'].get('ordinal_weight', 0.5),
+            ordinal_alpha=config['training'].get('ordinal_alpha', 2.0),
+            smoothing=label_smoothing
+        )
+        print(f"   Using {loss_type} loss")
+        if loss_type in ['focal', 'focal_ordinal']:
+            print(f"   Focal gamma: {config['training'].get('focal_gamma', 2.0)}")
+        if loss_type in ['ordinal', 'focal_ordinal']:
+            print(f"   Ordinal alpha: {config['training'].get('ordinal_alpha', 2.0)}")
+    else:
+        criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)
+    
+    if label_smoothing > 0:
+        print(f"   Using label smoothing: {label_smoothing}")
+    
+    # Create learning rate scheduler
+    use_scheduler = config['training'].get('use_scheduler', True)
+    scheduler = None
+    if use_scheduler:
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode='min',
+            factor=0.3,      # More aggressive reduction (was 0.5)
+            patience=3,      # Faster response to plateaus (was 5)
+            min_lr=1e-7      # Lower minimum (was 1e-6)
+        )
+        print(f"   Using ReduceLROnPlateau scheduler (factor=0.3, patience=3)")
+    
+    # Create checkpoint directory
+    checkpoint_dir = Path(config['checkpoint']['dir'])
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Get gradient clipping value
+    gradient_clip = config['training'].get('gradient_clip', None)
+    
+    # Create trainer
+    trainer = Trainer(
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        optimizer=optimizer,
+        criterion=criterion,
+        device=device,
+        checkpoint_dir=str(checkpoint_dir),
+        scheduler=scheduler,
+        gradient_clip=gradient_clip
+    )
+    
+    if gradient_clip is not None:
+        print(f"   Using gradient clipping: max_norm={gradient_clip}")
+    
+    # Train model
+    num_epochs = config['training']['num_epochs']
+    early_stopping_patience = config['training'].get('early_stopping_patience')
+    
+    print(f"\n🏋️  Training for {num_epochs} epochs...")
+    if early_stopping_patience:
+        print(f"   Early stopping: patience={early_stopping_patience}")
+    
+    history = trainer.fit(
+        num_epochs=num_epochs,
+        early_stopping_patience=early_stopping_patience,
+        verbose=True
+    )
+    
+    # Save training history
+    trainer.save_history("training_history.json")
+    history_path = checkpoint_dir / "training_history.json"
+    print(f"\n✓ Saved training history to: {history_path}")
+    
+    # Evaluate on test set
+    print(f"\n📈 Evaluating on test set...")
+    test_metrics = evaluate_model(model, test_loader, device)
+    
+    print(f"\n🎯 Test Set Results:")
+    print(f"   Exact Accuracy:  {test_metrics['exact_accuracy']:.2f}%")
+    print(f"   ±1 Grade Accuracy: {test_metrics['tolerance_1_accuracy']:.2f}%")
+    print(f"   ±2 Grade Accuracy: {test_metrics['tolerance_2_accuracy']:.2f}%")
+    print(f"   Loss: {test_metrics['avg_loss']:.4f}")
+    
+    # Save confusion matrix if requested
+    if config.get('evaluation', {}).get('save_confusion_matrix', False):
+        cm_path = config['evaluation'].get('confusion_matrix_path', 'models/confusion_matrix.png')
+        cm_path = Path(cm_path)
+        cm_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        cm = generate_confusion_matrix(
+            test_metrics['predictions'],
+            test_metrics['labels']
+        )
+        
+        plot_confusion_matrix(
+            cm,
+            get_all_grades(),
+            str(cm_path),
+            normalize=True
+        )
+        print(f"\n✓ Saved confusion matrix to: {cm_path}")
+    
+    print_completion_message("✅ Training completed successfully!")
+

@@ -137,6 +137,7 @@ __all__ = [
     'trainer',
     'evaluator',
     'predictor',
+    'cli',
     # Grade encoder functions
     'encode_grade',
     'decode_grade',

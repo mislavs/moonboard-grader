@@ -13,7 +13,10 @@ import torch
 
 # Import the functions we're testing
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from main import load_config, train_command, evaluate_command, predict_command
+from src.cli.utils import load_config
+from src.cli.train import train_command
+from src.cli.evaluate import evaluate_command
+from src.cli.predict import predict_command
 
 
 class TestLoadConfig:
@@ -501,14 +504,20 @@ class TestCLIIntegration:
             assert 'test_ratio' in config['data']
     
     def test_main_script_importable(self):
-        """Test that main.py can be imported."""
+        """Test that main.py can be imported and has proper structure."""
         import main
         
-        assert hasattr(main, 'load_config')
+        # Main entry point should exist
+        assert hasattr(main, 'main')
+        
+        # Commands should be importable (they're imported in main.py)
         assert hasattr(main, 'train_command')
         assert hasattr(main, 'evaluate_command')
         assert hasattr(main, 'predict_command')
-        assert hasattr(main, 'main')
+        
+        # Utilities are now in CLI module
+        from src.cli.utils import load_config
+        assert callable(load_config)
     
     def test_argparse_train_subcommand(self):
         """Test that train subcommand parser works."""
