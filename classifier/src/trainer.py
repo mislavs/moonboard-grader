@@ -192,7 +192,7 @@ class Trainer:
         num_epochs: int,
         early_stopping_patience: Optional[int] = None,
         verbose: bool = True
-    ) -> Dict[str, List[float]]:
+    ) -> Tuple[Dict[str, List[float]], Dict[str, float]]:
         """
         Train the model for multiple epochs with optional early stopping.
         
@@ -203,17 +203,16 @@ class Trainer:
             verbose: Whether to print training progress
             
         Returns:
-            Dictionary containing training history with keys:
-                - 'train_loss': List of training losses per epoch
-                - 'val_loss': List of validation losses per epoch
-                - 'val_accuracy': List of validation accuracies per epoch
+            Tuple containing:
+                - Dictionary with training history (train_loss, val_loss, val_accuracy)
+                - Dictionary with final metrics (final_val_loss, final_val_accuracy)
                 
         Raises:
             ValueError: If num_epochs is not positive
             
         Examples:
             >>> trainer = Trainer(model, train_loader, val_loader, optimizer, criterion)
-            >>> history = trainer.fit(num_epochs=50, early_stopping_patience=5)
+            >>> history, final_metrics = trainer.fit(num_epochs=50, early_stopping_patience=5)
         """
         if num_epochs <= 0:
             raise ValueError("num_epochs must be positive")
@@ -280,7 +279,13 @@ class Trainer:
             if self.val_loader is not None:
                 print(f"Best validation loss: {self.best_val_loss:.4f}")
         
-        return self.history
+        # Prepare final metrics
+        final_metrics = {
+            'final_val_loss': self.history['val_loss'][-1] if self.history['val_loss'] else 0.0,
+            'final_val_accuracy': self.history['val_accuracy'][-1] if self.history['val_accuracy'] else 0.0
+        }
+        
+        return self.history, final_metrics
     
     def save_checkpoint(self, filename: str) -> None:
         """

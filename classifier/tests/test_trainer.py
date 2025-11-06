@@ -385,7 +385,7 @@ def test_fit_basic(simple_model, tiny_dataloaders, temp_checkpoint_dir):
         checkpoint_dir=temp_checkpoint_dir
     )
     
-    history = trainer.fit(num_epochs=3, verbose=False)
+    history, final_metrics = trainer.fit(num_epochs=3, verbose=False)
     
     assert 'train_loss' in history
     assert 'val_loss' in history
@@ -393,6 +393,8 @@ def test_fit_basic(simple_model, tiny_dataloaders, temp_checkpoint_dir):
     assert len(history['train_loss']) == 3
     assert len(history['val_loss']) == 3
     assert len(history['val_accuracy']) == 3
+    assert 'final_val_loss' in final_metrics
+    assert 'final_val_accuracy' in final_metrics
 
 
 def test_fit_loss_decreases(simple_model, tiny_dataloaders, temp_checkpoint_dir):
@@ -410,7 +412,7 @@ def test_fit_loss_decreases(simple_model, tiny_dataloaders, temp_checkpoint_dir)
         checkpoint_dir=temp_checkpoint_dir
     )
     
-    history = trainer.fit(num_epochs=10, verbose=False)
+    history, _ = trainer.fit(num_epochs=10, verbose=False)
     
     # Loss should generally decrease (allow some fluctuation)
     first_loss = history['train_loss'][0]
@@ -477,7 +479,7 @@ def test_fit_without_validation(simple_model, tiny_dataloaders, temp_checkpoint_
         checkpoint_dir=temp_checkpoint_dir
     )
     
-    history = trainer.fit(num_epochs=3, verbose=False)
+    history, _ = trainer.fit(num_epochs=3, verbose=False)
     
     assert len(history['train_loss']) == 3
     assert all(loss == 0.0 for loss in history['val_loss'])
@@ -526,7 +528,7 @@ def test_early_stopping_triggers(simple_model, tiny_dataloaders, temp_checkpoint
     )
     
     # Train with early stopping patience
-    history = trainer.fit(num_epochs=20, early_stopping_patience=3, verbose=False)
+    history, _ = trainer.fit(num_epochs=20, early_stopping_patience=3, verbose=False)
     
     # Verify early stopping attributes exist and are tracked
     assert hasattr(trainer, 'epochs_without_improvement')
@@ -557,7 +559,7 @@ def test_early_stopping_without_val_loader(simple_model, tiny_dataloaders, temp_
     )
     
     # Should complete all epochs even with early stopping patience
-    history = trainer.fit(num_epochs=5, early_stopping_patience=2, verbose=False)
+    history, _ = trainer.fit(num_epochs=5, early_stopping_patience=2, verbose=False)
     
     assert len(history['train_loss']) == 5
 
@@ -578,7 +580,7 @@ def test_no_early_stopping_when_patience_none(simple_model, tiny_dataloaders, te
     )
     
     # Should complete all epochs without early stopping
-    history = trainer.fit(num_epochs=5, early_stopping_patience=None, verbose=False)
+    history, _ = trainer.fit(num_epochs=5, early_stopping_patience=None, verbose=False)
     
     assert len(history['train_loss']) == 5
 
@@ -599,7 +601,7 @@ def test_best_val_loss_tracking(simple_model, tiny_dataloaders, temp_checkpoint_
     )
     
     # Train for a few epochs
-    history = trainer.fit(num_epochs=5, verbose=False)
+    history, _ = trainer.fit(num_epochs=5, verbose=False)
     
     # Best val loss should be the minimum of all validation losses
     assert trainer.best_val_loss == min(history['val_loss'])
@@ -769,7 +771,7 @@ def test_history_tracking(simple_model, tiny_dataloaders, temp_checkpoint_dir):
     )
     
     num_epochs = 5
-    history = trainer.fit(num_epochs=num_epochs, verbose=False)
+    history, _ = trainer.fit(num_epochs=num_epochs, verbose=False)
     
     # Check history structure
     assert isinstance(history, dict)
@@ -866,7 +868,7 @@ def test_trainer_with_cnn_model(tiny_dataloaders, temp_checkpoint_dir):
         checkpoint_dir=temp_checkpoint_dir
     )
     
-    history = trainer.fit(num_epochs=3, verbose=False)
+    history, _ = trainer.fit(num_epochs=3, verbose=False)
     
     assert len(history['train_loss']) == 3
     assert all(isinstance(loss, float) for loss in history['train_loss'])
@@ -891,7 +893,7 @@ def test_trainer_with_sgd_optimizer(simple_model, tiny_dataloaders, temp_checkpo
         checkpoint_dir=temp_checkpoint_dir
     )
     
-    history = trainer.fit(num_epochs=3, verbose=False)
+    history, _ = trainer.fit(num_epochs=3, verbose=False)
     
     assert len(history['train_loss']) == 3
 

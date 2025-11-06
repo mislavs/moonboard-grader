@@ -6,7 +6,9 @@ training loop execution, and evaluation.
 """
 
 import sys
+import shutil
 from pathlib import Path
+from datetime import datetime
 import torch
 from torch import nn, optim
 import numpy as np
@@ -27,6 +29,54 @@ from src import (
     decode_grade,
     get_all_grades,
 )
+
+
+def append_training_log(log_path: Path, model_filename: str, config: dict, 
+                        test_metrics: dict, training_time: str, duration: str) -> None:
+    """
+    Append training session results to the log file.
+    
+    Args:
+        log_path: Path to the log file
+        model_filename: Name of the saved model file
+        config: Configuration dictionary
+        test_metrics: Dictionary containing test metrics
+        training_time: Timestamp string for this training session
+        duration: Training duration string (e.g., "15m 23s")
+    """
+    log_entry = f"""
+{'=' * 80}
+TRAINING SESSION: {training_time}
+{'=' * 80}
+
+Model File: {model_filename}
+Training Duration: {duration}
+
+Hyperparameters:
+  - Model Type: {config['model']['type']}
+  - Epochs: {config['training']['num_epochs']}
+  - Learning Rate: {config['training']['learning_rate']}
+  - Batch Size: {config['training']['batch_size']}
+  - Optimizer: {config['training'].get('optimizer', 'adam').upper()}
+  - Weight Decay: {config['training'].get('weight_decay', 0.0001)}
+  - Early Stopping Patience: {config['training'].get('early_stopping_patience', 'None')}
+  - Loss Type: {config['training'].get('loss_type', 'ce')}
+  - Use Class Weights: {config['training'].get('use_class_weights', True)}
+  - Label Smoothing: {config['training'].get('label_smoothing', 0.0)}
+  - Augmentation: {config.get('data', {}).get('augmentation', True)}
+  - Augmentation Type: {config.get('data', {}).get('augmentation_type', 'basic')}
+
+Test Set Results:
+  - Exact Accuracy:     {test_metrics['exact_accuracy']:.2f}%
+  - ±1 Grade Accuracy:  {test_metrics['tolerance_1_accuracy']:.2f}%
+  - ±2 Grade Accuracy:  {test_metrics['tolerance_2_accuracy']:.2f}%
+  - Loss:               {test_metrics['avg_loss']:.4f}
+
+"""
+    
+    # Append to log file
+    with open(log_path, 'a', encoding='utf-8') as f:
+        f.write(log_entry)
 
 
 def setup_train_parser(subparsers):
@@ -263,11 +313,31 @@ def train_command(args):
     if early_stopping_patience:
         print(f"   Early stopping: patience={early_stopping_patience}")
     
-    history = trainer.fit(
+    # Record start time
+    training_start_time = datetime.now()
+    
+    history, final_metrics = trainer.fit(
         num_epochs=num_epochs,
         early_stopping_patience=early_stopping_patience,
         verbose=True
     )
+    
+    # Calculate training duration
+    training_end_time = datetime.now()
+    training_duration = training_end_time - training_start_time
+    total_seconds = int(training_duration.total_seconds())
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    
+    if hours > 0:
+        duration_str = f"{hours}h {minutes}m {seconds}s"
+    elif minutes > 0:
+        duration_str = f"{minutes}m {seconds}s"
+    else:
+        duration_str = f"{seconds}s"
+    
+    print(f"\n⏱️  Training duration: {duration_str}")
     
     # Save training history
     trainer.save_history("training_history.json")
@@ -284,11 +354,16 @@ def train_command(args):
     print(f"   ±2 Grade Accuracy: {test_metrics['tolerance_2_accuracy']:.2f}%")
     print(f"   Loss: {test_metrics['avg_loss']:.4f}")
     
-    # Save confusion matrix if requested
+    # Generate unique timestamp for this training session
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    exact_acc = int(test_metrics['exact_accuracy'])
+    tol1_acc = int(test_metrics['tolerance_1_accuracy'])
+    tol2_acc = int(test_metrics['tolerance_2_accuracy'])
+    
+    # Save confusion matrix if requested (using the same timestamp)
     if config.get('evaluation', {}).get('save_confusion_matrix', False):
-        cm_path = config['evaluation'].get('confusion_matrix_path', 'models/confusion_matrix.png')
-        cm_path = Path(cm_path)
-        cm_path.parent.mkdir(parents=True, exist_ok=True)
+        cm_filename = f"confusion_matrix_{timestamp}.png"
+        cm_path = checkpoint_dir / cm_filename
         
         cm = generate_confusion_matrix(
             test_metrics['predictions'],
@@ -302,6 +377,22 @@ def train_command(args):
             normalize=True
         )
         print(f"\n✓ Saved confusion matrix to: {cm_path}")
+    
+    # Generate unique model filename with timestamp and accuracy metrics
+    unique_model_filename = f"model_{timestamp}_acc{exact_acc}_tol1-{tol1_acc}_tol2-{tol2_acc}.pth"
+    unique_model_path = checkpoint_dir / unique_model_filename
+    
+    # Copy the best model to the unique filename
+    best_model_path = checkpoint_dir / "best_model.pth"
+    if best_model_path.exists():
+        shutil.copy2(best_model_path, unique_model_path)
+        print(f"\n✓ Saved unique model to: {unique_model_path}")
+    
+    # Append to training log
+    log_path = checkpoint_dir / "training_log.txt"
+    training_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    append_training_log(log_path, unique_model_filename, config, test_metrics, training_time, duration_str)
+    print(f"✓ Appended results to training log: {log_path}")
     
     print_completion_message("✅ Training completed successfully!")
 
