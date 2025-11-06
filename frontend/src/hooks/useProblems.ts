@@ -13,6 +13,8 @@ interface UseProblemsReturn {
   goToPreviousPage: () => void;
   canGoNext: boolean;
   canGoPrevious: boolean;
+  benchmarkFilter: boolean | null;
+  setBenchmarkFilter: (filter: boolean | null) => void;
 }
 
 export function useProblems(
@@ -23,13 +25,14 @@ export function useProblems(
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [benchmarkFilter, setBenchmarkFilter] = useState<boolean | null>(null);
 
   useEffect(() => {
     async function loadProblems() {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetchProblems(page, DEFAULT_PAGE_SIZE);
+        const response = await fetchProblems(page, DEFAULT_PAGE_SIZE, benchmarkFilter);
         
         setProblems(response.items);
         setTotalPages(response.total_pages);
@@ -50,7 +53,7 @@ export function useProblems(
 
     loadProblems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [page, benchmarkFilter]);
 
   const goToNextPage = useCallback(() => {
     setPage((prev) => Math.min(prev + 1, totalPages));
@@ -58,6 +61,11 @@ export function useProblems(
 
   const goToPreviousPage = useCallback(() => {
     setPage((prev) => Math.max(prev - 1, 1));
+  }, []);
+
+  const handleSetBenchmarkFilter = useCallback((filter: boolean | null) => {
+    setBenchmarkFilter(filter);
+    setPage(1); // Reset to first page when filter changes
   }, []);
 
   return {
@@ -70,6 +78,8 @@ export function useProblems(
     goToPreviousPage,
     canGoNext: page < totalPages,
     canGoPrevious: page > 1,
+    benchmarkFilter,
+    setBenchmarkFilter: handleSetBenchmarkFilter,
   };
 }
 

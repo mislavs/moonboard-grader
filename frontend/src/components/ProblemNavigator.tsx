@@ -2,6 +2,7 @@ import ErrorMessage from './ErrorMessage';
 import LoadingSpinner from './LoadingSpinner';
 import ProblemListItem from './ProblemListItem';
 import PaginationControls from './PaginationControls';
+import BenchmarkFilter from './BenchmarkFilter';
 import { useProblems } from '../hooks/useProblems';
 
 interface ProblemNavigatorProps {
@@ -25,15 +26,21 @@ export default function ProblemNavigator({
     goToPreviousPage,
     canGoNext,
     canGoPrevious,
+    benchmarkFilter,
+    setBenchmarkFilter,
   } = useProblems(onFirstProblemLoaded);
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 shadow-lg flex flex-col" style={{ height: '976px' }}>
-      {loading && <LoadingSpinner message="Loading problems..." />}
+    <div className="bg-gray-800 rounded-lg p-4 shadow-lg flex flex-col relative" style={{ height: '976px' }}>
       {error && <ErrorMessage message={error} />}
 
-      {!loading && !error && (
+      {!error && (
         <>
+          <BenchmarkFilter
+            benchmarkFilter={benchmarkFilter}
+            onFilterChange={setBenchmarkFilter}
+          />
+
           <div className="space-y-2 overflow-y-auto mb-4 flex-1 min-h-0">
             {problems.map((problem) => (
               <ProblemListItem
@@ -54,6 +61,13 @@ export default function ProblemNavigator({
             canGoNext={canGoNext}
           />
         </>
+      )}
+
+      {/* Loading Overlay */}
+      {loading && (
+        <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center z-10">
+          <LoadingSpinner message="Loading problems..." />
+        </div>
       )}
     </div>
   );

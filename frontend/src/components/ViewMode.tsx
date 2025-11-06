@@ -62,11 +62,17 @@ export default function ViewMode() {
         </div>
 
         {/* Right Panel: MoonBoard */}
-        <div className="flex flex-col">
-          {loading && <LoadingSpinner message="Loading problem..." />}
+        <div className="flex flex-col relative">
           {error && <ErrorMessage message={error} />}
-          {problem && !loading && !error && (
+          {problem && !error && (
             <MoonBoard problem={problem} mode="view" />
+          )}
+          
+          {/* Loading Overlay */}
+          {loading && (
+            <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center z-10">
+              <LoadingSpinner message="Loading problem..." />
+            </div>
           )}
         </div>
       </div>

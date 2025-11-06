@@ -97,6 +97,7 @@ export interface ProblemSummary {
   id: number;
   name: string;
   grade: string;
+  isBenchmark: boolean;
 }
 
 /**
@@ -115,11 +116,16 @@ export interface PaginatedProblemsResponse {
  */
 export async function fetchProblems(
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 20,
+  benchmarksOnly?: boolean | null
 ): Promise<PaginatedProblemsResponse> {
-  return apiFetch<PaginatedProblemsResponse>(
-    `${API_BASE_URL}/problems?page=${page}&page_size=${pageSize}`
-  );
+  let url = `${API_BASE_URL}/problems?page=${page}&page_size=${pageSize}`;
+  
+  if (benchmarksOnly !== null && benchmarksOnly !== undefined) {
+    url += `&benchmarks_only=${benchmarksOnly}`;
+  }
+  
+  return apiFetch<PaginatedProblemsResponse>(url);
 }
 
 /**
