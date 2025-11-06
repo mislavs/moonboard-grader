@@ -450,3 +450,85 @@ class TestCheckDuplicateEndpoint:
         assert "problem_id" in data
         if data["problem_id"] is not None:
             assert isinstance(data["problem_id"], int)
+
+
+class TestBenchmarkFilteringAPI:
+    """Test suite for benchmark filtering in problems endpoint."""
+    
+    def test_get_problems_benchmarks_only_true(self, client_with_problem_service):
+        """Test GET /problems with benchmarks_only=true."""
+        response = client_with_problem_service.get("/problems?benchmarks_only=true")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        # Should return only the benchmark problem (ID 305445)
+        assert data["total"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["id"] == SAMPLE_PROBLEM_ID_1
+        assert data["items"][0]["isBenchmark"] is True
+    
+    def test_get_problems_benchmarks_only_false(self, client_with_problem_service):
+        """Test GET /problems with benchmarks_only=false."""
+        response = client_with_problem_service.get("/problems?benchmarks_only=false")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        # Should return only the non-benchmark problem (ID 123456)
+        assert data["total"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["id"] == SAMPLE_PROBLEM_ID_2
+        assert data["items"][0]["isBenchmark"] is False
+    
+    def test_get_problems_no_filter(self, client_with_problem_service):
+        """Test GET /problems without benchmark filter returns all problems."""
+        response = client_with_problem_service.get("/problems")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        # Should return all problems
+        assert data["total"] == 2
+        assert len(data["items"]) == 2
+    
+    def test_benchmark_filter_with_pagination(self, client_with_problem_service):
+        """Test that benchmark filtering works with pagination."""
+        # Request benchmarks with small page size
+        response = client_with_problem_service.get("/problems?benchmarks_only=true&page_size=1")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["total"] == 1  # Only 1 benchmark in test data
+        assert data["page_size"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["isBenchmark"] is True
+    
+    def test_isbenchmark_field_in_response(self, client_with_problem_service):
+        """Test that isBenchmark field is included in response."""
+        response = client_with_problem_service.get("/problems")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        # Check that all items have isBenchmark field
+        for item in data["items"]:
+            assert "isBenchmark" in item
+            assert isinstance(item["isBenchmark"], bool)
+    
+    def test_problem_detail_includes_isbenchmark(self, client_with_problem_service):
+        """Test that problem detail endpoint includes isBenchmark field."""
+        response = client_with_problem_service.get(f"/problems/{SAMPLE_PROBLEM_ID_1}")
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert "isBenchmark" in data
+        assert data["isBenchmark"] is True
+        
+        # Check non-benchmark problem
+        response2 = client_with_problem_service.get(f"/problems/{SAMPLE_PROBLEM_ID_2}")
+        assert response2.status_code == status.HTTP_200_OK
+        data2 = response2.json()
+        assert data2["isBenchmark"] is False

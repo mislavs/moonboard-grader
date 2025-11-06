@@ -7,6 +7,7 @@ Provides endpoints for browsing and managing problem data.
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 import logging
 import math
+from typing import Optional
 
 from ...models.schemas import (
     ProblemDetail,
@@ -54,17 +55,19 @@ def _handle_problem_service_error(e: Exception, context: str = "loading problems
 async def get_problems_list(
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(20, ge=1, le=100, description="Number of items per page"),
+    benchmarks_only: Optional[bool] = Query(None, description="Filter by benchmark status (true for benchmarks only, false for non-benchmarks only, null for all)"),
     problem_service: ProblemService = Depends(get_problem_service)
 ):
     """
     Get paginated list of problems with basic information.
     
-    Returns a paginated list of problems containing only id, name, and grade.
+    Returns a paginated list of problems containing only id, name, grade, and isBenchmark.
     Useful for dropdowns and problem selection interfaces.
     
     Args:
         page: Page number, starting from 1 (default: 1)
         page_size: Number of items per page, max 100 (default: 20)
+        benchmarks_only: Optional filter - true for benchmarks only, false for non-benchmarks only, null for all
         problem_service: Injected problem service (dependency)
         
     Returns:
@@ -74,7 +77,7 @@ async def get_problems_list(
         HTTPException: If problems data cannot be loaded
     """
     try:
-        items, total = problem_service.get_all_problems(page=page, page_size=page_size)
+        items, total = problem_service.get_all_problems(page=page, page_size=page_size, benchmarks_only=benchmarks_only)
         total_pages = math.ceil(total / page_size) if total > 0 else 0
         
         return PaginatedProblemsResponse(

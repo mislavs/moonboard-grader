@@ -123,16 +123,18 @@ class ProblemService:
             grade=problem.get('grade', 'Unknown'),
             setby=problem.get('setby', ''),
             repeats=problem.get('repeats', 0),
+            isBenchmark=problem.get('isBenchmark', False),
             moves=moves
         )
     
-    def get_all_problems(self, page: int = 1, page_size: int = 20) -> tuple[List[ProblemListItem], int]:
+    def get_all_problems(self, page: int = 1, page_size: int = 20, benchmarks_only: Optional[bool] = None) -> tuple[List[ProblemListItem], int]:
         """
         Get list of all problems with basic info (ID, name, grade), with pagination support.
         
         Args:
             page: Page number (1-indexed). Defaults to 1.
             page_size: Number of items per page. Defaults to 20.
+            benchmarks_only: Optional filter - True for only benchmarks, False for only non-benchmarks, None for all.
         
         Returns:
             Tuple of (paginated list of ProblemListItem objects, total count)
@@ -151,10 +153,19 @@ class ProblemService:
                     logger.warning(f"Problem at index {idx} missing apiId, skipping")
                     continue
                 
+                # Apply benchmark filter if specified
+                is_benchmark = problem.get('isBenchmark', False)
+                if benchmarks_only is not None:
+                    if benchmarks_only and not is_benchmark:
+                        continue
+                    if not benchmarks_only and is_benchmark:
+                        continue
+                
                 result.append(ProblemListItem(
                     id=api_id,
                     name=problem.get('name', 'Unnamed'),
-                    grade=problem.get('grade', 'Unknown')
+                    grade=problem.get('grade', 'Unknown'),
+                    isBenchmark=is_benchmark
                 ))
             except Exception as e:
                 logger.warning(f"Error processing problem at index {idx}: {e}")

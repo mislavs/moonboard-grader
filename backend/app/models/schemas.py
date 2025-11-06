@@ -126,13 +126,15 @@ class ProblemListItem(BaseModel):
     id: int = Field(..., description="Unique identifier for the problem")
     name: str = Field(..., description="Problem name")
     grade: str = Field(..., description="Problem grade")
+    isBenchmark: bool = Field(..., description="Whether this is a benchmark problem")
     
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "id": 305445,
                 "name": "Fat Guy In A Little Suit",
-                "grade": "6B+"
+                "grade": "6B+",
+                "isBenchmark": False
             }
         }
     )
@@ -146,6 +148,7 @@ class ProblemDetail(BaseModel):
     grade: str = Field(..., description="Problem grade")
     setby: str = Field(..., description="Name of who set the problem")
     repeats: int = Field(..., description="Number of times the problem has been repeated")
+    isBenchmark: bool = Field(..., description="Whether this is a benchmark problem")
     moves: List[ProblemMove] = Field(..., description="List of moves in the problem")
     
     model_config = ConfigDict(
@@ -156,6 +159,7 @@ class ProblemDetail(BaseModel):
                 "grade": "6B+",
                 "setby": "Kyle Knapp",
                 "repeats": 187,
+                "isBenchmark": False,
                 "moves": [
                     {
                         "description": "J4",

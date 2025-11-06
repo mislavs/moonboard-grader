@@ -114,6 +114,7 @@ def sample_problems_data():
                 "name": "Fat Guy In A Little Suit",
                 "grade": "6B+",
                 "apiId": SAMPLE_PROBLEM_ID_1,
+                "isBenchmark": True,
                 "holdsetup": {
                     "apiId": 15
                 },
@@ -136,6 +137,7 @@ def sample_problems_data():
                 "name": "Test Problem",
                 "grade": "7A",
                 "apiId": SAMPLE_PROBLEM_ID_2,
+                "isBenchmark": False,
                 "holdsetup": {
                     "apiId": 15
                 },

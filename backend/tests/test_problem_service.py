@@ -21,6 +21,7 @@ def sample_problems_data() -> Dict[str, Any]:
                 "name": "Test Problem 1",
                 "grade": "6B+",
                 "apiId": 1001,
+                "isBenchmark": True,
                 "holdsetup": {
                     "description": "MoonBoard Masters 2017",
                     "apiId": 15
@@ -44,6 +45,7 @@ def sample_problems_data() -> Dict[str, Any]:
                 "name": "Test Problem 2",
                 "grade": "7A",
                 "apiId": 1002,
+                "isBenchmark": False,
                 "holdsetup": {
                     "description": "MoonBoard Masters 2017",
                     "apiId": 15
@@ -67,6 +69,7 @@ def sample_problems_data() -> Dict[str, Any]:
                 "name": "Test Problem 3",
                 "grade": "6C",
                 "apiId": 1003,
+                "isBenchmark": True,
                 "holdsetup": {
                     "description": "MoonBoard Masters 2017",
                     "apiId": 15
@@ -370,4 +373,76 @@ class TestProblemService:
         
         result = problem_service.find_duplicate_by_moves(moves)
         assert result is None
+
+
+class TestBenchmarkFiltering:
+    """Test suite for benchmark filtering functionality."""
+    
+    def test_get_all_problems_benchmarks_only_true(self, problem_service: ProblemService):
+        """Test filtering to get only benchmark problems."""
+        problems, total = problem_service.get_all_problems(benchmarks_only=True)
+        
+        # Should return only the 2 benchmark problems (IDs 1001 and 1003)
+        assert total == 2
+        assert len(problems) == 2
+        assert all(p.isBenchmark for p in problems)
+        assert problems[0].id == 1001
+        assert problems[1].id == 1003
+    
+    def test_get_all_problems_benchmarks_only_false(self, problem_service: ProblemService):
+        """Test filtering to get only non-benchmark problems."""
+        problems, total = problem_service.get_all_problems(benchmarks_only=False)
+        
+        # Should return only the 1 non-benchmark problem (ID 1002)
+        assert total == 1
+        assert len(problems) == 1
+        assert not problems[0].isBenchmark
+        assert problems[0].id == 1002
+    
+    def test_get_all_problems_benchmarks_only_none(self, problem_service: ProblemService):
+        """Test that None filter returns all problems."""
+        problems, total = problem_service.get_all_problems(benchmarks_only=None)
+        
+        # Should return all 3 problems
+        assert total == 3
+        assert len(problems) == 3
+    
+    def test_benchmark_filtering_with_pagination(self, problem_service: ProblemService):
+        """Test that benchmark filtering works correctly with pagination."""
+        # Get first page of benchmarks with page_size=1
+        page1, total = problem_service.get_all_problems(page=1, page_size=1, benchmarks_only=True)
+        
+        assert total == 2  # Total benchmarks
+        assert len(page1) == 1  # Items on page
+        assert page1[0].id == 1001
+        assert page1[0].isBenchmark
+        
+        # Get second page of benchmarks
+        page2, total = problem_service.get_all_problems(page=2, page_size=1, benchmarks_only=True)
+        
+        assert total == 2  # Total benchmarks
+        assert len(page2) == 1  # Items on page
+        assert page2[0].id == 1003
+        assert page2[0].isBenchmark
+    
+    def test_benchmark_field_included_in_response(self, problem_service: ProblemService):
+        """Test that isBenchmark field is included in ProblemListItem."""
+        problems, _ = problem_service.get_all_problems()
+        
+        for problem in problems:
+            assert hasattr(problem, 'isBenchmark')
+            assert isinstance(problem.isBenchmark, bool)
+    
+    def test_get_problem_by_id_includes_benchmark(self, problem_service: ProblemService):
+        """Test that isBenchmark field is included in ProblemDetail."""
+        problem = problem_service.get_problem_by_id(1001)
+        
+        assert problem is not None
+        assert hasattr(problem, 'isBenchmark')
+        assert problem.isBenchmark is True
+        
+        # Check non-benchmark problem
+        problem2 = problem_service.get_problem_by_id(1002)
+        assert problem2 is not None
+        assert problem2.isBenchmark is False
 
