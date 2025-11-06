@@ -14,8 +14,6 @@ import numpy as np
 
 from .grade_encoder import decode_grade, get_num_grades
 from .grid_builder import create_grid_tensor
-from .models import FullyConnectedModel, ConvolutionalModel
-from .advanced_models import ResidualCNN
 
 
 class Predictor:
@@ -107,32 +105,50 @@ class Predictor:
         Raises:
             ValueError: If architecture cannot be inferred
         """
-        # Check for advanced model (has residual blocks or attention)
-        if any(key.startswith('res') for key in state_dict.keys()) or \
-           any(key.startswith('att') for key in state_dict.keys()):
-            # Residual CNN with residual blocks and attention
-            # fc3 is the final Linear layer
-            if 'fc3.weight' in state_dict:
-                num_classes = state_dict['fc3.weight'].shape[0]
+        # Import model classes dynamically to avoid circular dependencies
+        from .models import FullyConnectedModel, ConvolutionalModel, create_model
+        from .advanced_models import ResidualCNN, DeepResidualCNN
+        
+        # Determine number of classes from final layer
+        num_classes = None
+        
+        # Try common final layer names
+        for key in ['fc3.weight', 'network.7.weight', 'fc.weight', 'classifier.weight']:
+            if key in state_dict:
+                num_classes = state_dict[key].shape[0]
+                break
+        
+        if num_classes is None:
+            num_classes = get_num_grades()
+        
+        # Infer architecture based on state dict keys
+        state_keys = set(state_dict.keys())
+        
+        # Check for residual blocks (ResidualCNN or DeepResidualCNN)
+        if any('res' in key for key in state_keys):
+            # Check if it's deep version (has res3)
+            if any('res3' in key for key in state_keys):
+                return DeepResidualCNN(num_classes=num_classes)
             else:
-                num_classes = get_num_grades()
+                return ResidualCNN(num_classes=num_classes)
+        
+        # Check for attention mechanisms (also ResidualCNN)
+        if any('att' in key for key in state_keys):
             return ResidualCNN(num_classes=num_classes)
-        # Get number of classes from final layer
-        elif 'network.7.weight' in state_dict:
-            # Fully Connected Model (Sequential container)
-            # network.7 is the final Linear layer
-            num_classes = state_dict['network.7.weight'].shape[0]
+        
+        # Check for sequential network (FullyConnectedModel)
+        if any('network.' in key for key in state_keys):
             return FullyConnectedModel(num_classes=num_classes)
-        elif 'fc3.weight' in state_dict:
-            # Convolutional Model
-            # fc3 is the final Linear layer
-            num_classes = state_dict['fc3.weight'].shape[0]
+        
+        # Check for convolutional layers (ConvolutionalModel)
+        if 'conv1.weight' in state_keys and 'fc3.weight' in state_keys:
             return ConvolutionalModel(num_classes=num_classes)
-        else:
-            raise ValueError(
-                "Cannot infer model architecture from state dict. "
-                "Unknown model type."
-            )
+        
+        # Default fallback - try to create a basic model
+        raise ValueError(
+            "Cannot infer model architecture from state dict. "
+            "Unknown model type. Please ensure the checkpoint is from a supported model."
+        )
     
     def predict(
         self,
@@ -343,7 +359,7 @@ class Predictor:
         
         Returns:
             Dictionary containing model information:
-                - 'model_type': Type of model (FC or CNN)
+                - 'model_type': Type of model (string)
                 - 'num_parameters': Total number of parameters
                 - 'num_classes': Number of grade classes
                 - 'device': Device model is on
@@ -354,25 +370,33 @@ class Predictor:
             >>> print(f"Model type: {info['model_type']}")
             >>> print(f"Parameters: {info['num_parameters']:,}")
         """
-        # Determine model type
-        if isinstance(self.model, FullyConnectedModel):
-            model_type = 'FullyConnected'
-        elif isinstance(self.model, ConvolutionalModel):
-            model_type = 'Convolutional'
-        else:
-            model_type = 'Unknown'
+        # Get model class name
+        model_type = self.model.__class__.__name__
         
         # Count parameters
         num_parameters = sum(p.numel() for p in self.model.parameters())
         
-        # Get number of classes from model
-        if isinstance(self.model, FullyConnectedModel):
-            # Fully connected model - final layer is network[7]
-            num_classes = self.model.network[7].out_features
-        elif isinstance(self.model, ConvolutionalModel):
-            # Convolutional model - final layer is fc3
-            num_classes = self.model.fc3.out_features
-        else:
+        # Get number of classes - try common final layer names
+        num_classes = None
+        for attr_name in ['fc3', 'fc', 'classifier']:
+            if hasattr(self.model, attr_name):
+                final_layer = getattr(self.model, attr_name)
+                if isinstance(final_layer, torch.nn.Linear):
+                    num_classes = final_layer.out_features
+                    break
+        
+        # For Sequential models (FullyConnectedModel)
+        if num_classes is None and hasattr(self.model, 'network'):
+            network = self.model.network
+            if isinstance(network, torch.nn.Sequential):
+                # Get last Linear layer in the sequence
+                for layer in reversed(list(network)):
+                    if isinstance(layer, torch.nn.Linear):
+                        num_classes = layer.out_features
+                        break
+        
+        # Fallback to default
+        if num_classes is None:
             num_classes = get_num_grades()
         
         return {

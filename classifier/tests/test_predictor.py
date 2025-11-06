@@ -381,7 +381,7 @@ class TestModelInfo:
         predictor = Predictor(temp_checkpoint_fc)
         info = predictor.get_model_info()
         
-        assert info['model_type'] == 'FullyConnected'
+        assert info['model_type'] == 'FullyConnectedModel'
         assert info['num_parameters'] > 0
         assert info['num_classes'] == get_num_grades()
         assert info['device'] == 'cpu'
@@ -392,7 +392,7 @@ class TestModelInfo:
         predictor = Predictor(temp_checkpoint_cnn)
         info = predictor.get_model_info()
         
-        assert info['model_type'] == 'Convolutional'
+        assert info['model_type'] == 'ConvolutionalModel'
         assert info['num_parameters'] > 0
         assert info['num_classes'] == get_num_grades()
     

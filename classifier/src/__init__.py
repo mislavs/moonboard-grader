@@ -13,6 +13,7 @@ from . import position_parser
 from . import grid_builder
 from . import data_processor
 from . import dataset
+from . import data_splitter
 from . import augmentation
 from . import advanced_augmentation
 from . import models
@@ -56,6 +57,12 @@ from .dataset import (
     MoonboardDataset,
     create_data_splits,
     get_split_info
+)
+
+from .data_splitter import (
+    create_stratified_splits,
+    create_datasets_with_augmentation,
+    create_data_loaders
 )
 
 from .augmentation import (
@@ -121,6 +128,7 @@ __all__ = [
     'grid_builder',
     'data_processor',
     'dataset',
+    'data_splitter',
     'augmentation',
     'advanced_augmentation',
     'models',
@@ -154,6 +162,10 @@ __all__ = [
     'MoonboardDataset',
     'create_data_splits',
     'get_split_info',
+    # Data splitter functions
+    'create_stratified_splits',
+    'create_datasets_with_augmentation',
+    'create_data_loaders',
     # Augmentation functions
     'MoonboardAugmentation',
     'create_augmentation',

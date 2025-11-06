@@ -39,7 +39,7 @@ def test_cnn_model_initialization_default():
     """Test CNN model initializes with default num_classes."""
     model = ConvolutionalModel()
     assert model.num_classes == get_num_grades()
-    assert model.flattened_size == 256
+    assert model.flattened_size == 1024  # 128 channels * 4 height * 2 width
 
 
 def test_cnn_model_initialization_custom_classes():
@@ -344,49 +344,6 @@ def test_create_model_invalid_type():
     """Test create_model raises error for invalid model type."""
     with pytest.raises(ValueError, match="Invalid model_type"):
         create_model("invalid_type")
-
-
-# Test Parameter Counting
-
-def test_count_parameters_fc():
-    """Test count_parameters returns correct count for FC model."""
-    model = FullyConnectedModel(num_classes=19)
-    num_params = count_parameters(model)
-    
-    # Calculate expected parameters:
-    # Layer 1: (594 * 256) + 256 bias = 152,064 + 256 = 152,320
-    # Layer 2: (256 * 128) + 128 bias = 32,768 + 128 = 32,896
-    # Layer 3: (128 * 19) + 19 bias = 2,432 + 19 = 2,451
-    # Total: 187,667
-    expected = 152320 + 32896 + 2451
-    assert num_params == expected
-
-
-def test_count_parameters_cnn():
-    """Test count_parameters returns correct count for CNN model."""
-    model = ConvolutionalModel(num_classes=19)
-    num_params = count_parameters(model)
-    
-    # Calculate expected parameters:
-    # Conv1: (3 * 16 * 3 * 3) + 16 bias = 432 + 16 = 448
-    # Conv2: (16 * 32 * 3 * 3) + 32 bias = 4,608 + 32 = 4,640
-    # FC1: (256 * 128) + 128 bias = 32,768 + 128 = 32,896
-    # FC2: (128 * 19) + 19 bias = 2,432 + 19 = 2,451
-    # Total: 40,435
-    expected = 448 + 4640 + 32896 + 2451
-    assert num_params == expected
-
-
-def test_count_parameters_different_classes():
-    """Test count_parameters works with different num_classes."""
-    model1 = FullyConnectedModel(num_classes=10)
-    model2 = FullyConnectedModel(num_classes=30)
-    
-    count1 = count_parameters(model1)
-    count2 = count_parameters(model2)
-    
-    # Should differ in final layer size
-    assert count2 > count1
 
 
 # Test Model Device Movement

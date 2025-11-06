@@ -23,7 +23,8 @@ from sklearn.utils.class_weight import compute_class_weight
 from src import (
     load_dataset,
     get_dataset_stats,
-    create_data_splits,
+    create_datasets_with_augmentation,
+    create_data_loaders,
     create_model,
     count_parameters,
     Trainer,
@@ -34,7 +35,6 @@ from src import (
     plot_confusion_matrix,
     decode_grade,
     get_all_grades,
-    create_augmentation,
     MoonboardDataset,
 )
 
@@ -97,73 +97,30 @@ def train_command(args):
     test_ratio = config['data']['test_ratio']
     random_seed = config['data'].get('random_seed', 42)
     
-    # Create base splits without augmentation
-    from sklearn.model_selection import StratifiedShuffleSplit
-    
-    # First split: separate test set
-    test_size = test_ratio
-    splitter_test = StratifiedShuffleSplit(
-        n_splits=1, test_size=test_size, random_state=random_seed
+    # Create datasets with augmentation using new module
+    train_dataset, val_dataset, test_dataset = create_datasets_with_augmentation(
+        tensors, labels, config, train_ratio, val_ratio, test_ratio, random_seed
     )
-    train_val_idx, test_idx = next(splitter_test.split(tensors, labels))
-    
-    # Second split: separate train and validation
-    val_ratio_adjusted = val_ratio / (train_ratio + val_ratio)
-    splitter_val = StratifiedShuffleSplit(
-        n_splits=1, test_size=val_ratio_adjusted, random_state=random_seed
-    )
-    train_idx, val_idx = next(
-        splitter_val.split(tensors[train_val_idx], labels[train_val_idx])
-    )
-    
-    # Map back to original indices
-    train_idx = train_val_idx[train_idx]
-    val_idx = train_val_idx[val_idx]
-    
-    # Create augmentation transforms
-    use_augmentation = config.get('data', {}).get('augmentation', True)
-    flip_prob = config.get('data', {}).get('flip_probability', 0.5)
-    aug_type = config.get('data', {}).get('augmentation_type', 'basic')
-    
-    # Support advanced augmentation
-    if aug_type == 'advanced' and use_augmentation:
-        from src.advanced_augmentation import create_augmentation_pipeline
-        train_transform = create_augmentation_pipeline(
-            aug_type='advanced',
-            flip_prob=flip_prob,
-            noise_prob=config.get('data', {}).get('noise_probability', 0.3),
-            noise_level=config.get('data', {}).get('noise_level', 0.05),
-            dropout_prob=config.get('data', {}).get('dropout_probability', 0.2),
-            dropout_rate=config.get('data', {}).get('dropout_rate', 0.1),
-            jitter_prob=config.get('data', {}).get('jitter_probability', 0.3),
-            jitter_range=config.get('data', {}).get('jitter_range', 0.1)
-        )
-    else:
-        train_transform = create_augmentation(enabled=use_augmentation, flip_prob=flip_prob)
-    
-    val_transform = create_augmentation(enabled=False)  # No augmentation for validation
-    test_transform = create_augmentation(enabled=False)  # No augmentation for test
-    
-    # Create datasets with augmentation
-    train_dataset = MoonboardDataset(tensors[train_idx], labels[train_idx], transform=train_transform)
-    val_dataset = MoonboardDataset(tensors[val_idx], labels[val_idx], transform=val_transform)
-    test_dataset = MoonboardDataset(tensors[test_idx], labels[test_idx], transform=test_transform)
     
     print(f"   Train: {len(train_dataset)} ({train_ratio*100:.0f}%)")
     print(f"   Val:   {len(val_dataset)} ({val_ratio*100:.0f}%)")
     print(f"   Test:  {len(test_dataset)} ({test_ratio*100:.0f}%)")
     
+    # Display augmentation info
+    use_augmentation = config.get('data', {}).get('augmentation', True)
+    aug_type = config.get('data', {}).get('augmentation_type', 'basic')
     if use_augmentation:
         if aug_type == 'advanced':
             print(f"   Using ADVANCED data augmentation (flip, noise, dropout, jitter)")
         else:
+            flip_prob = config.get('data', {}).get('flip_probability', 0.5)
             print(f"   Using basic data augmentation (flip_prob={flip_prob})")
     
     # Create data loaders
     batch_size = config['training']['batch_size']
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    train_loader, val_loader, test_loader = create_data_loaders(
+        train_dataset, val_dataset, test_dataset, batch_size
+    )
     
     # Create model
     model_type = config['model']['type']
@@ -214,11 +171,13 @@ def train_command(args):
     if config['training'].get('use_class_weights', True):
         # Calculate class weights using sklearn's balanced approach
         # This handles class imbalance without extreme weights
-        unique_classes = np.unique(labels[train_idx])
+        # Get labels from training dataset
+        train_labels = train_dataset.labels
+        unique_classes = np.unique(train_labels)
         class_weights_array = compute_class_weight(
             class_weight='balanced',
             classes=unique_classes,
-            y=labels[train_idx]
+            y=train_labels
         )
         
         # Create full weight array for all classes (including those not in training set)
