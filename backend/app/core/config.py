@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     
     # Data Configuration
     problems_data_path: Path = Field(
-        default=Path("../classifier/data/problems.json"),
+        default=Path("../data/problems.json"),
         description="Path to the problems data JSON file"
     )
     
