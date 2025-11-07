@@ -34,9 +34,9 @@ This project implements a deep learning system to predict the difficulty grade o
 
 ### Setup
 
-1. Clone the repository and navigate to the neural-net directory:
+1. Clone the repository and navigate to the classifier directory:
 ```bash
-cd moonboard-grader/neural-net
+cd moonboard-grader/classifier
 ```
 
 2. Create a virtual environment (recommended):
@@ -50,7 +50,12 @@ venv\Scripts\activate
 source venv/bin/activate
 ```
 
-3. Install dependencies:
+3. Install the moonboard_core shared utilities package:
+```bash
+pip install -e ../moonboard_core
+```
+
+4. Install classifier dependencies:
 ```bash
 pip install -r requirements.txt
 ```
@@ -60,30 +65,6 @@ pip install -r requirements.txt
 Run the test suite to verify everything is installed correctly:
 ```bash
 pytest tests/
-```
-
-## Project Structure
-
-```
-neural-net/
-├── README.md           # This file
-├── spec.md            # Technical specification
-├── config.yaml        # Training configuration
-├── main.py           # CLI entry point
-├── requirements.txt   # Python dependencies
-├── data/             # Training data
-├── src/              # Source code
-│   ├── grade_encoder.py    # Grade string ↔ integer conversion
-│   ├── position_parser.py  # Hold position parsing
-│   ├── grid_builder.py     # Tensor construction
-│   ├── data_processor.py   # Data pipeline
-│   ├── dataset.py          # PyTorch Dataset class
-│   ├── models.py           # Neural network architectures
-│   ├── trainer.py          # Training loop
-│   ├── evaluator.py        # Evaluation metrics
-│   └── predictor.py        # Inference interface
-├── tests/            # Unit tests
-└── models/           # Saved model checkpoints
 ```
 
 ## Usage
@@ -97,7 +78,7 @@ python main.py train --config config.yaml
 ### Evaluating a Model
 
 ```bash
-python main.py evaluate --checkpoint models/best_model.pth --data data/problems.json
+python main.py evaluate --checkpoint models/best_model.pth --data ../data/problems.json
 ```
 
 ### Making Predictions
@@ -132,7 +113,7 @@ pytest tests/
 
 Run tests for a specific module:
 ```bash
-pytest tests/test_grade_encoder.py
+pytest tests/test_models.py
 ```
 
 Run with coverage:

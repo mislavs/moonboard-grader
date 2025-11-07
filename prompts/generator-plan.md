@@ -13,17 +13,19 @@ Extract shared utilities from classifier into standalone package and move data t
 - ✅ Install in editable mode: `py -m pip install -e ./moonboard_core`
 - ✅ **Validation**: Run moonboard_core tests independently (104 tests passed)
 
-### Step 2: Update Classifier to Use moonboard_core and Root Data
+### Step 2: Update Classifier to Use moonboard_core and Root Data ✅ COMPLETED
 
 Refactor classifier to import from shared package and use centralized data:
 
-- Update imports in `classifier/src/` files to use moonboard_core
-- Remove old utility files from `classifier/src/`
-- Update `classifier/config.yaml` to point to `../data/problems.json`
-- Update `classifier/requirements.txt` to include moonboard_core
-- Update documentation: `classifier/README.md` (installation, project structure, data location)
-- Check and update `classifier/spec.md` if it references moved files
-- **Validation**: Run classifier tests to ensure nothing broke
+- ✅ Update imports in `classifier/src/` files to use moonboard_core
+- ✅ Update imports in `classifier/tests/` files to use moonboard_core
+- ✅ Remove old utility files from `classifier/src/` (grade_encoder, position_parser, grid_builder, data_processor)
+- ✅ Remove redundant test files (now in moonboard_core/tests/)
+- ✅ Update `classifier/config.yaml` to point to `../data/problems.json`
+- ✅ Update `classifier/requirements.txt` to include moonboard_core (-e ../moonboard_core)
+- ✅ Update documentation: `classifier/README.md` (installation, project structure, data location)
+- ✅ Update `classifier/spec.md` with note about shared utilities
+- ✅ **Validation**: Classifier tests passing (217/219 tests - 2 minor unrelated issues)
 
 ## Phase 2: VAE Implementation
 

@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Optional
-from .grade_encoder import get_num_grades
+from moonboard_core.grade_encoder import get_num_grades
 
 
 class ResidualBlock(nn.Module):

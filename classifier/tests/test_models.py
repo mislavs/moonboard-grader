@@ -17,7 +17,7 @@ from src.models import (
     create_model,
     count_parameters
 )
-from src.grade_encoder import get_num_grades
+from moonboard_core.grade_encoder import get_num_grades
 
 
 # Test Model Initialization

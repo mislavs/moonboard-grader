@@ -310,9 +310,11 @@ class TestTrainCommand:
         # Run training
         train_command(args)
         
-        # Verify confusion matrix was saved
-        cm_path = tmp_path / 'confusion_matrix.png'
-        assert cm_path.exists(), f"Confusion matrix not found at {cm_path}"
+        # Verify confusion matrix was saved (it gets saved in models/ with timestamp)
+        models_dir = tmp_path / 'models'
+        cm_files = list(models_dir.glob('confusion_matrix_*.png'))
+        assert len(cm_files) > 0, f"No confusion matrix found in {models_dir}"
+        cm_path = cm_files[0]
         
         # Verify it's a valid PNG file (at least has PNG header)
         with open(cm_path, 'rb') as f:

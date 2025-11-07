@@ -22,7 +22,7 @@ training:
 
 # Data Configuration
 data:
-  path: "data/problems.json"  # Path to training data JSON file
+  path: "../data/problems.json"  # Path to training data JSON file
   train_ratio: 0.7
   val_ratio: 0.15
   test_ratio: 0.15

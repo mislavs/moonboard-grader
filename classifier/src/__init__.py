@@ -8,10 +8,6 @@ from Moonboard hold positions.
 __version__ = "0.1.0"
 
 # Import main modules
-from . import grade_encoder
-from . import position_parser
-from . import grid_builder
-from . import data_processor
 from . import dataset
 from . import data_splitter
 from . import augmentation
@@ -23,15 +19,15 @@ from . import trainer
 from . import evaluator
 from . import predictor
 
-# Import commonly used functions
-from .grade_encoder import (
+# Import commonly used functions from moonboard_core
+from moonboard_core.grade_encoder import (
     encode_grade,
     decode_grade,
     get_all_grades,
     get_num_grades
 )
 
-from .position_parser import (
+from moonboard_core.position_parser import (
     parse_position,
     validate_position,
     ROWS,
@@ -39,13 +35,13 @@ from .position_parser import (
     COLUMNS
 )
 
-from .grid_builder import (
+from moonboard_core.grid_builder import (
     create_grid_tensor,
     get_channel_counts,
     tensor_to_moves
 )
 
-from .data_processor import (
+from moonboard_core.data_processor import (
     process_problem,
     load_dataset,
     get_dataset_stats,
@@ -123,10 +119,6 @@ from .predictor import (
 
 __all__ = [
     # Modules
-    'grade_encoder',
-    'position_parser',
-    'grid_builder',
-    'data_processor',
     'dataset',
     'data_splitter',
     'augmentation',
@@ -138,7 +130,7 @@ __all__ = [
     'evaluator',
     'predictor',
     'cli',
-    # Grade encoder functions
+    # Grade encoder functions (from moonboard_core)
     'encode_grade',
     'decode_grade',
     'get_all_grades',

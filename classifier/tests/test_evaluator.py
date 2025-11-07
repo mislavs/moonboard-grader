@@ -25,7 +25,7 @@ from src.evaluator import (
     calculate_mean_absolute_error,
     get_metrics_summary
 )
-from src.grade_encoder import get_all_grades, get_num_grades
+from moonboard_core.grade_encoder import get_all_grades, get_num_grades
 
 
 # Simple model for testing

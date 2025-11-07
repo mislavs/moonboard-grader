@@ -14,8 +14,8 @@ import os
 
 from src.predictor import Predictor
 from src.models import FullyConnectedModel, ConvolutionalModel
-from src.grade_encoder import encode_grade, decode_grade, get_num_grades
-from src.grid_builder import create_grid_tensor
+from moonboard_core.grade_encoder import encode_grade, decode_grade, get_num_grades
+from moonboard_core.grid_builder import create_grid_tensor
 
 
 # Test data

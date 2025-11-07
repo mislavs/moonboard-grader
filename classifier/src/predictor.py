@@ -12,8 +12,8 @@ from typing import Dict, List, Union, Optional
 from pathlib import Path
 import numpy as np
 
-from .grade_encoder import decode_grade, get_num_grades
-from .grid_builder import create_grid_tensor
+from moonboard_core.grade_encoder import decode_grade, get_num_grades
+from moonboard_core.grid_builder import create_grid_tensor
 
 
 class Predictor:

@@ -11,7 +11,7 @@ import torch
 
 from .utils import print_section_header, print_completion_message
 from src import Predictor
-from src.grade_encoder import encode_grade
+from moonboard_core.grade_encoder import encode_grade
 
 
 def setup_predict_parser(subparsers):

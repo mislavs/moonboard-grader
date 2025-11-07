@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import precision_recall_fscore_support, confusion_matrix
 
-from .grade_encoder import get_all_grades, get_num_grades
+from moonboard_core.grade_encoder import get_all_grades, get_num_grades
 
 
 def evaluate_model(model: torch.nn.Module, dataloader: torch.utils.data.DataLoader, 

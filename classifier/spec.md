@@ -1,5 +1,7 @@
 # Moonboard Grade Prediction - Technical Specification
 
+> **Note**: This classifier uses shared utilities from the `moonboard_core` package, including `grade_encoder`, `position_parser`, `grid_builder`, and `data_processor`. These utilities are located in the parent directory's `moonboard_core/` folder and are shared with the VAE generator project.
+
 ## 1. Problem Statement and Objectives
 
 ### 1.1 Overview
@@ -536,7 +538,7 @@ training:
   early_stopping_patience: 10
 
 data:
-  train_path: data/problems.json
+  path: ../data/problems.json  # Shared data at root level
   train_ratio: 0.7
   val_ratio: 0.15
   test_ratio: 0.15

@@ -8,7 +8,7 @@ Supports both fully connected and convolutional architectures.
 import torch
 import torch.nn as nn
 from typing import Literal
-from .grade_encoder import get_num_grades
+from moonboard_core.grade_encoder import get_num_grades
 
 
 class FullyConnectedModel(nn.Module):

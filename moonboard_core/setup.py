@@ -12,7 +12,8 @@ setup(
     description="Shared utilities for Moonboard problem processing",
     author="Moonboard Grader Team",
     python_requires=">=3.8",
-    packages=find_packages(),
+    package_dir={'moonboard_core': '.'},
+    packages=['moonboard_core'],
     install_requires=[
         "numpy>=1.20.0",
     ],
