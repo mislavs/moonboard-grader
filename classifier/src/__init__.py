@@ -24,7 +24,10 @@ from moonboard_core.grade_encoder import (
     encode_grade,
     decode_grade,
     get_all_grades,
-    get_num_grades
+    get_num_grades,
+    remap_label,
+    unmap_label,
+    get_filtered_grade_names
 )
 
 from moonboard_core.position_parser import (
@@ -46,7 +49,8 @@ from moonboard_core.data_processor import (
     load_dataset,
     get_dataset_stats,
     save_processed_dataset,
-    load_processed_dataset
+    load_processed_dataset,
+    filter_dataset_by_grades
 )
 
 from .dataset import (
@@ -135,6 +139,9 @@ __all__ = [
     'decode_grade',
     'get_all_grades',
     'get_num_grades',
+    'remap_label',
+    'unmap_label',
+    'get_filtered_grade_names',
     # Position parser functions
     'parse_position',
     'validate_position',
@@ -151,6 +158,7 @@ __all__ = [
     'get_dataset_stats',
     'save_processed_dataset',
     'load_processed_dataset',
+    'filter_dataset_by_grades',
     # Dataset functions
     'MoonboardDataset',
     'create_data_splits',

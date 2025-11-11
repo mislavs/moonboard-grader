@@ -136,6 +136,34 @@ def train_command(args):
         grade_name = decode_grade(grade_label)
         print(f"      {grade_name}: {count}")
     
+    # Check if grade filtering is enabled
+    filter_enabled = config.get('data', {}).get('filter_grades', False)
+    grade_offset = 0
+    min_grade_idx = 0
+    max_grade_idx = 18
+    
+    if filter_enabled:
+        from src import filter_dataset_by_grades, remap_label
+        
+        min_grade_idx = config['data']['min_grade_index']
+        max_grade_idx = config['data']['max_grade_index']
+        grade_offset = min_grade_idx
+        
+        # Filter dataset to specified grade range
+        original_count = len(dataset)
+        dataset = filter_dataset_by_grades(dataset, min_grade_idx, max_grade_idx)
+        filtered_count = len(dataset)
+        
+        print(f"\n🔍 Grade Filtering:")
+        print(f"   Filtering to grades {decode_grade(min_grade_idx)} - {decode_grade(max_grade_idx)}")
+        print(f"   Original problems: {original_count}")
+        print(f"   Filtered problems: {filtered_count}")
+        print(f"   Removed: {original_count - filtered_count}")
+        print(f"   Using label offset: {grade_offset}")
+        
+        # Remap labels to start from 0
+        dataset = [(tensor, remap_label(label, grade_offset)) for tensor, label in dataset]
+    
     # Create data splits with augmentation
     print(f"\n🔀 Creating train/val/test splits...")
     tensors = np.array([x[0] for x in dataset])
@@ -299,7 +327,10 @@ def train_command(args):
         device=device,
         checkpoint_dir=str(checkpoint_dir),
         scheduler=scheduler,
-        gradient_clip=gradient_clip
+        gradient_clip=gradient_clip,
+        grade_offset=grade_offset,
+        min_grade_index=min_grade_idx,
+        max_grade_index=max_grade_idx
     )
     
     if gradient_clip is not None:
@@ -365,14 +396,24 @@ def train_command(args):
         cm_filename = f"confusion_matrix_{timestamp}.png"
         cm_path = checkpoint_dir / cm_filename
         
+        # Use filtered grade names if model is filtered
+        if grade_offset > 0:
+            from src import get_filtered_grade_names
+            cm_grade_names = get_filtered_grade_names(min_grade_idx, max_grade_idx)
+            cm_num_classes = len(cm_grade_names)
+        else:
+            cm_grade_names = get_all_grades()
+            cm_num_classes = len(cm_grade_names)
+        
         cm = generate_confusion_matrix(
             test_metrics['predictions'],
-            test_metrics['labels']
+            test_metrics['labels'],
+            num_classes=cm_num_classes
         )
         
         plot_confusion_matrix(
             cm,
-            get_all_grades(),
+            cm_grade_names,
             str(cm_path),
             normalize=True
         )

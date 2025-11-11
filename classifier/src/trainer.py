@@ -44,7 +44,10 @@ class Trainer:
         device: str = 'cpu',
         checkpoint_dir: str = 'models',
         scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
-        gradient_clip: Optional[float] = None
+        gradient_clip: Optional[float] = None,
+        grade_offset: int = 0,
+        min_grade_index: int = 0,
+        max_grade_index: int = 18
     ):
         """
         Initialize the Trainer.
@@ -59,6 +62,9 @@ class Trainer:
             checkpoint_dir: Directory to save model checkpoints
             scheduler: Optional learning rate scheduler
             gradient_clip: Optional gradient clipping max norm value
+            grade_offset: Offset for grade label remapping (0 if not using filtering)
+            min_grade_index: Minimum grade index in filtered range
+            max_grade_index: Maximum grade index in filtered range
             
         Raises:
             ValueError: If train_loader is None or empty
@@ -85,6 +91,9 @@ class Trainer:
         self.checkpoint_dir = Path(checkpoint_dir)
         self.scheduler = scheduler
         self.gradient_clip = gradient_clip
+        self.grade_offset = grade_offset
+        self.min_grade_index = min_grade_index
+        self.max_grade_index = max_grade_index
         
         # Create checkpoint directory if it doesn't exist
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -304,7 +313,10 @@ class Trainer:
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'best_val_loss': self.best_val_loss,
-            'history': self.history
+            'history': self.history,
+            'grade_offset': self.grade_offset,
+            'min_grade_index': self.min_grade_index,
+            'max_grade_index': self.max_grade_index
         }
         
         torch.save(checkpoint, checkpoint_path)

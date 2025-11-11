@@ -78,6 +78,11 @@ class Predictor:
         if 'model_state_dict' not in checkpoint:
             raise ValueError("Invalid checkpoint: missing 'model_state_dict'")
         
+        # Load filtering metadata (if present)
+        self.grade_offset = checkpoint.get('grade_offset', 0)
+        self.min_grade_index = checkpoint.get('min_grade_index', 0)
+        self.max_grade_index = checkpoint.get('max_grade_index', 18)
+        
         # Infer model architecture from state dict
         state_dict = checkpoint['model_state_dict']
         self.model = self._infer_model_architecture(state_dict)
@@ -207,22 +212,41 @@ class Predictor:
         # Convert to numpy for easier manipulation
         probs_array = probabilities.cpu().numpy()[0]
         
-        # Get all probabilities as dict
+        # Unmap labels if using filtered model
+        from moonboard_core.grade_encoder import unmap_label, get_filtered_grade_names
+        
+        if self.grade_offset > 0:
+            # Model outputs 0-10 (for 11 classes), need to map back to original indices
+            unmapped_label = unmap_label(predicted_label, self.grade_offset)
+            grade_names = get_filtered_grade_names(self.min_grade_index, self.max_grade_index)
+        else:
+            unmapped_label = predicted_label
+            grade_names = None  # Will use get_all_grades() in decode_grade
+        
+        # Get all probabilities as dict (using filtered or all grades)
         all_probs = {}
-        for label, prob in enumerate(probs_array):
-            grade = decode_grade(label)
+        for model_label, prob in enumerate(probs_array):
+            if self.grade_offset > 0:
+                original_label = unmap_label(model_label, self.grade_offset)
+                grade = decode_grade(original_label)
+            else:
+                grade = decode_grade(model_label)
             all_probs[grade] = float(prob)
         
         # Get top-k predictions
         top_k_indices = np.argsort(probs_array)[-return_top_k:][::-1]
-        top_k_predictions = [
-            (decode_grade(int(idx)), float(probs_array[idx]))
-            for idx in top_k_indices
-        ]
+        top_k_predictions = []
+        for idx in top_k_indices:
+            if self.grade_offset > 0:
+                original_label = unmap_label(int(idx), self.grade_offset)
+                grade = decode_grade(original_label)
+            else:
+                grade = decode_grade(int(idx))
+            top_k_predictions.append((grade, float(probs_array[idx])))
         
         return {
-            'predicted_grade': decode_grade(predicted_label),
-            'predicted_label': predicted_label,
+            'predicted_grade': decode_grade(unmapped_label),
+            'predicted_label': unmapped_label,
             'confidence': confidence,
             'all_probabilities': all_probs,
             'top_k_predictions': top_k_predictions
@@ -399,11 +423,23 @@ class Predictor:
         if num_classes is None:
             num_classes = get_num_grades()
         
-        return {
+        info = {
             'model_type': model_type,
             'num_parameters': num_parameters,
             'num_classes': num_classes,
             'device': self.device,
             'checkpoint_path': str(self.checkpoint_path)
         }
+        
+        # Add filtering information if model uses filtering
+        if self.grade_offset > 0:
+            from moonboard_core.grade_encoder import decode_grade
+            info['filtered'] = True
+            info['grade_offset'] = self.grade_offset
+            info['min_grade'] = decode_grade(self.min_grade_index)
+            info['max_grade'] = decode_grade(self.max_grade_index)
+        else:
+            info['filtered'] = False
+        
+        return info
 

@@ -1,21 +1,21 @@
-# Moonboard Grade Prediction - Configuration File
-# Adjust these parameters for training and evaluation
+# Moonboard Grade Prediction - Filtered Configuration
+# This config trains on a filtered subset of grades (6A+ through 7C) for better performance
 
 # Model Configuration
 model:
   type: "cnn"  # Options: "fc" (fully connected) or "cnn" (convolutional)
-  num_classes: 19  # Number of Font grade classes (5+ to 8C+)
+  num_classes: 10  # Number of filtered grade classes (6A+ to 7C)
 
 # Training Configuration
 training:
   learning_rate: 0.0003
   batch_size: 64
   num_epochs: 150
-  early_stopping_patience: 8
+  early_stopping_patience: 15
   optimizer: "adam"  # Options: "adam", "sgd"
   weight_decay: 0.001
   use_class_weights: true
-  max_class_weight: 5.0
+  max_class_weight: 10.0  # Increased from 5.0 for better handling of imbalanced filtered data
   use_scheduler: true
   label_smoothing: 0.1
   gradient_clip: 1.0
@@ -26,9 +26,14 @@ data:
   train_ratio: 0.7
   val_ratio: 0.15
   test_ratio: 0.15
-  random_seed: 42  # For reproducible splits
+  random_seed: 123  # Changed to get better stratification for small classes
   augmentation: false
   flip_probability: 0.0
+  
+  # Grade Filtering Configuration
+  filter_grades: true
+  min_grade_index: 2   # 6A+
+  max_grade_index: 11  # 7C
 
 # Checkpoint Configuration
 checkpoint:
@@ -43,7 +48,7 @@ device: "cuda"  # Options: "cuda" (GPU) or "cpu"
 evaluation:
   tolerance_levels: [1, 2]  # Calculate accuracy within ±N grades
   save_confusion_matrix: true
-  confusion_matrix_path: "models/confusion_matrix.png"
+  confusion_matrix_path: "models/confusion_matrix_filtered.png"
 
 # Prediction Configuration
 prediction:

@@ -163,6 +163,56 @@ def load_dataset(json_path: Union[str, Path]) -> List[Tuple[np.ndarray, int]]:
     return dataset
 
 
+def filter_dataset_by_grades(
+    dataset: List[Tuple[np.ndarray, int]], 
+    min_grade_index: int, 
+    max_grade_index: int
+) -> List[Tuple[np.ndarray, int]]:
+    """
+    Filter a dataset to only include problems within a specific grade range.
+    
+    Args:
+        dataset: List of (tensor, label) tuples
+        min_grade_index: Minimum grade index (inclusive)
+        max_grade_index: Maximum grade index (inclusive)
+    
+    Returns:
+        Filtered list of (tensor, label) tuples containing only problems
+        within the specified grade range
+        
+    Raises:
+        ValueError: If indices are invalid or dataset is malformed
+        
+    Examples:
+        >>> dataset = load_dataset("data/problems.json")
+        >>> # Filter to only 6A+ (index 2) through 7C (index 12)
+        >>> filtered = filter_dataset_by_grades(dataset, 2, 12)
+        >>> len(filtered) < len(dataset)
+        True
+    """
+    if not isinstance(dataset, list):
+        raise ValueError(f"dataset must be a list, got {type(dataset).__name__}")
+    
+    if not isinstance(min_grade_index, int) or not isinstance(max_grade_index, int):
+        raise ValueError("min_grade_index and max_grade_index must be integers")
+    
+    if min_grade_index < 0:
+        raise ValueError(f"min_grade_index must be >= 0, got {min_grade_index}")
+    
+    if max_grade_index < min_grade_index:
+        raise ValueError(
+            f"max_grade_index ({max_grade_index}) must be >= min_grade_index ({min_grade_index})"
+        )
+    
+    # Filter dataset
+    filtered = []
+    for tensor, label in dataset:
+        if min_grade_index <= label <= max_grade_index:
+            filtered.append((tensor, label))
+    
+    return filtered
+
+
 def get_dataset_stats(dataset: List[Tuple[np.ndarray, int]]) -> Dict:
     """
     Calculate statistics about a processed dataset.

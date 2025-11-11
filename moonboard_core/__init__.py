@@ -14,6 +14,9 @@ from .grade_encoder import (
     decode_grade,
     get_all_grades,
     get_num_grades,
+    remap_label,
+    unmap_label,
+    get_filtered_grade_names,
 )
 
 from .position_parser import (
@@ -36,6 +39,7 @@ from .data_processor import (
     get_dataset_stats,
     save_processed_dataset,
     load_processed_dataset,
+    filter_dataset_by_grades,
 )
 
 __version__ = "0.1.0"
@@ -46,6 +50,9 @@ __all__ = [
     "decode_grade",
     "get_all_grades",
     "get_num_grades",
+    "remap_label",
+    "unmap_label",
+    "get_filtered_grade_names",
     # Position parsing
     "parse_position",
     "validate_position",
@@ -62,5 +69,6 @@ __all__ = [
     "get_dataset_stats",
     "save_processed_dataset",
     "load_processed_dataset",
+    "filter_dataset_by_grades",
 ]
 

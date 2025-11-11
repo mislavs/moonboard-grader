@@ -109,6 +109,30 @@ def evaluate_command(args):
     
     print(f"   Total problems: {len(dataset)}")
     
+    # Check if model uses filtered grades (from checkpoint metadata)
+    # Load checkpoint to get filtering info
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    grade_offset = checkpoint.get('grade_offset', 0)
+    min_grade_idx = checkpoint.get('min_grade_index', 0)
+    max_grade_idx = checkpoint.get('max_grade_index', 18)
+    
+    if grade_offset > 0:
+        from src import filter_dataset_by_grades, remap_label, decode_grade
+        
+        print(f"\n🔍 Detected filtered model:")
+        print(f"   Grade range: {decode_grade(min_grade_idx)} - {decode_grade(max_grade_idx)}")
+        print(f"   Label offset: {grade_offset}")
+        
+        # Filter dataset to same range as model
+        original_count = len(dataset)
+        dataset = filter_dataset_by_grades(dataset, min_grade_idx, max_grade_idx)
+        filtered_count = len(dataset)
+        
+        print(f"   Filtered evaluation data: {original_count} → {filtered_count} problems")
+        
+        # Remap labels to match model's expected range
+        dataset = [(tensor, remap_label(label, grade_offset)) for tensor, label in dataset]
+    
     # Create data loader
     tensors = np.array([x[0] for x in dataset])
     labels = np.array([x[1] for x in dataset])
@@ -137,7 +161,14 @@ def evaluate_command(args):
     print(f"   {'Grade':<6} {'Precision':<10} {'Recall':<10} {'F1':<10} {'Support':<10}")
     print(f"   {'-'*50}")
     
-    for grade in get_all_grades():
+    # Use filtered grade names if model is filtered
+    if grade_offset > 0:
+        from src import get_filtered_grade_names
+        grade_names = get_filtered_grade_names(min_grade_idx, max_grade_idx)
+    else:
+        grade_names = get_all_grades()
+    
+    for grade in grade_names:
         if grade in per_grade:
             p = per_grade[grade]['precision']
             r = per_grade[grade]['recall']
@@ -150,14 +181,24 @@ def evaluate_command(args):
         output_path = Path(args.output) if args.output else Path("confusion_matrix.png")
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
+        # Use filtered grade names if model is filtered
+        if grade_offset > 0:
+            from src import get_filtered_grade_names
+            cm_grade_names = get_filtered_grade_names(min_grade_idx, max_grade_idx)
+            cm_num_classes = len(cm_grade_names)
+        else:
+            cm_grade_names = get_all_grades()
+            cm_num_classes = len(cm_grade_names)
+        
         cm = generate_confusion_matrix(
             metrics['predictions'],
-            metrics['labels']
+            metrics['labels'],
+            num_classes=cm_num_classes
         )
         
         plot_confusion_matrix(
             cm,
-            get_all_grades(),
+            cm_grade_names,
             str(output_path),
             normalize=True
         )
