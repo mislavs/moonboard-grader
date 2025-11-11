@@ -27,8 +27,6 @@ data:
   val_ratio: 0.15
   test_ratio: 0.15
   random_seed: 42  # For reproducible splits
-  augmentation: false
-  flip_probability: 0.0
 
 # Checkpoint Configuration
 checkpoint:

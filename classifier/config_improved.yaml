@@ -41,24 +41,11 @@ training:
 
 # Data Configuration
 data:
-  path: "data/problems.json"
+  path: "../data/problems.json"
   train_ratio: 0.7
   val_ratio: 0.15
   test_ratio: 0.15
   random_seed: 42
-  
-  # Advanced augmentation (NEW)
-  augmentation: true
-  augmentation_type: "advanced"  # Options: "none", "basic", "advanced"
-  
-  # Advanced augmentation parameters
-  flip_probability: 0.5      # Probability of horizontal flip
-  noise_probability: 0.3     # Probability of adding Gaussian noise
-  noise_level: 0.05          # Standard deviation of noise
-  dropout_probability: 0.2   # Probability of hold dropout
-  dropout_rate: 0.1          # Fraction of holds to drop
-  jitter_probability: 0.3    # Probability of intensity jitter
-  jitter_range: 0.1          # Range of intensity variation
 
 # Checkpoint Configuration
 checkpoint:

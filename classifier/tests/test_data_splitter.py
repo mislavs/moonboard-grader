@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from src.data_splitter import (
     create_stratified_splits,
-    create_datasets_with_augmentation,
+    create_datasets,
     create_data_loaders
 )
 from src.dataset import MoonboardDataset
@@ -88,97 +88,6 @@ class TestStratifiedSplits:
         
         # Check they're different
         assert not np.array_equal(train_idx1, train_idx2)
-
-
-class TestDatasetsWithAugmentation:
-    """Test dataset creation with augmentation."""
-    
-    def test_create_datasets_basic_augmentation(self):
-        """Test dataset creation with basic augmentation."""
-        tensors = np.random.randn(190, 3, 18, 11).astype(np.float32)
-        labels = np.repeat(np.arange(19), 10)
-        np.random.shuffle(labels)
-        
-        config = {
-            'data': {
-                'augmentation': True,
-                'augmentation_type': 'basic',
-                'flip_probability': 0.5
-            }
-        }
-        
-        train_ds, val_ds, test_ds = create_datasets_with_augmentation(
-            tensors, labels, config, train_ratio=0.7, val_ratio=0.15, 
-            test_ratio=0.15, random_seed=42
-        )
-        
-        # Check all are MoonboardDataset instances
-        assert isinstance(train_ds, MoonboardDataset)
-        assert isinstance(val_ds, MoonboardDataset)
-        assert isinstance(test_ds, MoonboardDataset)
-        
-        # Check sizes
-        assert len(train_ds) + len(val_ds) + len(test_ds) == 190
-        
-        # Check train has augmentation, val/test don't
-        assert train_ds.transform is not None
-        assert val_ds.transform is not None  # Will be identity function
-        assert test_ds.transform is not None  # Will be identity function
-    
-    def test_create_datasets_no_augmentation(self):
-        """Test dataset creation without augmentation."""
-        tensors = np.random.randn(190, 3, 18, 11).astype(np.float32)
-        labels = np.repeat(np.arange(19), 10)
-        np.random.shuffle(labels)
-        
-        config = {
-            'data': {
-                'augmentation': False
-            }
-        }
-        
-        train_ds, val_ds, test_ds = create_datasets_with_augmentation(
-            tensors, labels, config, train_ratio=0.7, val_ratio=0.15, 
-            test_ratio=0.15, random_seed=42
-        )
-        
-        # Check all are MoonboardDataset instances
-        assert isinstance(train_ds, MoonboardDataset)
-        assert isinstance(val_ds, MoonboardDataset)
-        assert isinstance(test_ds, MoonboardDataset)
-        
-        # Check sizes
-        assert len(train_ds) + len(val_ds) + len(test_ds) == 190
-    
-    def test_create_datasets_advanced_augmentation(self):
-        """Test dataset creation with advanced augmentation."""
-        tensors = np.random.randn(190, 3, 18, 11).astype(np.float32)
-        labels = np.repeat(np.arange(19), 10)
-        np.random.shuffle(labels)
-        
-        config = {
-            'data': {
-                'augmentation': True,
-                'augmentation_type': 'advanced',
-                'flip_probability': 0.5,
-                'noise_probability': 0.3,
-                'noise_level': 0.05,
-                'dropout_probability': 0.2,
-                'dropout_rate': 0.1,
-                'jitter_probability': 0.3,
-                'jitter_range': 0.1
-            }
-        }
-        
-        train_ds, val_ds, test_ds = create_datasets_with_augmentation(
-            tensors, labels, config, train_ratio=0.7, val_ratio=0.15, 
-            test_ratio=0.15, random_seed=42
-        )
-        
-        # Check all are MoonboardDataset instances
-        assert isinstance(train_ds, MoonboardDataset)
-        assert isinstance(val_ds, MoonboardDataset)
-        assert isinstance(test_ds, MoonboardDataset)
 
 
 class TestDataLoaders:

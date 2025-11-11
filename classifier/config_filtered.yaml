@@ -27,8 +27,6 @@ data:
   val_ratio: 0.15
   test_ratio: 0.15
   random_seed: 123  # Changed to get better stratification for small classes
-  augmentation: false
-  flip_probability: 0.0
   
   # Grade Filtering Configuration
   filter_grades: true

@@ -753,23 +753,7 @@ python main.py predict \
 - Simultaneously predict grade and other attributes (style tags, quality rating)
 - Share representations, potentially improve all tasks
 
-#### 8.2.3 Data Augmentation
-
-**Horizontal Flipping**:
-- Mirror problems left-right (A ↔ K)
-- Doubles dataset size
-- Most problems are grade-equivalent when mirrored
-
-**Grade Smoothing**:
-- Use soft labels (probability distribution around true grade)
-- Account for grading uncertainty
-- May improve generalization
-
-**Synthetic Problems**:
-- Generate new problems by interpolating between similar-grade problems
-- Carefully validate quality
-
-#### 8.2.4 Uncertainty Quantification
+#### 8.2.3 Uncertainty Quantification
 
 **Bayesian Neural Networks**:
 - Provide confidence intervals, not just point predictions

@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from sklearn.model_selection import StratifiedShuffleSplit
-from typing import Tuple, List, Optional, Callable
+from typing import Tuple, List, Optional
 
 
 class MoonboardDataset(Dataset):
@@ -19,7 +19,6 @@ class MoonboardDataset(Dataset):
     Args:
         data: List of numpy arrays or single stacked numpy array of shape (N, 3, 18, 11)
         labels: List of integer labels or numpy array of shape (N,)
-        transform: Optional augmentation callable to apply to samples
         
     The dataset returns (tensor, label) pairs where:
         - tensor: torch.FloatTensor of shape (3, 18, 11) representing the grid
@@ -29,8 +28,7 @@ class MoonboardDataset(Dataset):
     def __init__(
         self,
         data: np.ndarray,
-        labels: np.ndarray,
-        transform: Optional[Callable] = None
+        labels: np.ndarray
     ):
         """
         Initialize the dataset.
@@ -38,7 +36,6 @@ class MoonboardDataset(Dataset):
         Args:
             data: numpy array of shape (N, 3, 18, 11) or list of (3, 18, 11) arrays
             labels: numpy array of shape (N,) or list of integers
-            transform: Optional callable for data augmentation (applied after conversion to tensor)
             
         Raises:
             ValueError: If data and labels have different lengths
@@ -86,7 +83,6 @@ class MoonboardDataset(Dataset):
             
         self.data = data.astype(np.float32)
         self.labels = labels.astype(np.int64)
-        self.transform = transform
         
     def __len__(self) -> int:
         """Return the number of samples in the dataset."""
@@ -110,10 +106,6 @@ class MoonboardDataset(Dataset):
         # Convert to PyTorch tensors
         sample = torch.from_numpy(self.data[idx]).float()
         label = int(self.labels[idx])
-        
-        # Apply augmentation if specified
-        if self.transform is not None:
-            sample = self.transform(sample)
         
         return sample, label
     

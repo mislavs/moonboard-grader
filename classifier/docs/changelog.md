@@ -4,6 +4,34 @@ All notable changes to the Moonboard Grade Prediction model will be documented i
 
 ---
 
+## [v0.5.0] - 2025-11-11 (Augmentation Feature Removal)
+
+### Breaking Changes
+
+#### Complete Removal of Data Augmentation
+
+**Rationale**: Data augmentation techniques were found to be fundamentally flawed for climbing grade prediction. Augmentations like horizontal flip, Gaussian noise, hold dropout, and intensity jitter modify the climbing problems in ways that can significantly change difficulty, but incorrectly preserve the original grade labels. This creates invalid training data where augmented problems may have different actual grades than their labels indicate.
+
+**Removed Components**:
+- `classifier/src/augmentation.py` - Basic augmentation (horizontal flip)
+- `classifier/src/advanced_augmentation.py` - Advanced augmentations (noise, dropout, jitter, mixup, cutmix)
+- All augmentation configuration parameters from config files
+- Transform parameter from `MoonboardDataset`
+- `create_datasets_with_augmentation()` function (replaced with simpler `create_datasets()`)
+
+**Impact**:
+- Training now uses only original, correctly-labeled data
+- Removes potential source of label noise and training instability
+- Simplifies codebase and reduces complexity
+- May reduce apparent training set size, but improves data quality
+
+**Migration**:
+- Remove `augmentation`, `augmentation_type`, and all augmentation-related parameters from configuration files
+- Use `create_datasets()` instead of `create_datasets_with_augmentation()`
+- `MoonboardDataset` no longer accepts `transform` parameter
+
+---
+
 ## [v0.4.0] - 2025-11-01 (Performance Improvement Package)
 
 ### Major Enhancements

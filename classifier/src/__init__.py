@@ -10,8 +10,6 @@ __version__ = "0.1.0"
 # Import main modules
 from . import dataset
 from . import data_splitter
-from . import augmentation
-from . import advanced_augmentation
 from . import models
 from . import advanced_models
 from . import losses
@@ -61,21 +59,8 @@ from .dataset import (
 
 from .data_splitter import (
     create_stratified_splits,
-    create_datasets_with_augmentation,
+    create_datasets,
     create_data_loaders
-)
-
-from .augmentation import (
-    MoonboardAugmentation,
-    create_augmentation,
-    no_augmentation
-)
-
-from .advanced_augmentation import (
-    AdvancedMoonboardAugmentation,
-    MixUpAugmentation,
-    CutMixAugmentation,
-    create_augmentation_pipeline
 )
 
 from .advanced_models import (
@@ -125,8 +110,6 @@ __all__ = [
     # Modules
     'dataset',
     'data_splitter',
-    'augmentation',
-    'advanced_augmentation',
     'models',
     'advanced_models',
     'losses',
@@ -165,17 +148,8 @@ __all__ = [
     'get_split_info',
     # Data splitter functions
     'create_stratified_splits',
-    'create_datasets_with_augmentation',
+    'create_datasets',
     'create_data_loaders',
-    # Augmentation functions
-    'MoonboardAugmentation',
-    'create_augmentation',
-    'no_augmentation',
-    # Advanced augmentation functions
-    'AdvancedMoonboardAugmentation',
-    'MixUpAugmentation',
-    'CutMixAugmentation',
-    'create_augmentation_pipeline',
     # Model functions
     'FullyConnectedModel',
     'ConvolutionalModel',

@@ -286,5 +286,4 @@ print(f"Predicted: {result['predicted_grade']}")
 - Experiment with different model architectures
 - Try different hyperparameters (learning rate, batch size, etc.)
 - Analyze per-grade performance to identify which grades are hardest to predict
-- Consider data augmentation (if applicable)
 

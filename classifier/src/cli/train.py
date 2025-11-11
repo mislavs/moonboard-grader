@@ -18,7 +18,7 @@ from .utils import load_config, setup_device, print_section_header, print_comple
 from src import (
     load_dataset,
     get_dataset_stats,
-    create_datasets_with_augmentation,
+    create_datasets,
     create_data_loaders,
     create_model,
     count_parameters,
@@ -63,8 +63,6 @@ Hyperparameters:
   - Loss Type: {config['training'].get('loss_type', 'ce')}
   - Use Class Weights: {config['training'].get('use_class_weights', True)}
   - Label Smoothing: {config['training'].get('label_smoothing', 0.0)}
-  - Augmentation: {config.get('data', {}).get('augmentation', True)}
-  - Augmentation Type: {config.get('data', {}).get('augmentation_type', 'basic')}
 
 Test Set Results:
   - Exact Accuracy:     {test_metrics['exact_accuracy']:.2f}%
@@ -164,7 +162,7 @@ def train_command(args):
         # Remap labels to start from 0
         dataset = [(tensor, remap_label(label, grade_offset)) for tensor, label in dataset]
     
-    # Create data splits with augmentation
+    # Create data splits
     print(f"\n🔀 Creating train/val/test splits...")
     tensors = np.array([x[0] for x in dataset])
     labels = np.array([x[1] for x in dataset])
@@ -174,24 +172,14 @@ def train_command(args):
     test_ratio = config['data']['test_ratio']
     random_seed = config['data'].get('random_seed', 42)
     
-    # Create datasets with augmentation using new module
-    train_dataset, val_dataset, test_dataset = create_datasets_with_augmentation(
+    # Create datasets
+    train_dataset, val_dataset, test_dataset = create_datasets(
         tensors, labels, config, train_ratio, val_ratio, test_ratio, random_seed
     )
     
     print(f"   Train: {len(train_dataset)} ({train_ratio*100:.0f}%)")
     print(f"   Val:   {len(val_dataset)} ({val_ratio*100:.0f}%)")
     print(f"   Test:  {len(test_dataset)} ({test_ratio*100:.0f}%)")
-    
-    # Display augmentation info
-    use_augmentation = config.get('data', {}).get('augmentation', True)
-    aug_type = config.get('data', {}).get('augmentation_type', 'basic')
-    if use_augmentation:
-        if aug_type == 'advanced':
-            print(f"   Using ADVANCED data augmentation (flip, noise, dropout, jitter)")
-        else:
-            flip_prob = config.get('data', {}).get('flip_probability', 0.5)
-            print(f"   Using basic data augmentation (flip_prob={flip_prob})")
     
     # Create data loaders
     batch_size = config['training']['batch_size']
