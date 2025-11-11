@@ -4,7 +4,7 @@
 # Model Configuration
 model:
   type: "residual_cnn"  # Options: "fc", "cnn", "residual_cnn", "deep_residual_cnn"
-  num_classes: 19
+  num_classes: 10  # Number of filtered grade classes (6A+ to 7C)
   
   # ResidualCNN specific parameters
   use_attention: true  # Enable spatial and channel attention
@@ -46,6 +46,11 @@ data:
   val_ratio: 0.15
   test_ratio: 0.15
   random_seed: 42
+  
+  # Grade Filtering Configuration
+  filter_grades: true
+  min_grade_index: 2   # 6A+
+  max_grade_index: 11  # 7C
 
 # Checkpoint Configuration
 checkpoint:
