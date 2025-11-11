@@ -355,7 +355,11 @@ def calculate_mean_absolute_error(predictions: np.ndarray, labels: np.ndarray) -
     return float(mae)
 
 
-def get_metrics_summary(predictions: np.ndarray, labels: np.ndarray) -> Dict:
+def get_metrics_summary(
+    predictions: np.ndarray,
+    labels: np.ndarray,
+    grade_names: Optional[List[str]] = None
+) -> Dict:
     """
     Get a comprehensive summary of all evaluation metrics.
     
@@ -372,6 +376,10 @@ def get_metrics_summary(predictions: np.ndarray, labels: np.ndarray) -> Dict:
         'tolerance_2_accuracy': calculate_tolerance_accuracy(predictions, labels, tolerance=2),
         'mean_absolute_error': calculate_mean_absolute_error(predictions, labels),
         'num_samples': len(labels),
-        'per_grade_metrics': per_grade_metrics(predictions, labels)
+        'per_grade_metrics': per_grade_metrics(
+            predictions,
+            labels,
+            grade_names=grade_names
+        )
     }
 

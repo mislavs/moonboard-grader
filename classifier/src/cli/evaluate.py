@@ -151,7 +151,18 @@ def evaluate_command(args):
     
     # Get detailed metrics
     print(f"\n📊 Detailed Metrics:")
-    metrics_summary = get_metrics_summary(metrics['predictions'], metrics['labels'])
+    # Use filtered grade names if model is filtered
+    if grade_offset > 0:
+        from src import get_filtered_grade_names
+        grade_names = get_filtered_grade_names(min_grade_idx, max_grade_idx)
+    else:
+        grade_names = get_all_grades()
+    
+    metrics_summary = get_metrics_summary(
+        metrics['predictions'],
+        metrics['labels'],
+        grade_names=grade_names
+    )
     
     print(f"   Mean Absolute Error: {metrics_summary['mean_absolute_error']:.2f} grades")
     
@@ -160,13 +171,6 @@ def evaluate_command(args):
     per_grade = metrics_summary['per_grade_metrics']
     print(f"   {'Grade':<6} {'Precision':<10} {'Recall':<10} {'F1':<10} {'Support':<10}")
     print(f"   {'-'*50}")
-    
-    # Use filtered grade names if model is filtered
-    if grade_offset > 0:
-        from src import get_filtered_grade_names
-        grade_names = get_filtered_grade_names(min_grade_idx, max_grade_idx)
-    else:
-        grade_names = get_all_grades()
     
     for grade in grade_names:
         if grade in per_grade:
