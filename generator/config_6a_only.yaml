@@ -1,0 +1,38 @@
+# Configuration for Training on 6A+ Boulders Only
+# This trains a conditional VAE on a single grade for simplicity
+
+# Data configuration
+data:
+  data_path: "../data/problems.json"
+  min_grade_index: 2  # 6A+ (see moonboard_core.grade_encoder for index mapping)
+  max_grade_index: 2  # 6A+ only
+  train_split: 0.8  # 80% training, 20% validation
+  batch_size: 64
+  num_workers: 0  # Set to 0 for Windows compatibility
+
+# Model architecture
+model:
+  latent_dim: 128
+  num_grades: 1  # Will be automatically set to 1 since we filter to one grade
+  grade_embedding_dim: 32
+
+# Training hyperparameters
+training:
+  num_epochs: 50
+  learning_rate: 0.001
+  kl_weight: 1.0
+  kl_annealing: true  # Gradually increase KL weight from 0 to kl_weight
+  kl_annealing_epochs: 10  # Number of epochs to anneal over
+
+# Checkpoint and logging
+checkpoint:
+  checkpoint_dir: "models"
+  save_every: 5  # Save checkpoint every N epochs
+  
+logging:
+  log_dir: "runs"
+  log_interval: 100  # Log batch progress every N batches
+
+# Device configuration
+device: "cuda"  # Use "cuda" if available, otherwise "cpu"
+
