@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends
 
 from ...models.schemas import HealthResponse, ModelInfoResponse
 from ...services.predictor_service import PredictorService
-from ..dependencies import get_predictor_service
+from ...services.generator_service import GeneratorService
+from ..dependencies import get_predictor_service, get_generator_service
 from ...core.config import settings
 
 router = APIRouter()
@@ -27,16 +28,28 @@ async def root():
 
 @router.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health_check(
-    predictor_service: PredictorService = Depends(get_predictor_service)
+    predictor_service: PredictorService = Depends(get_predictor_service),
+    generator_service: GeneratorService = Depends(get_generator_service)
 ):
     """
     Health check endpoint.
     
-    Returns the service status and whether the model is loaded.
+    Returns the service status and whether the models are loaded.
+    Status will be "healthy" if both models are loaded, "degraded" otherwise.
     """
+    predictor_loaded = predictor_service.is_loaded
+    generator_loaded = generator_service.is_loaded
+    
+    # Determine overall status
+    if predictor_loaded and generator_loaded:
+        status = "healthy"
+    else:
+        status = "degraded"
+    
     return HealthResponse(
-        status="healthy",
-        model_loaded=predictor_service.is_loaded
+        status=status,
+        model_loaded=predictor_loaded,
+        generator_model_loaded=generator_loaded
     )
 
 

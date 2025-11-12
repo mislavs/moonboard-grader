@@ -82,7 +82,8 @@ class HealthResponse(BaseModel):
     """Health check response."""
     
     status: str = Field(..., description="Service status")
-    model_loaded: bool = Field(..., description="Whether the model is loaded")
+    model_loaded: bool = Field(..., description="Whether the predictor model is loaded")
+    generator_model_loaded: bool = Field(..., description="Whether the generator model is loaded")
     
     model_config = ConfigDict(protected_namespaces=())
 
@@ -232,3 +233,68 @@ class DuplicateCheckResponse(BaseModel):
     
     exists: bool = Field(..., description="Whether a problem with these moves exists")
     problem_id: Optional[int] = Field(None, description="ID of the matching problem if found")
+
+
+# ============================================================================
+# Generation Schemas
+# ============================================================================
+
+
+class GenerateRequest(BaseModel):
+    """Request body for problem generation."""
+    
+    grade: str = Field(..., description="Font grade for the problem (e.g., '6A+', '7B')")
+    temperature: float = Field(default=1.0, ge=0.1, le=2.0, description="Sampling temperature (higher = more random)")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "grade": "6A+",
+                "temperature": 1.0
+            }
+        }
+    )
+
+
+class ProblemStats(BaseModel):
+    """Statistics for a generated problem."""
+    
+    num_moves: int = Field(..., description="Total number of moves")
+    num_start_holds: int = Field(..., description="Number of starting holds")
+    num_end_holds: int = Field(..., description="Number of ending holds")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "num_moves": 8,
+                "num_start_holds": 2,
+                "num_end_holds": 1
+            }
+        }
+    )
+
+
+class GenerateResponse(BaseModel):
+    """Response body for problem generation."""
+    
+    moves: List[ProblemMove] = Field(..., description="List of moves in the generated problem")
+    grade: str = Field(..., description="Grade of the generated problem")
+    stats: ProblemStats = Field(..., description="Statistics about the generated problem")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "moves": [
+                    {"description": "A5", "isStart": True, "isEnd": False},
+                    {"description": "B7", "isStart": False, "isEnd": False},
+                    {"description": "C10", "isStart": False, "isEnd": True}
+                ],
+                "grade": "6A+",
+                "stats": {
+                    "num_moves": 8,
+                    "num_start_holds": 2,
+                    "num_end_holds": 1
+                }
+            }
+        }
+    )

@@ -9,12 +9,16 @@ from fastapi import HTTPException, status
 
 from ..services.predictor_service import PredictorService
 from ..services.problem_service import ProblemService
+from ..services.generator_service import GeneratorService
 
 # Global predictor service instance
 _predictor_service: Optional[PredictorService] = None
 
 # Global problem service instance
 _problem_service: Optional[ProblemService] = None
+
+# Global generator service instance
+_generator_service: Optional[GeneratorService] = None
 
 
 def get_predictor_service() -> PredictorService:
@@ -97,4 +101,57 @@ def set_problem_service(service: ProblemService) -> None:
     """
     global _problem_service
     _problem_service = service
+
+
+def get_generator_service() -> GeneratorService:
+    """
+    Dependency that returns the generator service.
+    
+    Returns:
+        GeneratorService instance
+        
+    Raises:
+        HTTPException: If service is not initialized
+    """
+    if _generator_service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Generator service not initialized"
+        )
+    return _generator_service
+
+
+def set_generator_service(service: GeneratorService) -> None:
+    """
+    Set the global generator service instance.
+    
+    Args:
+        service: GeneratorService instance to set
+    """
+    global _generator_service
+    _generator_service = service
+
+
+def get_loaded_generator() -> GeneratorService:
+    """
+    Dependency that returns a loaded generator service.
+    
+    Returns:
+        Loaded GeneratorService instance
+        
+    Raises:
+        HTTPException: If model is not loaded
+    """
+    service = get_generator_service()
+    
+    if not service.is_loaded:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Generator model not loaded. Please ensure generator_model.pth "
+                "exists in the models/ directory and restart the server."
+            )
+        )
+    
+    return service
 

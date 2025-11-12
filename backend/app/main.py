@@ -13,7 +13,8 @@ from .core.config import settings
 from .core.logging import setup_logging
 from .services.predictor_service import PredictorService
 from .services.problem_service import ProblemService
-from .api.dependencies import set_predictor_service, set_problem_service
+from .services.generator_service import GeneratorService
+from .api.dependencies import set_predictor_service, set_problem_service, set_generator_service
 from .api import router
 
 # Setup logging
@@ -97,6 +98,33 @@ async def startup_handler():
     problem_service = ProblemService()
     set_problem_service(problem_service)
     logger.info("Problem service initialized!")
+    
+    # Create and set generator service
+    logger.info("Initializing generator service...")
+    generator_service = GeneratorService(
+        model_path=settings.model_path.parent / "generator_model.pth",
+        device=settings.device
+    )
+    
+    # Try to load the generator model
+    try:
+        generator_model_path = settings.model_path.parent / "generator_model.pth"
+        if not generator_model_path.exists():
+            logger.warning(
+                f"Generator model file not found at {generator_model_path}. "
+                "API will be available but generation will fail. "
+                "Please add generator_model.pth to the models/ directory."
+            )
+        else:
+            generator_service.load_model()
+            logger.info("Generator model loaded successfully!")
+    except Exception as e:
+        logger.error(f"Failed to load generator model: {e}")
+        logger.warning("API will start but generation will fail until model is loaded.")
+    
+    # Set the global generator service
+    set_generator_service(generator_service)
+    logger.info("Generator service initialized!")
     
     logger.info("Application startup complete!")
 
