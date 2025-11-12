@@ -149,3 +149,37 @@ export async function checkDuplicate(moves: Move[]): Promise<DuplicateCheckRespo
   });
 }
 
+/**
+ * Problem statistics from generation
+ */
+export interface ProblemStats {
+  num_moves: number;
+  num_start_holds: number;
+  num_end_holds: number;
+}
+
+/**
+ * Generate response
+ */
+export interface GenerateResponse {
+  moves: Move[];
+  grade: string;
+  stats: ProblemStats;
+}
+
+/**
+ * Generate a new climbing problem
+ */
+export async function generateProblem(
+  grade: string = '6A+',
+  temperature: number = 1.0
+): Promise<GenerateResponse> {
+  return apiFetch<GenerateResponse>(`${API_BASE_URL}/generate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ grade, temperature }),
+  });
+}
+

@@ -5,8 +5,10 @@ interface CreateModeControlsProps {
   onClearAll: () => void;
   onPredictGrade: () => void;
   onCheckDuplicate: () => void;
+  onGenerate: () => void;
   isLoading?: boolean;
   isCheckingDuplicate?: boolean;
+  isGenerating?: boolean;
 }
 
 export default function CreateModeControls({ 
@@ -14,8 +16,10 @@ export default function CreateModeControls({
   onClearAll, 
   onPredictGrade,
   onCheckDuplicate,
+  onGenerate,
   isLoading = false,
-  isCheckingDuplicate = false
+  isCheckingDuplicate = false,
+  isGenerating = false
 }: CreateModeControlsProps) {
   return (
     <div className="flex flex-col gap-4 w-full">
@@ -52,6 +56,20 @@ export default function CreateModeControls({
 
       {/* Action Buttons */}
       <div className="flex flex-col gap-3 w-full">
+        <button
+          onClick={onGenerate}
+          disabled={isGenerating}
+          className="w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-lg transition-colors duration-200"
+        >
+          {isGenerating ? (
+            <span className="flex items-center justify-center gap-2">
+              <SpinnerIcon />
+              Generating...
+            </span>
+          ) : (
+            'Generate Boulder'
+          )}
+        </button>
         <button
           onClick={onPredictGrade}
           disabled={movesCount === 0 || isLoading}

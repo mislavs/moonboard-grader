@@ -8,6 +8,7 @@ import DuplicateCheckResult from './DuplicateCheckResult';
 import { usePrediction } from '../hooks/usePrediction';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { useBackendHealth } from '../hooks/useBackendHealth';
+import { useGeneration } from '../hooks/useGeneration';
 import type { Move } from '../types/problem';
 import { ERROR_MESSAGES } from '../config/api';
 
@@ -15,6 +16,7 @@ export default function CreateMode() {
   const [createdMoves, setCreatedMoves] = useState<Move[]>([]);
   const { prediction, predicting, error, predict, reset } = usePrediction();
   const { duplicate, checking, error: duplicateError, checkForDuplicate, reset: resetDuplicate } = useDuplicateCheck();
+  const { generating, error: generateError, generate, reset: resetGenerate } = useGeneration();
   const backendHealthy = useBackendHealth();
 
   // Clear duplicate result when moves change
@@ -27,6 +29,7 @@ export default function CreateMode() {
     setCreatedMoves([]);
     reset();
     resetDuplicate();
+    resetGenerate();
   };
 
   const handlePredictGrade = async () => {
@@ -35,6 +38,19 @@ export default function CreateMode() {
 
   const handleCheckDuplicate = async () => {
     await checkForDuplicate(createdMoves);
+  };
+
+  const handleGenerate = async () => {
+    // Clear existing state
+    reset();
+    resetDuplicate();
+    resetGenerate();
+    
+    // Generate new problem
+    const result = await generate();
+    if (result) {
+      setCreatedMoves(result.moves);
+    }
   };
 
   return (
@@ -53,9 +69,19 @@ export default function CreateMode() {
             onClearAll={handleClearAll}
             onPredictGrade={handlePredictGrade}
             onCheckDuplicate={handleCheckDuplicate}
+            onGenerate={handleGenerate}
             isLoading={predicting}
             isCheckingDuplicate={checking}
+            isGenerating={generating}
           />
+
+          {generateError && !generating && (
+            <ErrorMessage message={generateError} />
+          )}
+
+          {generating && (
+            <LoadingSpinner message="Generating boulder..." />
+          )}
 
           {duplicateError && !checking && (
             <ErrorMessage message={duplicateError} />
