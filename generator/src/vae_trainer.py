@@ -53,7 +53,6 @@ class VAETrainer:
         
         # Logging configuration
         self.log_interval = config.get('log_interval', 100)
-        self.checkpoint_frequency = config.get('checkpoint_frequency', 5)
         
         # Optimizer
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
@@ -233,14 +232,13 @@ class VAETrainer:
         with torch.no_grad():
             return self._compute_losses(self.val_loader, kl_weight, log_progress=False)
     
-    def save_checkpoint(self, epoch: int, filename: str = 'checkpoint.pth', is_best: bool = False):
+    def save_checkpoint(self, epoch: int, filename: str):
         """
         Save model checkpoint.
         
         Args:
             epoch: Current epoch number
             filename: Checkpoint filename
-            is_best: Whether this is the best model so far
         """
         checkpoint = {
             'epoch': epoch,
@@ -255,11 +253,6 @@ class VAETrainer:
         
         checkpoint_path = self.checkpoint_dir / filename
         torch.save(checkpoint, checkpoint_path)
-        
-        # Save as best model if applicable
-        if is_best:
-            best_path = self.checkpoint_dir / 'best_vae.pth'
-            torch.save(checkpoint, best_path)
     
     def load_checkpoint(self, checkpoint_path: str):
         """
@@ -328,15 +321,14 @@ class VAETrainer:
             self.train_losses.append(train_loss)
             self.val_losses.append(val_loss)
             
-            # Save checkpoint
-            is_best = val_loss < self.best_val_loss
-            if is_best:
+            # Save best model based on validation loss
+            if val_loss < self.best_val_loss:
                 self.best_val_loss = val_loss
-                self.save_checkpoint(epoch, 'checkpoint.pth', is_best=True)
+                self.save_checkpoint(epoch, 'best_vae.pth')
                 print(f"  → New best validation loss: {val_loss:.4f} - Saved checkpoint")
-            
-            if (epoch + 1) % self.checkpoint_frequency == 0:
-                self.save_checkpoint(epoch, f'checkpoint_epoch_{epoch+1}.pth', is_best=False)
+        
+        # Save final model
+        self.save_checkpoint(self.current_epoch, 'final_vae.pth')
         
         print(f'\n✓ Training completed!')
         print(f'  Best validation loss: {self.best_val_loss:.4f}')

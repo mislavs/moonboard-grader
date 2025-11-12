@@ -72,7 +72,6 @@ def build_training_config(config: Dict) -> Dict:
         'kl_annealing': config['training']['kl_annealing'],
         'kl_annealing_epochs': config['training']['kl_annealing_epochs'],
         'checkpoint_dir': config['checkpoint']['checkpoint_dir'],
-        'checkpoint_frequency': config['checkpoint'].get('save_every', 5),
         'log_dir': config['logging']['log_dir'],
         'log_interval': config['logging'].get('log_interval', 100),
     }

@@ -24,7 +24,6 @@ training:
 # Checkpoint and logging
 checkpoint:
   checkpoint_dir: "models"
-  save_every: 5  # Save checkpoint every N epochs
   
 logging:
   log_dir: "runs"
