@@ -1,1 +1,1 @@
-- don't create implementation summary documents unless explicitly asked
+- don't create summary documents unless explicitly asked

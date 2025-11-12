@@ -232,13 +232,14 @@ class VAETrainer:
         with torch.no_grad():
             return self._compute_losses(self.val_loader, kl_weight, log_progress=False)
     
-    def save_checkpoint(self, epoch: int, filename: str):
+    def save_checkpoint(self, epoch: int, filename: str, is_best: bool = False):
         """
         Save model checkpoint.
         
         Args:
             epoch: Current epoch number
             filename: Checkpoint filename
+            is_best: If True, also save a copy as 'best_vae.pth'
         """
         checkpoint = {
             'epoch': epoch,
@@ -249,10 +250,20 @@ class VAETrainer:
             'config': self.config,
             'train_losses': self.train_losses,
             'val_losses': self.val_losses,
+            'model_config': {
+                'latent_dim': self.model.latent_dim,
+                'num_grades': self.model.num_grades,
+                'grade_embedding_dim': self.model.grade_embedding_dim,
+            }
         }
         
         checkpoint_path = self.checkpoint_dir / filename
         torch.save(checkpoint, checkpoint_path)
+        
+        # Also save as best checkpoint if requested
+        if is_best:
+            best_path = self.checkpoint_dir / 'best_vae.pth'
+            torch.save(checkpoint, best_path)
     
     def load_checkpoint(self, checkpoint_path: str):
         """
@@ -324,7 +335,7 @@ class VAETrainer:
             # Save best model based on validation loss
             if val_loss < self.best_val_loss:
                 self.best_val_loss = val_loss
-                self.save_checkpoint(epoch, 'best_vae.pth')
+                self.save_checkpoint(epoch, f'checkpoint_epoch_{epoch}.pth', is_best=True)
                 print(f"  → New best validation loss: {val_loss:.4f} - Saved checkpoint")
         
         # Save final model

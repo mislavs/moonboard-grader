@@ -33,6 +33,11 @@ from .grid_builder import (
     tensor_to_moves,
 )
 
+from .grid_to_moves import (
+    grid_to_moves,
+    validate_moves,
+)
+
 from .data_processor import (
     process_problem,
     load_dataset,
@@ -63,6 +68,9 @@ __all__ = [
     "create_grid_tensor",
     "get_channel_counts",
     "tensor_to_moves",
+    # Grid to moves conversion
+    "grid_to_moves",
+    "validate_moves",
     # Data processing
     "process_problem",
     "load_dataset",
