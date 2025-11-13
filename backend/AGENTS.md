@@ -4,8 +4,7 @@
 
 On this system, use `py` instead of `python` for Python commands. For example:
 - `py -m uvicorn app.main:app --reload` instead of `python -m uvicorn app.main:app --reload`
-- `py -m pip install -r requirements.txt` instead of `python -m pip install -r requirements.txt`
-- `py -m pip install -e ../classifier` instead of `python -m pip install -e ../classifier`
+- `uv sync` to install dependencies
 
 ## Running the Backend Server
 

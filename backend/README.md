@@ -7,11 +7,7 @@ FastAPI backend service for predicting climbing problem grades using deep learni
 ### 1. Install Dependencies
 
 ```powershell
-# Install classifier package
-py -m pip install -e ..\classifier
-
-# Install backend requirements
-py -m pip install -r requirements.txt
+uv sync
 ```
 
 ### 2. Add Model File

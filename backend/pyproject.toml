@@ -1,0 +1,33 @@
+[project]
+name = "moonboard-backend"
+version = "0.1.0"
+description = "FastAPI backend service for predicting climbing problem grades using deep learning"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "python-multipart>=0.0.6",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.25.0",
+    "moonboard-classifier",
+    "moonboard-generator",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# local package sources
+[tool.uv.sources]
+moonboard-classifier = { path = "../classifier", editable = true }
+moonboard-generator = { path = "../generator", editable = true }
+

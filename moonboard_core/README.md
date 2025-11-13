@@ -13,16 +13,8 @@ This package provides core functionality for working with Moonboard boulder prob
 
 ## Installation
 
-Install in editable mode for development:
-
 ```bash
-py -m pip install -e .
-```
-
-For development with testing tools:
-
-```bash
-py -m pip install -e .[dev]
+uv sync
 ```
 
 ## Usage
@@ -78,7 +70,7 @@ moonboard_core/
 ├── position_parser.py    # Hold position parsing
 ├── grid_builder.py       # Tensor grid creation
 ├── data_processor.py     # Dataset loading and processing
-├── setup.py              # Package configuration
+├── pyproject.toml        # Package configuration
 ├── pytest.ini            # Pytest configuration
 └── tests/                # Unit tests
     ├── test_grade_encoder.py

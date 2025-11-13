@@ -26,6 +26,8 @@ env/
 ENV/
 .venv
 
+uv.lock
+
 # PyTorch
 *.pth
 *.pt

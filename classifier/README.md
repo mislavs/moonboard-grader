@@ -29,8 +29,8 @@ This project implements a deep learning system to predict the difficulty grade o
 
 ### Prerequisites
 
-- Python 3.10 or higher
-- pip package manager
+- Python 3.9 or higher
+- uv package manager ([install uv](https://docs.astral.sh/uv/getting-started/installation/))
 
 ### Setup
 
@@ -39,25 +39,10 @@ This project implements a deep learning system to predict the difficulty grade o
 cd moonboard-grader/classifier
 ```
 
-2. Create a virtual environment (recommended):
+2. Install dependencies:
+
 ```bash
-python -m venv venv
-
-# On Windows
-venv\Scripts\activate
-
-# On macOS/Linux
-source venv/bin/activate
-```
-
-3. Install the moonboard_core shared utilities package:
-```bash
-pip install -e ../moonboard_core
-```
-
-4. Install classifier dependencies:
-```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 ### Verify Installation
@@ -72,19 +57,19 @@ pytest tests/
 ### Training a Model
 
 ```bash
-python main.py train --config config.yaml
+py main.py train --config config.yaml
 ```
 
 ### Evaluating a Model
 
 ```bash
-python main.py evaluate --checkpoint models/best_model.pth --data ../data/problems.json
+py main.py evaluate --checkpoint models/best_model.pth --data ../data/problems.json
 ```
 
 ### Making Predictions
 
 ```bash
-python main.py predict --checkpoint models/best_model.pth --input problem.json
+py main.py predict --checkpoint models/best_model.pth --input problem.json
 ```
 
 ## Data Format

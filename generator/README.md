@@ -8,14 +8,8 @@ This project uses a conditional VAE to generate novel climbing problems at speci
 
 ## Installation
 
-1. Install the shared moonboard_core package:
 ```bash
-pip install -e ../moonboard_core
-```
-
-2. Install generator dependencies:
-```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 ## Usage
@@ -24,14 +18,14 @@ pip install -r requirements.txt
 
 Train a new VAE model:
 ```bash
-python main.py train --config config.yaml
+py main.py train --config config.yaml
 ```
 
 ### Generating Problems
 
 Generate new climbing problems:
 ```bash
-python main.py generate --checkpoint models/best_vae.pth --grade 6B+ --num-samples 10
+py main.py generate --checkpoint models/best_vae.pth --grade 6B+ --num-samples 10
 ```
 
 ## Data Format

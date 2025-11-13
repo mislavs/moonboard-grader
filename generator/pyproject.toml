@@ -1,0 +1,32 @@
+[project]
+name = "moonboard-generator"
+version = "0.1.0"
+description = "Moonboard climbing problem generator using Conditional VAE"
+authors = [{name = "Moonboard Grader Team"}]
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.0.0",
+    "numpy>=1.24.0",
+    "pyyaml>=6.0",
+    "tensorboard>=2.14.0",
+    "moonboard_core",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+# Tell uv where to find local packages
+[tool.uv.sources]
+moonboard_core = { path = "../moonboard_core", editable = true }
+
