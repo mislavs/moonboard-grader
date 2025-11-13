@@ -139,6 +139,8 @@ class TestValidateMoves:
         moves = [
             {"description": "A1", "isStart": True, "isEnd": False},
             {"description": "F7", "isStart": False, "isEnd": False},
+            {"description": "F10", "isStart": False, "isEnd": False},
+            {"description": "F12", "isStart": False, "isEnd": False},
             {"description": "K18", "isStart": False, "isEnd": True}
         ]
         
@@ -146,9 +148,9 @@ class TestValidateMoves:
         
         assert result['valid'] is True
         assert len(result['errors']) == 0
-        assert result['stats']['total_holds'] == 3
+        assert result['stats']['total_holds'] == 5
         assert result['stats']['start_holds'] == 1
-        assert result['stats']['middle_holds'] == 1
+        assert result['stats']['middle_holds'] == 3
         assert result['stats']['end_holds'] == 1
     
     def test_no_holds(self):
@@ -156,12 +158,18 @@ class TestValidateMoves:
         result = validate_moves([])
         
         assert result['valid'] is False
-        assert "no holds" in result['errors'][0].lower()
+        # Should have 3 errors: no start, no end, insufficient middle
+        assert len(result['errors']) == 3
+        assert any("start hold" in err.lower() for err in result['errors'])
+        assert any("end hold" in err.lower() for err in result['errors'])
+        assert any("middle hold" in err.lower() for err in result['errors'])
     
     def test_no_start_holds(self):
         """Test validation of problem with no start holds."""
         moves = [
             {"description": "F7", "isStart": False, "isEnd": False},
+            {"description": "F10", "isStart": False, "isEnd": False},
+            {"description": "F12", "isStart": False, "isEnd": False},
             {"description": "K18", "isStart": False, "isEnd": True}
         ]
         
@@ -174,7 +182,9 @@ class TestValidateMoves:
         """Test validation of problem with no end holds."""
         moves = [
             {"description": "A1", "isStart": True, "isEnd": False},
-            {"description": "F7", "isStart": False, "isEnd": False}
+            {"description": "F7", "isStart": False, "isEnd": False},
+            {"description": "F10", "isStart": False, "isEnd": False},
+            {"description": "F12", "isStart": False, "isEnd": False}
         ]
         
         result = validate_moves(moves)
@@ -182,8 +192,24 @@ class TestValidateMoves:
         assert result['valid'] is False
         assert any("end hold" in err.lower() for err in result['errors'])
     
-    def test_warnings_few_holds(self):
-        """Test that problems with very few holds generate warnings."""
+    def test_insufficient_middle_holds(self):
+        """Test validation of problem with insufficient middle holds."""
+        # Only 2 middle holds (needs at least 3)
+        moves = [
+            {"description": "A1", "isStart": True, "isEnd": False},
+            {"description": "F7", "isStart": False, "isEnd": False},
+            {"description": "F10", "isStart": False, "isEnd": False},
+            {"description": "K18", "isStart": False, "isEnd": True}
+        ]
+        
+        result = validate_moves(moves)
+        
+        assert result['valid'] is False
+        assert any("middle hold" in err.lower() for err in result['errors'])
+        assert result['stats']['middle_holds'] == 2
+    
+    def test_no_middle_holds(self):
+        """Test validation of problem with no middle holds."""
         moves = [
             {"description": "A1", "isStart": True, "isEnd": False},
             {"description": "K18", "isStart": False, "isEnd": True}
@@ -191,9 +217,24 @@ class TestValidateMoves:
         
         result = validate_moves(moves)
         
-        assert result['valid'] is True  # Still valid
-        assert len(result['warnings']) > 0
-        assert any("few holds" in warn.lower() for warn in result['warnings'])
+        assert result['valid'] is False
+        assert any("middle hold" in err.lower() for err in result['errors'])
+        assert result['stats']['middle_holds'] == 0
+    
+    def test_minimum_valid_holds(self):
+        """Test that problems with minimum valid holds (1 start + 3 middle + 1 end) are valid."""
+        moves = [
+            {"description": "A1", "isStart": True, "isEnd": False},
+            {"description": "F7", "isStart": False, "isEnd": False},
+            {"description": "F10", "isStart": False, "isEnd": False},
+            {"description": "F12", "isStart": False, "isEnd": False},
+            {"description": "K18", "isStart": False, "isEnd": True}
+        ]
+        
+        result = validate_moves(moves)
+        
+        assert result['valid'] is True
+        assert len(result['errors']) == 0
     
     def test_warnings_many_holds(self):
         """Test that problems with many holds generate warnings."""
@@ -228,7 +269,7 @@ class TestValidateMoves:
         
         result = validate_moves(moves)
         
-        # Should have errors for: no holds, no start, no end
+        # Should have errors for: no start, no end, insufficient middle
         assert len(result['errors']) == 3
         assert result['valid'] is False
 

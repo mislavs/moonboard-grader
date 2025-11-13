@@ -10,10 +10,10 @@ from typing import List, Dict, Any, Tuple
 from .position_parser import COLUMNS, ROWS, COLS
 
 # Validation thresholds
-MIN_HOLDS = 3
 MAX_HOLDS = 20
 MAX_START_HOLDS = 4
 MAX_END_HOLDS = 2
+MIN_MIDDLE_HOLDS = 3
 
 
 def _move_sort_key(move: Dict) -> Tuple[int, int]:
@@ -150,6 +150,9 @@ def validate_moves(moves: List[Dict]) -> Dict[str, Any]:
     Examples:
         >>> moves = [
         ...     {"description": "A1", "isStart": True, "isEnd": False},
+        ...     {"description": "F7", "isStart": False, "isEnd": False},
+        ...     {"description": "F10", "isStart": False, "isEnd": False},
+        ...     {"description": "F12", "isStart": False, "isEnd": False},
         ...     {"description": "K18", "isStart": False, "isEnd": True}
         ... ]
         >>> result = validate_moves(moves)
@@ -166,19 +169,16 @@ def validate_moves(moves: List[Dict]) -> Dict[str, Any]:
     total_holds = len(moves)
     
     # Validation rules
-    if total_holds == 0:
-        errors.append("Problem has no holds")
-    
     if start_holds == 0:
         errors.append("Problem must have at least one start hold")
     
     if end_holds == 0:
         errors.append("Problem must have at least one end hold")
     
-    # Warnings for unusual problems
-    if total_holds < MIN_HOLDS:
-        warnings.append(f"Problem has very few holds ({total_holds})")
+    if middle_holds < MIN_MIDDLE_HOLDS:
+        errors.append(f"Problem must have at least {MIN_MIDDLE_HOLDS} middle holds (found {middle_holds})")
     
+    # Warnings for unusual problems
     if total_holds > MAX_HOLDS:
         warnings.append(f"Problem has many holds ({total_holds})")
     
