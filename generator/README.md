@@ -1,34 +1,194 @@
 # MoonBoard Generator
 
-A Variational Autoencoder (VAE) based generator for creating synthetic MoonBoard climbing problems.
-
-## Overview
-
-This project uses a conditional VAE to generate novel climbing problems at specified difficulty grades. The VAE learns latent representations of climbing problems from the MoonBoard dataset and can generate new problems by sampling from this learned distribution.
+A Variational Autoencoder (VAE) for generating synthetic MoonBoard climbing problems at specified difficulty grades.
 
 ## Installation
 
 ```bash
 uv sync
+pip install -e ../moonboard_core
 ```
 
-## Usage
+## Quick Start
 
-### Training
+**Train a model:**
 
-Train a new VAE model:
 ```bash
 py main.py train --config config.yaml
 ```
 
-### Generating Problems
+**Generate problems:**
 
-Generate new climbing problems:
 ```bash
 py main.py generate --checkpoint models/best_vae.pth --grade 6B+ --num-samples 10
 ```
 
+**Save to file:**
+
+```bash
+py main.py generate --checkpoint models/best_vae.pth --grade 6B+ --num-samples 10 --output generated.json
+```
+
+**Generate only valid problems:**
+
+```bash
+py main.py generate --checkpoint models/best_vae.pth --grade 7A --num-samples 10 --retry
+```
+
+## Commands
+
+### Train
+
+```bash
+py main.py train [--config config.yaml] [--resume checkpoint.pth]
+```
+
+Monitor training with TensorBoard:
+
+```bash
+tensorboard --logdir runs
+```
+
+### Generate
+
+```bash
+py main.py generate --checkpoint PATH --grade GRADE [OPTIONS]
+```
+
+**Key options:**
+
+- `--grade`: Grade to generate (e.g., "6B+", "7A")
+- `--num-samples`: Number of problems (default: 1)
+- `--temperature`: Sampling randomness, 0.5-2.0 (default: 1.0)
+- `--threshold`: Hold detection threshold, 0.0-1.0 (default: 0.5)
+- `--output`: Save to JSON file
+- `--include-grade`: Include grade info in output
+- `--retry`: Generate only valid problems
+- `--cpu`: Force CPU usage
+
+**Examples:**
+
+```bash
+# Higher creativity
+py main.py generate --checkpoint models/best_vae.pth --grade 7B --temperature 1.5
+
+# Denser problems
+py main.py generate --checkpoint models/best_vae.pth --grade 6C --threshold 0.3
+
+# Multiple grades
+py main.py generate --checkpoint models/best_vae.pth --grade-labels "0,2,4,6,8"
+```
+
+## Configuration
+
+Edit `config.yaml` to customize training:
+
+```yaml
+data:
+  data_path: "../data/problems.json"
+  train_split: 0.8
+  batch_size: 64
+
+model:
+  latent_dim: 128
+  grade_embedding_dim: 32
+
+training:
+  num_epochs: 50
+  learning_rate: 0.001
+  kl_weight: 1.0
+  kl_annealing: true
+  kl_annealing_epochs: 10
+
+checkpoint:
+  checkpoint_dir: "models"
+
+logging:
+  log_dir: "runs"
+  log_interval: 100
+
+device: "cuda"  # or "cpu"
+```
+
 ## Data Format
 
-The generator uses the shared dataset located at `../data/problems.json`. Problems are represented as 3-channel grids (start holds, middle holds, end holds) and conditioned on difficulty grade during training and generation.
+**Input** (`../data/problems.json`):
 
+```json
+{
+  "Grade": "6B+",
+  "Moves": [
+    {"Description": "A5", "IsStart": true, "IsEnd": false},
+    {"Description": "K10", "IsStart": false, "IsEnd": true}
+  ]
+}
+```
+
+**Output** (generated problems):
+
+```json
+[
+  {
+    "moves": [...],
+    "stats": {
+      "num_holds": 10,
+      "num_start_holds": 2,
+      "num_end_holds": 1,
+      "num_middle_holds": 7
+    }
+  }
+]
+```
+
+## Generation Parameters
+
+**Temperature**: Controls randomness
+- `0.5`: Conservative
+- `1.0`: Standard (default)
+- `1.5`: Creative
+
+**Threshold**: Controls hold density
+- `0.3`: More holds
+- `0.5`: Balanced (default)
+- `0.7`: Fewer holds
+
+## Python API
+
+```python
+from src.generator import ProblemGenerator
+from moonboard_core import encode_grade
+
+# Load generator
+generator = ProblemGenerator.from_checkpoint('models/best_vae.pth')
+
+# Generate problems
+problems = generator.generate(
+    grade_label=encode_grade('6B+'),
+    num_samples=10,
+    temperature=1.0
+)
+
+# Access moves
+for problem in problems:
+    print(f"Generated {len(problem['moves'])} holds")
+```
+
+## Troubleshooting
+
+**Training too slow**: Use GPU with `device: "cuda"` in config
+
+**Invalid generated problems**: Use `--retry` flag or lower `--threshold 0.3`
+
+**KL loss goes to zero**: Enable KL annealing in config
+
+**Out of memory**: Reduce `batch_size` in config or use `--cpu`
+
+## Testing
+
+```bash
+pytest tests/
+```
+
+## Technical Details
+
+See [`spec.md`](spec.md) for VAE architecture and implementation details.

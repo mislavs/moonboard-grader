@@ -18,3 +18,5 @@ desktop.ini
 *.tmp
 *.temp
 
+# Aspire CLI
+.aspire/
