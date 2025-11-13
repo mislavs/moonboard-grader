@@ -26,23 +26,19 @@ Web interface to visualize problems and see predictions.
 - Display predicted grades
 - **Tech**: React, TypeScript, Vite
 
-## Tech Stack
+### 4. Generator
+AI system that creates synthetic climbing problems using a Variational Autoencoder.
+- Generates problems at specified difficulty grades
+- Trains on existing problem data
+- Configurable creativity and hold density
+- **Tech**: Python, PyTorch, VAE
 
-**Classifier:**
-- Python
-- PyTorch
-- NumPy
-
-**Backend:**
-- Python
-- FastAPI
-- Uvicorn
-
-**Frontend:**
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
+### 5. Aspire App
+Orchestration layer that runs the entire application stack.
+- Coordinates backend and frontend services
+- Health monitoring and service dependencies
+- Simplified deployment and development
+- **Tech**: .NET Aspire, C#
 
 ## Quick Start
 
@@ -50,4 +46,6 @@ See individual README files in each component directory for detailed setup instr
 - `classifier/README.md` - Train and evaluate models
 - `backend/README.md` - Run the API server
 - `frontend/README.md` - Run the web interface
+- `generator/README.md` - Generate synthetic climbing problems
+- `aspire-app/` - Run the full application stack with Aspire
 
