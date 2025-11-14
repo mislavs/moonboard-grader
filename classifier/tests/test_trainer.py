@@ -287,12 +287,14 @@ def test_validate_epoch(simple_model, tiny_dataloaders, temp_checkpoint_dir):
         checkpoint_dir=temp_checkpoint_dir
     )
     
-    val_loss, val_accuracy = trainer.validate_epoch()
+    val_loss, val_accuracy, val_tolerance_1_accuracy = trainer.validate_epoch()
     
     assert isinstance(val_loss, float)
     assert isinstance(val_accuracy, float)
+    assert isinstance(val_tolerance_1_accuracy, float)
     assert val_loss >= 0
     assert 0 <= val_accuracy <= 1
+    assert 0 <= val_tolerance_1_accuracy <= 1
 
 
 def test_validate_epoch_without_val_loader(simple_model, tiny_dataloaders, temp_checkpoint_dir):
@@ -310,10 +312,11 @@ def test_validate_epoch_without_val_loader(simple_model, tiny_dataloaders, temp_
         checkpoint_dir=temp_checkpoint_dir
     )
     
-    val_loss, val_accuracy = trainer.validate_epoch()
+    val_loss, val_accuracy, val_tolerance_1_accuracy = trainer.validate_epoch()
     
     assert val_loss == 0.0
     assert val_accuracy == 0.0
+    assert val_tolerance_1_accuracy == 0.0
 
 
 def test_validate_epoch_model_in_eval_mode(simple_model, tiny_dataloaders, temp_checkpoint_dir):
@@ -778,11 +781,13 @@ def test_history_tracking(simple_model, tiny_dataloaders, temp_checkpoint_dir):
     assert 'train_loss' in history
     assert 'val_loss' in history
     assert 'val_accuracy' in history
+    assert 'val_tolerance_1_accuracy' in history
     
     # Check lengths
     assert len(history['train_loss']) == num_epochs
     assert len(history['val_loss']) == num_epochs
     assert len(history['val_accuracy']) == num_epochs
+    assert len(history['val_tolerance_1_accuracy']) == num_epochs
     
     # Check all values are numbers
     for loss in history['train_loss']:
@@ -790,6 +795,8 @@ def test_history_tracking(simple_model, tiny_dataloaders, temp_checkpoint_dir):
     for loss in history['val_loss']:
         assert isinstance(loss, float)
     for acc in history['val_accuracy']:
+        assert isinstance(acc, float)
+    for acc in history['val_tolerance_1_accuracy']:
         assert isinstance(acc, float)
 
 

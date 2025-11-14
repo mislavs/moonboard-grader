@@ -107,7 +107,8 @@ class Trainer:
         self.history: Dict[str, List[float]] = {
             'train_loss': [],
             'val_loss': [],
-            'val_accuracy': []
+            'val_accuracy': [],
+            'val_tolerance_1_accuracy': []
         }
         self.best_val_loss = float('inf')
         self.epochs_without_improvement = 0
@@ -156,24 +157,25 @@ class Trainer:
         avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
         return avg_loss
     
-    def validate_epoch(self) -> Tuple[float, float]:
+    def validate_epoch(self) -> Tuple[float, float, float]:
         """
         Validate the model for one epoch.
         
         Returns:
-            Tuple of (average validation loss, validation accuracy)
-            Returns (0.0, 0.0) if val_loader is None
+            Tuple of (average validation loss, validation accuracy, tolerance 1 accuracy)
+            Returns (0.0, 0.0, 0.0) if val_loader is None
             
         Examples:
             >>> trainer = Trainer(model, train_loader, val_loader, optimizer, criterion)
-            >>> val_loss, val_acc = trainer.validate_epoch()
+            >>> val_loss, val_acc, val_tol1_acc = trainer.validate_epoch()
         """
         if self.val_loader is None:
-            return 0.0, 0.0
+            return 0.0, 0.0, 0.0
         
         self.model.eval()
         total_loss = 0.0
         correct_predictions = 0
+        tolerance_1_correct = 0
         total_samples = 0
         num_batches = 0
         
@@ -190,6 +192,11 @@ class Trainer:
                 # Calculate accuracy
                 _, predicted = torch.max(outputs, 1)
                 correct_predictions += (predicted == batch_labels).sum().item()
+                
+                # Calculate tolerance 1 accuracy (within ±1 grade)
+                differences = torch.abs(predicted - batch_labels)
+                tolerance_1_correct += (differences <= 1).sum().item()
+                
                 total_samples += batch_labels.size(0)
                 
                 # Track loss
@@ -198,8 +205,9 @@ class Trainer:
         
         avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
         accuracy = correct_predictions / total_samples if total_samples > 0 else 0.0
+        tolerance_1_accuracy = tolerance_1_correct / total_samples if total_samples > 0 else 0.0
         
-        return avg_loss, accuracy
+        return avg_loss, accuracy, tolerance_1_accuracy
     
     def fit(
         self,
@@ -247,15 +255,17 @@ class Trainer:
             self.history['train_loss'].append(train_loss)
             
             # Validate
-            val_loss, val_accuracy = self.validate_epoch()
+            val_loss, val_accuracy, val_tolerance_1_accuracy = self.validate_epoch()
             self.history['val_loss'].append(val_loss)
             self.history['val_accuracy'].append(val_accuracy)
+            self.history['val_tolerance_1_accuracy'].append(val_tolerance_1_accuracy)
             
             # Log to TensorBoard
             self.writer.add_scalar('Loss/train', train_loss, epoch)
             if self.val_loader is not None:
                 self.writer.add_scalar('Loss/val', val_loss, epoch)
                 self.writer.add_scalar('Accuracy/val_exact', val_accuracy, epoch)
+                self.writer.add_scalar('Accuracy/val_tolerance_1', val_tolerance_1_accuracy, epoch)
             
             # Print progress
             if verbose:
@@ -263,7 +273,8 @@ class Trainer:
                     print(f"Epoch {epoch+1}/{num_epochs} - "
                           f"Train Loss: {train_loss:.4f} - "
                           f"Val Loss: {val_loss:.4f} - "
-                          f"Val Acc: {val_accuracy:.4f}")
+                          f"Val Acc: {val_accuracy:.4f} - "
+                          f"Val ±1 Acc: {val_tolerance_1_accuracy:.4f}")
                 else:
                     print(f"Epoch {epoch+1}/{num_epochs} - "
                           f"Train Loss: {train_loss:.4f}")
@@ -362,7 +373,8 @@ class Trainer:
         self.history = checkpoint.get('history', {
             'train_loss': [],
             'val_loss': [],
-            'val_accuracy': []
+            'val_accuracy': [],
+            'val_tolerance_1_accuracy': []
         })
     
     def log_test_results(self, config: Dict, test_metrics: Dict, confusion_matrix_path: Optional[str] = None) -> None:
