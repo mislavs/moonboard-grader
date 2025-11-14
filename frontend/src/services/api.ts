@@ -117,12 +117,22 @@ export interface PaginatedProblemsResponse {
 export async function fetchProblems(
   page: number = 1,
   pageSize: number = 20,
-  benchmarksOnly?: boolean | null
+  benchmarksOnly?: boolean | null,
+  gradeFrom?: string | null,
+  gradeTo?: string | null
 ): Promise<PaginatedProblemsResponse> {
   let url = `${API_BASE_URL}/problems?page=${page}&page_size=${pageSize}`;
   
   if (benchmarksOnly !== null && benchmarksOnly !== undefined) {
     url += `&benchmarks_only=${benchmarksOnly}`;
+  }
+  
+  if (gradeFrom) {
+    url += `&grade_from=${encodeURIComponent(gradeFrom)}`;
+  }
+  
+  if (gradeTo) {
+    url += `&grade_to=${encodeURIComponent(gradeTo)}`;
   }
   
   return apiFetch<PaginatedProblemsResponse>(url);

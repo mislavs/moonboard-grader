@@ -14,17 +14,17 @@ from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Import grade encoder from classifier for consistent grade ordering
+# Import grade encoder from moonboard_core for consistent grade ordering
 try:
     import sys
-    # Add classifier to path if not already there
-    classifier_path = Path(__file__).parent.parent.parent.parent / "classifier"
-    if classifier_path.exists() and str(classifier_path) not in sys.path:
-        sys.path.insert(0, str(classifier_path))
-    from src.grade_encoder import encode_grade  # type: ignore
+    # Add moonboard_core to path if not already there
+    moonboard_core_path = Path(__file__).parent.parent.parent.parent / "moonboard_core"
+    if moonboard_core_path.exists() and str(moonboard_core_path.parent) not in sys.path:
+        sys.path.insert(0, str(moonboard_core_path.parent))
+    from moonboard_core.grade_encoder import encode_grade  # type: ignore
 except ImportError as e:
     logger.warning(f"Failed to import grade_encoder: {e}")
-    # Fallback if classifier not installed
+    # Fallback if moonboard_core not installed
     def encode_grade(grade: str) -> int:
         raise NotImplementedError("Grade encoder not available")
 

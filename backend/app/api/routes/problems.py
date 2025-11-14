@@ -83,14 +83,14 @@ async def get_problems_list(
     # Validate grade parameters if provided
     if grade_from is not None or grade_to is not None:
         try:
-            # Import here to avoid circular dependency issues
+            # Import from moonboard_core package
             import sys
             from pathlib import Path as PathLib
-            # Add classifier to path if not already there
-            classifier_path = PathLib(__file__).parent.parent.parent.parent.parent / "classifier"
-            if classifier_path.exists() and str(classifier_path) not in sys.path:
-                sys.path.insert(0, str(classifier_path))
-            from src.grade_encoder import encode_grade  # type: ignore
+            # Add moonboard_core to path if not already there
+            moonboard_core_path = PathLib(__file__).parent.parent.parent.parent.parent / "moonboard_core"
+            if moonboard_core_path.exists() and str(moonboard_core_path.parent) not in sys.path:
+                sys.path.insert(0, str(moonboard_core_path.parent))
+            from moonboard_core.grade_encoder import encode_grade  # type: ignore
             
             if grade_from is not None:
                 encode_grade(grade_from)  # Will raise ValueError if invalid

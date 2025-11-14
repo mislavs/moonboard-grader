@@ -15,6 +15,10 @@ interface UseProblemsReturn {
   canGoPrevious: boolean;
   benchmarkFilter: boolean | null;
   setBenchmarkFilter: (filter: boolean | null) => void;
+  gradeFrom: string | null;
+  gradeTo: string | null;
+  setGradeFrom: (grade: string | null) => void;
+  setGradeTo: (grade: string | null) => void;
 }
 
 export function useProblems(
@@ -26,13 +30,15 @@ export function useProblems(
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [benchmarkFilter, setBenchmarkFilter] = useState<boolean | null>(null);
+  const [gradeFrom, setGradeFrom] = useState<string | null>(null);
+  const [gradeTo, setGradeTo] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadProblems() {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetchProblems(page, DEFAULT_PAGE_SIZE, benchmarkFilter);
+        const response = await fetchProblems(page, DEFAULT_PAGE_SIZE, benchmarkFilter, gradeFrom, gradeTo);
         
         setProblems(response.items);
         setTotalPages(response.total_pages);
@@ -53,7 +59,7 @@ export function useProblems(
 
     loadProblems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, benchmarkFilter]);
+  }, [page, benchmarkFilter, gradeFrom, gradeTo]);
 
   const goToNextPage = useCallback(() => {
     setPage((prev) => Math.min(prev + 1, totalPages));
@@ -65,6 +71,16 @@ export function useProblems(
 
   const handleSetBenchmarkFilter = useCallback((filter: boolean | null) => {
     setBenchmarkFilter(filter);
+    setPage(1); // Reset to first page when filter changes
+  }, []);
+
+  const handleSetGradeFrom = useCallback((grade: string | null) => {
+    setGradeFrom(grade);
+    setPage(1); // Reset to first page when filter changes
+  }, []);
+
+  const handleSetGradeTo = useCallback((grade: string | null) => {
+    setGradeTo(grade);
     setPage(1); // Reset to first page when filter changes
   }, []);
 
@@ -80,6 +96,10 @@ export function useProblems(
     canGoPrevious: page > 1,
     benchmarkFilter,
     setBenchmarkFilter: handleSetBenchmarkFilter,
+    gradeFrom,
+    gradeTo,
+    setGradeFrom: handleSetGradeFrom,
+    setGradeTo: handleSetGradeTo,
   };
 }
 

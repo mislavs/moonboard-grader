@@ -3,6 +3,7 @@ import LoadingSpinner from './LoadingSpinner';
 import ProblemListItem from './ProblemListItem';
 import PaginationControls from './PaginationControls';
 import BenchmarkFilter from './BenchmarkFilter';
+import GradeFilter from './GradeFilter';
 import { useProblems } from '../hooks/useProblems';
 
 interface ProblemNavigatorProps {
@@ -28,6 +29,10 @@ export default function ProblemNavigator({
     canGoPrevious,
     benchmarkFilter,
     setBenchmarkFilter,
+    gradeFrom,
+    gradeTo,
+    setGradeFrom,
+    setGradeTo,
   } = useProblems(onFirstProblemLoaded);
 
   return (
@@ -36,6 +41,13 @@ export default function ProblemNavigator({
 
       {!error && (
         <>
+          <GradeFilter
+            gradeFrom={gradeFrom}
+            gradeTo={gradeTo}
+            onGradeFromChange={setGradeFrom}
+            onGradeToChange={setGradeTo}
+          />
+
           <BenchmarkFilter
             benchmarkFilter={benchmarkFilter}
             onFilterChange={setBenchmarkFilter}
