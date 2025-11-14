@@ -92,9 +92,12 @@ class VAETrainer:
         if not self.kl_annealing:
             return self.kl_weight
         
-        # Linear annealing from 0 to kl_weight over kl_annealing_epochs
+        # Start at 10% of target, anneal to 100% over kl_annealing_epochs
+        # This prevents posterior collapse by ensuring KL is never completely ignored
+        min_weight = 0.1 * self.kl_weight
         if epoch < self.kl_annealing_epochs:
-            return self.kl_weight * (epoch / self.kl_annealing_epochs)
+            progress = epoch / self.kl_annealing_epochs
+            return min_weight + (self.kl_weight - min_weight) * progress
         return self.kl_weight
     
     def _compute_losses(self, data_loader, kl_weight: float, log_progress: bool = False) -> Tuple[float, float, float]:

@@ -1,1 +1,3 @@
 - don't create summary documents unless explicitly asked
+- use `py` instead of `python` to run python commands
+- don't run model training on your own without asking

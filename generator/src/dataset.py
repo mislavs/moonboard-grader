@@ -92,7 +92,7 @@ class MoonBoardDataset(Dataset):
             
         Returns:
             grid_tensor: Tensor of shape (3, 18, 11) with hold positions
-            grade_label: Integer label for the grade (remapped if filtered)
+            grade_label: Integer label for the grade (always 0-based, remapped if filtered)
         """
         # Get grid and label from processed dataset
         grid_array, original_label = self.dataset[idx]
@@ -100,11 +100,28 @@ class MoonBoardDataset(Dataset):
         # Convert to PyTorch tensor
         grid_tensor = torch.from_numpy(grid_array).float()
         
-        # Remap label if we're using a filtered range
+        # Always remap label to 0-based index using the grade mapping
+        # This ensures labels are always in range [0, num_grades-1]
         if self.min_grade_index is not None:
+            # Filtered: remap by subtracting offset
             grade_label = original_label - self.min_grade_index
         else:
-            grade_label = original_label
+            # Not filtered: convert original label to grade string, then map to 0-based index
+            grade_str = decode_grade(original_label)
+            if grade_str not in self.grade_to_label:
+                raise ValueError(
+                    f"Grade '{grade_str}' (label {original_label}) not found in dataset. "
+                    f"Available grades: {list(self.grade_to_label.keys())}"
+                )
+            grade_label = self.grade_to_label[grade_str]
+        
+        # Validate label is within bounds (safety check)
+        num_grades = len(self.grade_to_label)
+        if grade_label < 0 or grade_label >= num_grades:
+            raise ValueError(
+                f"Invalid grade label {grade_label} (original: {original_label}). "
+                f"Must be in range [0, {num_grades-1}]"
+            )
         
         # Apply transform if provided
         if self.transform is not None:
