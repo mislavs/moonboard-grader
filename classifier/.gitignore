@@ -60,6 +60,9 @@ data/*.json
 *.log
 logs/
 
+# TensorBoard
+runs/
+
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb

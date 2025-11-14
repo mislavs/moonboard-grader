@@ -31,52 +31,6 @@ from src import (
 )
 
 
-def append_training_log(log_path: Path, model_filename: str, config: dict, 
-                        test_metrics: dict, training_time: str, duration: str) -> None:
-    """
-    Append training session results to the log file.
-    
-    Args:
-        log_path: Path to the log file
-        model_filename: Name of the saved model file
-        config: Configuration dictionary
-        test_metrics: Dictionary containing test metrics
-        training_time: Timestamp string for this training session
-        duration: Training duration string (e.g., "15m 23s")
-    """
-    log_entry = f"""
-{'=' * 80}
-TRAINING SESSION: {training_time}
-{'=' * 80}
-
-Model File: {model_filename}
-Training Duration: {duration}
-
-Hyperparameters:
-  - Model Type: {config['model']['type']}
-  - Epochs: {config['training']['num_epochs']}
-  - Learning Rate: {config['training']['learning_rate']}
-  - Batch Size: {config['training']['batch_size']}
-  - Optimizer: {config['training'].get('optimizer', 'adam').upper()}
-  - Weight Decay: {config['training'].get('weight_decay', 0.0001)}
-  - Early Stopping Patience: {config['training'].get('early_stopping_patience', 'None')}
-  - Loss Type: {config['training'].get('loss_type', 'ce')}
-  - Use Class Weights: {config['training'].get('use_class_weights', True)}
-  - Label Smoothing: {config['training'].get('label_smoothing', 0.0)}
-
-Test Set Results:
-  - Exact Accuracy:     {test_metrics['exact_accuracy']:.2f}%
-  - ±1 Grade Accuracy:  {test_metrics['tolerance_1_accuracy']:.2f}%
-  - ±2 Grade Accuracy:  {test_metrics['tolerance_2_accuracy']:.2f}%
-  - Loss:               {test_metrics['avg_loss']:.4f}
-
-"""
-    
-    # Append to log file
-    with open(log_path, 'a', encoding='utf-8') as f:
-        f.write(log_entry)
-
-
 def setup_train_parser(subparsers):
     """
     Setup argument parser for train command.
@@ -358,11 +312,6 @@ def train_command(args):
     
     print(f"\n⏱️  Training duration: {duration_str}")
     
-    # Save training history
-    trainer.save_history("training_history.json")
-    history_path = checkpoint_dir / "training_history.json"
-    print(f"\n✓ Saved training history to: {history_path}")
-    
     # Evaluate on test set
     print(f"\n📈 Evaluating on test set...")
     test_metrics = evaluate_model(model, test_loader, device)
@@ -417,11 +366,9 @@ def train_command(args):
         shutil.copy2(best_model_path, unique_model_path)
         print(f"\n✓ Saved unique model to: {unique_model_path}")
     
-    # Append to training log
-    log_path = checkpoint_dir / "training_log.txt"
-    training_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    append_training_log(log_path, unique_model_filename, config, test_metrics, training_time, duration_str)
-    print(f"✓ Appended results to training log: {log_path}")
+    # Log final test results to TensorBoard
+    trainer.log_test_results(config, test_metrics, str(cm_path) if cm_path.exists() else None)
     
+    print(f"\n✓ TensorBoard logs saved. View with: py -m tensorboard.main --logdir=runs")
     print_completion_message("✅ Training completed successfully!")
 

@@ -72,6 +72,26 @@ py main.py evaluate --checkpoint models/best_model.pth --data ../data/problems.j
 py main.py predict --checkpoint models/best_model.pth --input problem.json
 ```
 
+## Viewing Training Results
+
+Training metrics are logged to TensorBoard. To view them:
+
+1. Start TensorBoard:
+```bash
+py -m tensorboard.main --logdir=runs
+```
+
+2. Open your browser to http://localhost:6006
+
+You'll see:
+- Training and validation loss curves
+- Validation accuracy over time
+- Hyperparameter comparison across experiments
+- Confusion matrices
+- Learning rate schedules
+
+To compare multiple experiments, TensorBoard will automatically overlay their curves. Each training run is saved in a timestamped directory under `runs/`.
+
 ## Data Format
 
 Input problems should be in JSON format with the following structure:

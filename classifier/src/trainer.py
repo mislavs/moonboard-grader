@@ -8,10 +8,11 @@ checkpointing, early stopping, and metrics tracking.
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from typing import Dict, List, Optional, Tuple
-import os
-import json
+import numpy as np
 from pathlib import Path
+from datetime import datetime
 
 
 class Trainer:
@@ -97,6 +98,10 @@ class Trainer:
         
         # Create checkpoint directory if it doesn't exist
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize TensorBoard writer
+        run_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        self.writer = SummaryWriter(f'runs/{run_name}')
         
         # Initialize tracking variables
         self.history: Dict[str, List[float]] = {
@@ -246,6 +251,12 @@ class Trainer:
             self.history['val_loss'].append(val_loss)
             self.history['val_accuracy'].append(val_accuracy)
             
+            # Log to TensorBoard
+            self.writer.add_scalar('Loss/train', train_loss, epoch)
+            if self.val_loader is not None:
+                self.writer.add_scalar('Loss/val', val_loss, epoch)
+                self.writer.add_scalar('Accuracy/val_exact', val_accuracy, epoch)
+            
             # Print progress
             if verbose:
                 if self.val_loader is not None:
@@ -270,6 +281,9 @@ class Trainer:
             # Step the learning rate scheduler if using one
             if self.scheduler is not None and self.val_loader is not None:
                 self.scheduler.step(val_loss)
+                # Log learning rate
+                current_lr = self.optimizer.param_groups[0]['lr']
+                self.writer.add_scalar('Learning_Rate', current_lr, epoch)
             
             # Early stopping check
             if early_stopping_patience is not None and self.val_loader is not None:
@@ -351,33 +365,52 @@ class Trainer:
             'val_accuracy': []
         })
     
-    def save_history(self, filename: str = 'training_history.json') -> None:
+    def log_test_results(self, config: Dict, test_metrics: Dict, confusion_matrix_path: Optional[str] = None) -> None:
         """
-        Save training history to JSON file.
+        Log final test results and hyperparameters to TensorBoard, then close the writer.
         
         Args:
-            filename: Name of the JSON file to save
-            
-        Examples:
-            >>> trainer.save_history('history.json')
+            config: Configuration dictionary with hyperparameters
+            test_metrics: Dictionary containing test metrics (exact_accuracy, tolerance_1_accuracy, etc.)
+            confusion_matrix_path: Optional path to confusion matrix image
         """
-        history_path = self.checkpoint_dir / filename
+        # Log test metrics as scalars
+        self.writer.add_scalar('Test/exact_accuracy', test_metrics['exact_accuracy'], 0)
+        self.writer.add_scalar('Test/tolerance_1_accuracy', test_metrics['tolerance_1_accuracy'], 0)
+        self.writer.add_scalar('Test/tolerance_2_accuracy', test_metrics['tolerance_2_accuracy'], 0)
+        self.writer.add_scalar('Test/loss', test_metrics['avg_loss'], 0)
         
-        with open(history_path, 'w') as f:
-            json.dump(self.history, f, indent=2)
+        # Log hyperparameters as text for easy viewing
+        hparam_text = f"""
+**Model Configuration:**
+- Type: {config['model']['type']}
+- Learning Rate: {config['training']['learning_rate']}
+- Batch Size: {config['training']['batch_size']}
+- Optimizer: {config['training'].get('optimizer', 'adam')}
+- Weight Decay: {config['training'].get('weight_decay', 0.001)}
+- Loss Type: {config['training'].get('loss_type', 'ce')}
+- Label Smoothing: {config['training'].get('label_smoothing', 0.0)}
+- Early Stopping Patience: {config['training'].get('early_stopping_patience', 'None')}
+
+**Test Results:**
+- Exact Accuracy: {test_metrics['exact_accuracy']:.2f}%
+- ±1 Grade Accuracy: {test_metrics['tolerance_1_accuracy']:.2f}%
+- ±2 Grade Accuracy: {test_metrics['tolerance_2_accuracy']:.2f}%
+- Loss: {test_metrics['avg_loss']:.4f}
+"""
+        self.writer.add_text('Hyperparameters_and_Results', hparam_text, 0)
+        
+        # Log confusion matrix if provided
+        if confusion_matrix_path and Path(confusion_matrix_path).exists():
+            from PIL import Image
+            img = Image.open(confusion_matrix_path)
+            img_array = np.array(img)
+            # Convert to format TensorBoard expects: (C, H, W)
+            if len(img_array.shape) == 3:
+                img_array = img_array.transpose(2, 0, 1)
+            self.writer.add_image('Confusion_Matrix', img_array, 0)
+        
+        # Close the writer
+        self.writer.close()
     
-    def get_history(self) -> Dict[str, List[float]]:
-        """
-        Get the training history.
-        
-        Returns:
-            Dictionary containing training metrics history
-            
-        Examples:
-            >>> history = trainer.get_history()
-            >>> print(history['train_loss'])
-        """
-        return {
-            key: list(value) for key, value in self.history.items()
-        }
 
