@@ -133,6 +133,209 @@ class TestLoadDataset:
         
         with pytest.raises(ValueError, match="JSON must have a 'data' key"):
             load_dataset(test_file)
+    
+    def test_load_with_min_repeats_none(self):
+        """Test loading with min_repeats=None (no filtering)"""
+        test_file = self.temp_dir / "repeats.json"
+        data = {
+            "data": [
+                {
+                    "grade": "6B+",
+                    "repeats": 0,
+                    "moves": [
+                        {"description": "A1", "isStart": True, "isEnd": False},
+                        {"description": "K18", "isStart": False, "isEnd": True}
+                    ]
+                },
+                {
+                    "grade": "6C",
+                    "repeats": 5,
+                    "moves": [
+                        {"description": "B2", "isStart": True, "isEnd": False},
+                        {"description": "J17", "isStart": False, "isEnd": True}
+                    ]
+                },
+                {
+                    "grade": "7A",
+                    "repeats": 10,
+                    "moves": [
+                        {"description": "C3", "isStart": True, "isEnd": False},
+                        {"description": "H16", "isStart": False, "isEnd": True}
+                    ]
+                }
+            ]
+        }
+        
+        with open(test_file, 'w') as f:
+            json.dump(data, f)
+        
+        dataset = load_dataset(test_file, min_repeats=None)
+        
+        # Should include all problems
+        assert len(dataset) == 3
+    
+    def test_load_with_min_repeats_zero(self):
+        """Test loading with min_repeats=0 (include all)"""
+        test_file = self.temp_dir / "repeats_zero.json"
+        data = {
+            "data": [
+                {
+                    "grade": "6B+",
+                    "repeats": 0,
+                    "moves": [
+                        {"description": "A1", "isStart": True, "isEnd": False},
+                        {"description": "K18", "isStart": False, "isEnd": True}
+                    ]
+                },
+                {
+                    "grade": "6C",
+                    "repeats": 5,
+                    "moves": [
+                        {"description": "B2", "isStart": True, "isEnd": False},
+                        {"description": "J17", "isStart": False, "isEnd": True}
+                    ]
+                }
+            ]
+        }
+        
+        with open(test_file, 'w') as f:
+            json.dump(data, f)
+        
+        dataset = load_dataset(test_file, min_repeats=0)
+        
+        # Should include all problems (0 repeats and above)
+        assert len(dataset) == 2
+    
+    def test_load_with_min_repeats_one(self):
+        """Test loading with min_repeats=1 (exclude zero-repeat routes)"""
+        test_file = self.temp_dir / "repeats_one.json"
+        data = {
+            "data": [
+                {
+                    "grade": "6B+",
+                    "repeats": 0,
+                    "moves": [
+                        {"description": "A1", "isStart": True, "isEnd": False},
+                        {"description": "K18", "isStart": False, "isEnd": True}
+                    ]
+                },
+                {
+                    "grade": "6C",
+                    "repeats": 5,
+                    "moves": [
+                        {"description": "B2", "isStart": True, "isEnd": False},
+                        {"description": "J17", "isStart": False, "isEnd": True}
+                    ]
+                },
+                {
+                    "grade": "7A",
+                    "repeats": 10,
+                    "moves": [
+                        {"description": "C3", "isStart": True, "isEnd": False},
+                        {"description": "H16", "isStart": False, "isEnd": True}
+                    ]
+                }
+            ]
+        }
+        
+        with open(test_file, 'w') as f:
+            json.dump(data, f)
+        
+        dataset = load_dataset(test_file, min_repeats=1)
+        
+        # Should exclude the first problem (0 repeats)
+        assert len(dataset) == 2
+        # Verify the remaining problems are the ones with repeats >= 1
+        _, label1 = dataset[0]
+        _, label2 = dataset[1]
+        assert label1 == encode_grade("6C")
+        assert label2 == encode_grade("7A")
+    
+    def test_load_with_min_repeats_high(self):
+        """Test loading with higher min_repeats value"""
+        test_file = self.temp_dir / "repeats_high.json"
+        data = {
+            "data": [
+                {
+                    "grade": "6B+",
+                    "repeats": 0,
+                    "moves": [
+                        {"description": "A1", "isStart": True, "isEnd": False},
+                        {"description": "K18", "isStart": False, "isEnd": True}
+                    ]
+                },
+                {
+                    "grade": "6C",
+                    "repeats": 5,
+                    "moves": [
+                        {"description": "B2", "isStart": True, "isEnd": False},
+                        {"description": "J17", "isStart": False, "isEnd": True}
+                    ]
+                },
+                {
+                    "grade": "7A",
+                    "repeats": 10,
+                    "moves": [
+                        {"description": "C3", "isStart": True, "isEnd": False},
+                        {"description": "H16", "isStart": False, "isEnd": True}
+                    ]
+                },
+                {
+                    "grade": "7B",
+                    "repeats": 15,
+                    "moves": [
+                        {"description": "D4", "isStart": True, "isEnd": False},
+                        {"description": "G15", "isStart": False, "isEnd": True}
+                    ]
+                }
+            ]
+        }
+        
+        with open(test_file, 'w') as f:
+            json.dump(data, f)
+        
+        dataset = load_dataset(test_file, min_repeats=10)
+        
+        # Should only include problems with >= 10 repeats
+        assert len(dataset) == 2
+        _, label1 = dataset[0]
+        _, label2 = dataset[1]
+        assert label1 == encode_grade("7A")
+        assert label2 == encode_grade("7B")
+    
+    def test_load_with_missing_repeats_field(self):
+        """Test that problems without repeats field default to 0"""
+        test_file = self.temp_dir / "missing_repeats.json"
+        data = {
+            "data": [
+                {
+                    "grade": "6B+",
+                    # No repeats field
+                    "moves": [
+                        {"description": "A1", "isStart": True, "isEnd": False},
+                        {"description": "K18", "isStart": False, "isEnd": True}
+                    ]
+                },
+                {
+                    "grade": "6C",
+                    "repeats": 5,
+                    "moves": [
+                        {"description": "B2", "isStart": True, "isEnd": False},
+                        {"description": "J17", "isStart": False, "isEnd": True}
+                    ]
+                }
+            ]
+        }
+        
+        with open(test_file, 'w') as f:
+            json.dump(data, f)
+        
+        dataset = load_dataset(test_file, min_repeats=1)
+        
+        # Should exclude the first problem (missing repeats = 0)
+        assert len(dataset) == 1
+        _, label = dataset[0]
+        assert label == encode_grade("6C")
 
 
 class TestGetDatasetStats:

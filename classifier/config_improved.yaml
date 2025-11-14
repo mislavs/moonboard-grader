@@ -51,6 +51,10 @@ data:
   filter_grades: true
   min_grade_index: 2   # 6A+
   max_grade_index: 11  # 7C
+  
+  # Repeats Filtering Configuration
+  filter_repeats: false  # Enable/disable repeats filtering
+  min_repeats: 1         # Minimum number of repeats (0 = include all, 1 = exclude zero-repeat routes)
 
 # Checkpoint Configuration
 checkpoint:

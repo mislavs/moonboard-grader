@@ -73,7 +73,16 @@ def train_command(args):
     # Load dataset
     data_path = config['data']['path']
     print(f"\n📂 Loading dataset from: {data_path}")
-    dataset = load_dataset(data_path)
+    
+    # Check if repeats filtering is enabled
+    filter_repeats_enabled = config.get('data', {}).get('filter_repeats', False)
+    min_repeats = None
+    
+    if filter_repeats_enabled:
+        min_repeats = config['data'].get('min_repeats', 1)
+        print(f"   Filtering routes with minimum {min_repeats} repeat(s)")
+    
+    dataset = load_dataset(data_path, min_repeats=min_repeats)
     
     if len(dataset) == 0:
         print("❌ Error: No problems found in dataset")

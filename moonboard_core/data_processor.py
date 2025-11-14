@@ -9,7 +9,7 @@ and providing dataset statistics.
 import json
 import numpy as np
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Optional
 
 from .grade_encoder import encode_grade
 from .grid_builder import create_grid_tensor
@@ -77,7 +77,7 @@ def process_problem(problem_dict: Dict) -> Tuple[np.ndarray, int]:
     return (grid_tensor, grade_label)
 
 
-def load_dataset(json_path: Union[str, Path]) -> List[Tuple[np.ndarray, int]]:
+def load_dataset(json_path: Union[str, Path], min_repeats: Optional[int] = None) -> List[Tuple[np.ndarray, int]]:
     """
     Load a dataset from a JSON file and process all problems.
     
@@ -88,11 +88,15 @@ def load_dataset(json_path: Union[str, Path]) -> List[Tuple[np.ndarray, int]]:
                 "data": [
                     {
                         "grade": "6B+",
-                        "moves": [...]
+                        "moves": [...],
+                        "repeats": 10
                     },
                     ...
                 ]
             }
+        min_repeats: Optional minimum number of repeats to include a problem.
+            If None, no filtering is applied. If specified, only problems
+            with repeats >= min_repeats are included.
     
     Returns:
         List of (tensor, label) tuples, one per problem
@@ -109,6 +113,8 @@ def load_dataset(json_path: Union[str, Path]) -> List[Tuple[np.ndarray, int]]:
         >>> tensor, label = dataset[0]
         >>> tensor.shape
         (3, 18, 11)
+        >>> # Filter to only include problems with at least 1 repeat
+        >>> dataset = load_dataset("data/problems.json", min_repeats=1)
     """
     json_path = Path(json_path)
     
@@ -145,8 +151,16 @@ def load_dataset(json_path: Union[str, Path]) -> List[Tuple[np.ndarray, int]]:
     # Process all problems
     dataset = []
     errors = []
+    filtered_by_repeats = 0
     
     for i, problem in enumerate(problems_list):
+        # Filter by repeats if min_repeats is specified
+        if min_repeats is not None:
+            repeats = problem.get('repeats', 0)
+            if repeats < min_repeats:
+                filtered_by_repeats += 1
+                continue
+        
         try:
             tensor_label_pair = process_problem(problem)
             dataset.append(tensor_label_pair)
