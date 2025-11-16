@@ -407,10 +407,9 @@ def format_problem_output(
         else:
             output['grade_label'] = grade_label
     
-    # Include validation stats if available
+    # Include validation info if available
     if 'validation' in problem:
         validation = problem['validation']
-        output['stats'] = validation['stats']
         if not validation['valid']:
             output['validation_errors'] = validation['errors']
         if validation['warnings']:

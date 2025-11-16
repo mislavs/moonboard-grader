@@ -13,7 +13,8 @@ from fastapi.testclient import TestClient
 from app.main import create_application
 from app.services.predictor_service import PredictorService
 from app.services.problem_service import ProblemService
-from app.api.dependencies import set_predictor_service, set_problem_service
+from app.services.generator_service import GeneratorService
+from app.api.dependencies import set_predictor_service, set_problem_service, set_generator_service
 
 
 @pytest.fixture
@@ -187,4 +188,82 @@ def app_with_problem_service(predictor_service: PredictorService, problem_servic
 def client_with_problem_service(app_with_problem_service) -> TestClient:
     """Test client with both predictor and problem services."""
     return TestClient(app_with_problem_service)
+
+
+@pytest.fixture
+def mock_generator():
+    """Mock Generator instance for testing."""
+    mock = MagicMock()
+    # Mock the generate_with_retry method (which is what GeneratorService calls)
+    mock.generate_with_retry.return_value = [
+        {
+            'moves': [
+                {'description': 'A1', 'isStart': True, 'isEnd': False},
+                {'description': 'B5', 'isStart': False, 'isEnd': False},
+                {'description': 'K10', 'isStart': False, 'isEnd': True}
+            ],
+            'grade_label': 2,  # 6A+
+            'validation': {
+                'valid': True,
+                'errors': [],
+                'warnings': []
+            }
+        }
+    ]
+    return mock
+
+
+@pytest.fixture
+def generator_service(mock_generator, tmp_path: Path) -> GeneratorService:
+    """Create a generator service with mocked generator."""
+    # Create a fake model file
+    model_path = tmp_path / "test_generator_model.pth"
+    model_path.touch()
+    
+    service = GeneratorService(model_path=model_path, device="cpu")
+    service._generator = mock_generator
+    service._is_loaded = True
+    service._min_grade_index = 2  # Matches the filtered training (6A+)
+    
+    return service
+
+
+@pytest.fixture
+def unloaded_generator_service(tmp_path: Path) -> GeneratorService:
+    """Create a generator service without loading the model."""
+    model_path = tmp_path / "test_generator_model.pth"
+    service = GeneratorService(model_path=model_path, device="cpu")
+    return service
+
+
+@pytest.fixture
+def app_with_loaded_generator(generator_service: GeneratorService) -> Generator:
+    """Create test app with loaded generator."""
+    app = create_application()
+    set_generator_service(generator_service)
+    yield app
+    # Cleanup
+    set_generator_service(None)
+
+
+@pytest.fixture
+def app_with_unloaded_generator(unloaded_generator_service: GeneratorService) -> Generator:
+    """Create test app with unloaded generator."""
+    app = create_application()
+    set_generator_service(unloaded_generator_service)
+    yield app
+    # Cleanup
+    set_generator_service(None)
+
+
+@pytest.fixture
+def client_with_loaded_generator(app_with_loaded_generator) -> TestClient:
+    """Test client with loaded generator."""
+    return TestClient(app_with_loaded_generator)
+
+
+@pytest.fixture
+def client_with_unloaded_generator(app_with_unloaded_generator) -> TestClient:
+    """Test client with unloaded generator."""
+    return TestClient(app_with_unloaded_generator)
 

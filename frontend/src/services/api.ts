@@ -160,21 +160,11 @@ export async function checkDuplicate(moves: Move[]): Promise<DuplicateCheckRespo
 }
 
 /**
- * Problem statistics from generation
- */
-export interface ProblemStats {
-  num_moves: number;
-  num_start_holds: number;
-  num_end_holds: number;
-}
-
-/**
  * Generate response
  */
 export interface GenerateResponse {
   moves: Move[];
   grade: string;
-  stats: ProblemStats;
 }
 
 /**

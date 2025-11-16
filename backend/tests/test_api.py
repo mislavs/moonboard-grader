@@ -682,3 +682,120 @@ class TestGradeFilteringAPI:
         # Should return no results for inverted range
         assert data["total"] == 0
         assert len(data["items"]) == 0
+
+
+class TestGenerationEndpoint:
+    """Test suite for generation endpoint."""
+    
+    def test_generate_success_with_default_grade(self, client_with_loaded_generator, mock_generator):
+        """Test successful generation with default grade (6A+)."""
+        request_data = {
+            "grade": "6A+",
+            "temperature": 1.0
+        }
+        
+        response = client_with_loaded_generator.post("/generate", json=request_data)
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        # Verify response structure
+        assert "moves" in data
+        assert "grade" in data
+        
+        # Verify data content
+        assert len(data["moves"]) == 3
+        assert data["grade"] == "6A+"
+        
+        # Verify mock was called with correct parameters
+        # Note: The service converts grade string to label and calls generate_with_retry
+        mock_generator.generate_with_retry.assert_called_once()
+        call_args = mock_generator.generate_with_retry.call_args
+        assert call_args.kwargs['grade_label'] == 0  # 6A+ maps to label 0 in filtered model (starting from min_grade_index=2)
+        assert call_args.kwargs['temperature'] == 1.0
+        assert call_args.kwargs['max_attempts'] == 10
+    
+    def test_generate_with_different_grades(self, client_with_loaded_generator, mock_generator):
+        """Test that generation uses the requested grade (not hardcoded)."""
+        test_grades = ["6B", "6C+", "7A", "7B+", "7C"]
+        
+        for grade in test_grades:
+            request_data = {
+                "grade": grade,
+                "temperature": 1.0
+            }
+            
+            response = client_with_loaded_generator.post("/generate", json=request_data)
+            
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            
+            # Verify the response includes the requested grade
+            assert data["grade"] == grade
+            
+            # Verify mock was called (the service handles grade conversion internally)
+            assert mock_generator.generate_with_retry.called
+            
+            # Reset mock for next iteration
+            mock_generator.reset_mock()
+    
+    def test_generate_with_custom_temperature(self, client_with_loaded_generator, mock_generator):
+        """Test generation with custom temperature parameter."""
+        request_data = {
+            "grade": "7A",
+            "temperature": 1.5
+        }
+        
+        response = client_with_loaded_generator.post("/generate", json=request_data)
+        
+        assert response.status_code == status.HTTP_200_OK
+        
+        # Verify temperature was passed correctly
+        mock_generator.generate_with_retry.assert_called_once()
+        call_args = mock_generator.generate_with_retry.call_args
+        assert call_args.kwargs['temperature'] == 1.5
+        assert call_args.kwargs['max_attempts'] == 10
+    
+    def test_generate_with_unloaded_model(self, client_with_unloaded_generator):
+        """Test generation when model is not loaded."""
+        request_data = {
+            "grade": "6A+",
+            "temperature": 1.0
+        }
+        
+        response = client_with_unloaded_generator.post("/generate", json=request_data)
+        
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        assert "Generator model not loaded" in response.json()["detail"]
+    
+    def test_generate_invalid_request_missing_grade(self, client_with_loaded_generator):
+        """Test generation with missing grade."""
+        invalid_request = {"temperature": 1.0}
+        response = client_with_loaded_generator.post("/generate", json=invalid_request)
+        
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    
+    def test_generate_invalid_temperature(self, client_with_loaded_generator):
+        """Test generation with invalid temperature (out of range)."""
+        # Temperature must be between 0.1 and 2.0
+        invalid_request = {
+            "grade": "6A+",
+            "temperature": 3.0  # Too high
+        }
+        response = client_with_loaded_generator.post("/generate", json=invalid_request)
+        
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    
+    def test_generate_handles_value_error(self, client_with_loaded_generator, mock_generator):
+        """Test that ValueError from generator service is handled properly."""
+        mock_generator.generate_with_retry.side_effect = ValueError("Invalid grade")
+        
+        request_data = {
+            "grade": "INVALID",
+            "temperature": 1.0
+        }
+        
+        response = client_with_loaded_generator.post("/generate", json=request_data)
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Invalid generation parameters" in response.json()["detail"]

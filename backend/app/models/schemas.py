@@ -256,30 +256,11 @@ class GenerateRequest(BaseModel):
     )
 
 
-class ProblemStats(BaseModel):
-    """Statistics for a generated problem."""
-    
-    num_moves: int = Field(..., description="Total number of moves")
-    num_start_holds: int = Field(..., description="Number of starting holds")
-    num_end_holds: int = Field(..., description="Number of ending holds")
-    
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "num_moves": 8,
-                "num_start_holds": 2,
-                "num_end_holds": 1
-            }
-        }
-    )
-
-
 class GenerateResponse(BaseModel):
     """Response body for problem generation."""
     
     moves: List[ProblemMove] = Field(..., description="List of moves in the generated problem")
     grade: str = Field(..., description="Grade of the generated problem")
-    stats: ProblemStats = Field(..., description="Statistics about the generated problem")
     
     model_config = ConfigDict(
         json_schema_extra={
@@ -289,12 +270,7 @@ class GenerateResponse(BaseModel):
                     {"description": "B7", "isStart": False, "isEnd": False},
                     {"description": "C10", "isStart": False, "isEnd": True}
                 ],
-                "grade": "6A+",
-                "stats": {
-                    "num_moves": 8,
-                    "num_start_holds": 2,
-                    "num_end_holds": 1
-                }
+                "grade": "6A+"
             }
         }
     )

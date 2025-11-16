@@ -13,3 +13,14 @@ export const FONT_GRADES = [
 
 export type FontGrade = typeof FONT_GRADES[number];
 
+/**
+ * Available grades for problem generation (filtered subset matching the trained model).
+ * These correspond to the grades the generator model was trained on (6A+ to 7C).
+ */
+export const AVAILABLE_GRADES = [
+  "6A+", "6B", "6B+", "6C", "6C+", 
+  "7A", "7A+", "7B", "7B+", "7C"
+] as const;
+
+export type AvailableGrade = typeof AVAILABLE_GRADES[number];
+

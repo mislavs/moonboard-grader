@@ -11,9 +11,11 @@ import { useBackendHealth } from '../hooks/useBackendHealth';
 import { useGeneration } from '../hooks/useGeneration';
 import type { Move } from '../types/problem';
 import { ERROR_MESSAGES } from '../config/api';
+import { AVAILABLE_GRADES } from '../constants/grades';
 
 export default function CreateMode() {
   const [createdMoves, setCreatedMoves] = useState<Move[]>([]);
+  const [selectedGrade, setSelectedGrade] = useState<string>(AVAILABLE_GRADES[0]);
   const { prediction, predicting, error, predict, reset } = usePrediction();
   const { duplicate, checking, error: duplicateError, checkForDuplicate, reset: resetDuplicate } = useDuplicateCheck();
   const { generating, error: generateError, generate, reset: resetGenerate } = useGeneration();
@@ -46,8 +48,8 @@ export default function CreateMode() {
     resetDuplicate();
     resetGenerate();
     
-    // Generate new problem
-    const result = await generate();
+    // Generate new problem with selected grade
+    const result = await generate(selectedGrade);
     if (result) {
       setCreatedMoves(result.moves);
     }
@@ -70,6 +72,8 @@ export default function CreateMode() {
             onPredictGrade={handlePredictGrade}
             onCheckDuplicate={handleCheckDuplicate}
             onGenerate={handleGenerate}
+            selectedGrade={selectedGrade}
+            onGradeChange={setSelectedGrade}
             isLoading={predicting}
             isCheckingDuplicate={checking}
             isGenerating={generating}

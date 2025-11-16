@@ -108,8 +108,25 @@ class GeneratorService:
                     # Single grade model - likely 6A+ only (index 2)
                     self._min_grade_index = 2
                     logger.info("Detected single-grade model, assuming 6A+ only (min_grade_index=2)")
-                else:
+                elif num_grades == 10:
+                    # Filtered model (6A+ to 7C) - most common case
+                    self._min_grade_index = 2  # 6A+ is at index 2 in full grade list
+                    logger.info("Detected 10-grade model, assuming filtered 6A+ to 7C (min_grade_index=2)")
+                elif num_grades == 17:
+                    # Full model with all grades except extremes
+                    self._min_grade_index = 1  # Starts at 6A (index 1)
+                    logger.info("Detected 17-grade model (min_grade_index=1)")
+                elif num_grades == 19:
+                    # Full model with all grades including 5+
                     self._min_grade_index = 0
+                    logger.info("Detected 19-grade model, full range 5+ to 8C+ (min_grade_index=0)")
+                else:
+                    # Unknown configuration, assume no offset
+                    self._min_grade_index = 0
+                    logger.warning(
+                        f"Unknown num_grades={num_grades}, assuming min_grade_index=0. "
+                        "Generation may fail if model was trained on filtered grades."
+                    )
             
             logger.info(f"Model min_grade_index={self._min_grade_index}")
             

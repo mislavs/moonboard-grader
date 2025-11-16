@@ -1,4 +1,5 @@
 import SpinnerIcon from './SpinnerIcon';
+import GradeSelector from './GradeSelector';
 
 interface CreateModeControlsProps {
   movesCount: number;
@@ -6,6 +7,8 @@ interface CreateModeControlsProps {
   onPredictGrade: () => void;
   onCheckDuplicate: () => void;
   onGenerate: () => void;
+  selectedGrade: string;
+  onGradeChange: (grade: string) => void;
   isLoading?: boolean;
   isCheckingDuplicate?: boolean;
   isGenerating?: boolean;
@@ -17,6 +20,8 @@ export default function CreateModeControls({
   onPredictGrade,
   onCheckDuplicate,
   onGenerate,
+  selectedGrade,
+  onGradeChange,
   isLoading = false,
   isCheckingDuplicate = false,
   isGenerating = false
@@ -47,12 +52,13 @@ export default function CreateModeControls({
             <span className="text-gray-300">Remove</span>
           </li>
         </ul>
-        <div className="mt-3 pt-3 border-t border-gray-700">
-          <p className="text-gray-400 text-xs">
-            Holds: <span className="text-white font-semibold">{movesCount}</span>
-          </p>
-        </div>
       </div>
+
+      {/* Grade Selection */}
+      <GradeSelector
+        selectedGrade={selectedGrade}
+        onGradeChange={onGradeChange}
+      />
 
       {/* Action Buttons */}
       <div className="flex flex-col gap-3 w-full">

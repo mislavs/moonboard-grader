@@ -11,7 +11,6 @@ from ...models.schemas import (
     GenerateRequest,
     GenerateResponse,
     ProblemMove,
-    ProblemStats,
 )
 from ...services.generator_service import GeneratorService
 from ..dependencies import get_loaded_generator
@@ -32,8 +31,6 @@ async def generate_problem(
     Uses a Conditional VAE model to generate novel problems. The endpoint
     will retry generation until a valid problem is produced (or max attempts reached).
     
-    NOTE: Currently ignores the input grade and always generates 6A+ problems.
-    
     Args:
         request: Generation parameters including grade and temperature
         generator_service: Injected generator service (dependency)
@@ -45,18 +42,13 @@ async def generate_problem(
         HTTPException: If model is not loaded or generation fails
     """
     try:
-        # NOTE: Currently hardcoded to always generate 6A+ (as per plan)
-        # The input grade is ignored for now
-        hardcoded_grade = "6A+"
-        
         logger.info(
-            f"Generation request received for grade {request.grade} "
-            f"(using hardcoded {hardcoded_grade})"
+            f"Generation request received for grade {request.grade}"
         )
         
         # Generate problem with retry logic
         result = generator_service.generate_problem(
-            grade=hardcoded_grade,
+            grade=request.grade,
             temperature=request.temperature,
             max_attempts=10
         )
@@ -71,23 +63,14 @@ async def generate_problem(
             for move in result['moves']
         ]
         
-        # Extract stats
-        stats_dict = result.get('stats', {})
-        stats = ProblemStats(
-            num_moves=stats_dict.get('num_moves', len(moves)),
-            num_start_holds=stats_dict.get('num_start_holds', 0),
-            num_end_holds=stats_dict.get('num_end_holds', 0)
-        )
-        
         # Build response
         response = GenerateResponse(
             moves=moves,
-            grade=hardcoded_grade,
-            stats=stats
+            grade=request.grade
         )
         
         logger.info(
-            f"Successfully generated problem with {len(moves)} moves at grade {hardcoded_grade}"
+            f"Successfully generated problem with {len(moves)} moves at grade {request.grade}"
         )
         
         return response
