@@ -34,7 +34,17 @@ def get_metrics() -> List[str]:
     for metric_name, metric_func in METRIC_FUNCTIONS.items():
         try:
             # Call with None parameters - placeholder metrics return not_implemented status
-            result = metric_func(None, None, 'cpu')
+            # Different metrics have different signatures, so we need to handle each
+            if metric_name == 'diversity':
+                result = metric_func(None, None, None, 'cpu')
+            elif metric_name in ['reconstruction', 'latent_space']:
+                result = metric_func(None, None, 'cpu')
+            elif metric_name in ['statistical']:
+                result = metric_func(None, None, None, 'cpu')
+            elif metric_name == 'grade_conditioning':
+                result = metric_func(None, None, None, 'cpu')
+            else:
+                result = metric_func(None, None, 'cpu')
             
             # If it doesn't have 'status': 'not_implemented', it's ready
             if not (isinstance(result, dict) and result.get('status') == 'not_implemented'):
@@ -85,7 +95,7 @@ def run_evaluation(
         if metric == 'reconstruction':
             results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, device)
         elif metric == 'diversity':
-            results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, num_samples, device)
+            results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, num_samples, device)
         elif metric == 'statistical':
             results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, num_samples, device)
         elif metric == 'latent_space':

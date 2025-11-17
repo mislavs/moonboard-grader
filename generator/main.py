@@ -372,6 +372,19 @@ def evaluate_command(args):
         # Set device
         device = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
         
+        # Suppress generator and evaluator logging during evaluation for cleaner output
+        generator_logger = logging.getLogger('src.generator')
+        evaluator_logger = logging.getLogger('src.evaluator')
+        dataset_logger = logging.getLogger('src.dataset')
+        
+        original_generator_level = generator_logger.level
+        original_evaluator_level = evaluator_logger.level
+        original_dataset_level = dataset_logger.level
+        
+        generator_logger.setLevel(logging.ERROR)
+        evaluator_logger.setLevel(logging.WARNING)
+        dataset_logger.setLevel(logging.WARNING)
+        
         # Print header
         print("\n" + "=" * 50)
         print("=== GENERATOR EVALUATION ===")
@@ -458,6 +471,11 @@ def evaluate_command(args):
             print(f"Results saved to: {output_path}")
             print()
         
+        # Restore original logging levels
+        generator_logger.setLevel(original_generator_level)
+        evaluator_logger.setLevel(original_evaluator_level)
+        dataset_logger.setLevel(original_dataset_level)
+        
     except FileNotFoundError as e:
         print(f"\n[!] {e}")
         sys.exit(1)
@@ -465,6 +483,14 @@ def evaluate_command(args):
         print(f"\n[!] Evaluation failed: {e}")
         logger.error(f"Evaluation failed: {e}", exc_info=True)
         sys.exit(1)
+    finally:
+        # Ensure logging levels are restored even if there's an exception
+        try:
+            generator_logger.setLevel(original_generator_level)
+            evaluator_logger.setLevel(original_evaluator_level)
+            dataset_logger.setLevel(original_dataset_level)
+        except:
+            pass
 
 
 def _print_metric_results(results: Dict, indent: int = 0):
@@ -481,6 +507,9 @@ def _print_metric_results(results: Dict, indent: int = 0):
         if key == 'per_grade_iou' and isinstance(value, dict):
             print(f"{prefix}{key}:")
             _print_grade_iou_table(value, indent + 2)
+        elif key == 'per_grade' and isinstance(value, dict):
+            print(f"{prefix}{key}:")
+            _print_grade_diversity_table(value, indent + 2)
         elif isinstance(value, dict):
             print(f"{prefix}{key}:")
             _print_metric_results(value, indent + 2)
@@ -517,6 +546,53 @@ def _print_grade_iou_table(grade_data: Dict, indent: int = 0):
         num_samples = stats.get('num_samples', 0)
         
         row = f"{prefix}{grade:<8} {mean_iou:<12.4f} {std_iou:<12.4f} {num_samples:<10}"
+        print(row)
+    
+    print(separator)
+
+
+def _print_grade_diversity_table(grade_data: Dict, indent: int = 0):
+    """
+    Print per-grade diversity statistics as a formatted table.
+    
+    Args:
+        grade_data: Dictionary mapping grade names to diversity statistics
+        indent: Indentation level
+    """
+    prefix = " " * indent
+    
+    # Table header
+    header = f"{prefix}{'Grade':<8} {'Diversity':<12} {'Uniqueness':<12} {'Valid':<10} {'Generated':<12} {'Status':<20}"
+    separator = f"{prefix}{'-' * 74}"
+    
+    print(separator)
+    print(header)
+    print(separator)
+    
+    # Sort grades by their keys for consistent display
+    for grade, stats in sorted(grade_data.items()):
+        if stats.get('skipped', False):
+            # Skipped grade
+            reason = stats.get('reason', 'unknown')
+            num_valid = stats.get('num_valid', 0)
+            num_generated = stats.get('num_generated', 0)
+            status = f"SKIPPED ({reason})"
+            row = f"{prefix}{grade:<8} {'-':<12} {'-':<12} {num_valid:<10} {num_generated:<12} {status:<20}"
+        else:
+            # Valid grade
+            mean_diversity = stats.get('mean_diversity', 0.0)
+            uniqueness = stats.get('uniqueness_ratio', 0.0)
+            total_valid = stats.get('total_valid', 0)
+            num_generated = stats.get('num_generated', 0)
+            unique = stats.get('unique_problems', 0)
+            
+            diversity_str = f"{mean_diversity:.4f}"
+            uniqueness_str = f"{uniqueness:.1%}"
+            valid_str = f"{total_valid} ({unique}u)"
+            status = "OK"
+            
+            row = f"{prefix}{grade:<8} {diversity_str:<12} {uniqueness_str:<12} {valid_str:<10} {num_generated:<12} {status:<20}"
+        
         print(row)
     
     print(separator)
