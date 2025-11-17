@@ -509,7 +509,25 @@ def _print_metric_results(results: Dict, indent: int = 0):
             _print_grade_iou_table(value, indent + 2)
         elif key == 'per_grade' and isinstance(value, dict):
             print(f"{prefix}{key}:")
-            _print_grade_diversity_table(value, indent + 2)
+            # Detect which type of per_grade data we have
+            # Check first non-empty value to determine type
+            sample_value = next((v for v in value.values() if v), None)
+            if sample_value:
+                if 'mean_diversity' in sample_value or 'uniqueness_ratio' in sample_value:
+                    # Diversity metric
+                    _print_grade_diversity_table(value, indent + 2)
+                elif 'wasserstein_distances' in sample_value or 'mean_distance' in sample_value:
+                    # Statistical metric
+                    _print_grade_statistical_table(value, indent + 2)
+                else:
+                    # Unknown format, print as nested dict
+                    _print_metric_results(value, indent + 2)
+            else:
+                # Empty data
+                _print_metric_results(value, indent + 2)
+        elif key == 'per_statistic' and isinstance(value, dict):
+            print(f"{prefix}{key}:")
+            _print_per_statistic_table(value, indent + 2)
         elif isinstance(value, dict):
             print(f"{prefix}{key}:")
             _print_metric_results(value, indent + 2)
@@ -562,7 +580,7 @@ def _print_grade_diversity_table(grade_data: Dict, indent: int = 0):
     prefix = " " * indent
     
     # Table header
-    header = f"{prefix}{'Grade':<8} {'Diversity':<12} {'Uniqueness':<12} {'Valid':<10} {'Generated':<12} {'Status':<20}"
+    header = f"{prefix}{'Grade':<8} {'Diversity':<12} {'Uniqueness':<12} {'Valid':<10} {'Requested':<12} {'Status':<20}"
     separator = f"{prefix}{'-' * 74}"
     
     print(separator)
@@ -575,15 +593,15 @@ def _print_grade_diversity_table(grade_data: Dict, indent: int = 0):
             # Skipped grade
             reason = stats.get('reason', 'unknown')
             num_valid = stats.get('num_valid', 0)
-            num_generated = stats.get('num_generated', 0)
+            num_requested = stats.get('num_requested', 0)
             status = f"SKIPPED ({reason})"
-            row = f"{prefix}{grade:<8} {'-':<12} {'-':<12} {num_valid:<10} {num_generated:<12} {status:<20}"
+            row = f"{prefix}{grade:<8} {'-':<12} {'-':<12} {num_valid:<10} {num_requested:<12} {status:<20}"
         else:
             # Valid grade
             mean_diversity = stats.get('mean_diversity', 0.0)
             uniqueness = stats.get('uniqueness_ratio', 0.0)
             total_valid = stats.get('total_valid', 0)
-            num_generated = stats.get('num_generated', 0)
+            num_requested = stats.get('num_requested', 0)
             unique = stats.get('unique_problems', 0)
             
             diversity_str = f"{mean_diversity:.4f}"
@@ -591,9 +609,110 @@ def _print_grade_diversity_table(grade_data: Dict, indent: int = 0):
             valid_str = f"{total_valid} ({unique}u)"
             status = "OK"
             
-            row = f"{prefix}{grade:<8} {diversity_str:<12} {uniqueness_str:<12} {valid_str:<10} {num_generated:<12} {status:<20}"
+            row = f"{prefix}{grade:<8} {diversity_str:<12} {uniqueness_str:<12} {valid_str:<10} {num_requested:<12} {status:<20}"
         
         print(row)
+    
+    print(separator)
+
+
+def _print_grade_statistical_table(grade_data: Dict, indent: int = 0):
+    """
+    Print per-grade statistical similarity statistics as a formatted table.
+    
+    Args:
+        grade_data: Dictionary mapping grade names to statistical similarity metrics
+        indent: Indentation level
+    """
+    prefix = " " * indent
+    
+    # Table header
+    header = f"{prefix}{'Grade':<8} {'Mean Dist':<12} {'Gen/Real':<12} {'Status':<30}"
+    separator = f"{prefix}{'-' * 62}"
+    
+    print(separator)
+    print(header)
+    print(separator)
+    
+    # Sort grades by their keys for consistent display
+    for grade, stats in sorted(grade_data.items()):
+        if stats.get('skipped', False):
+            # Skipped grade
+            reason = stats.get('reason', 'unknown')
+            num_real = stats.get('num_real', 0)
+            status = f"SKIPPED ({reason})"
+            row = f"{prefix}{grade:<8} {'-':<12} {'-':<12} {status:<30}"
+        else:
+            # Valid grade
+            mean_distance = stats.get('mean_distance', 0.0)
+            num_generated = stats.get('num_generated', 0)
+            num_real = stats.get('num_real', 0)
+            
+            mean_dist_str = f"{mean_distance:.4f}" if mean_distance is not None else "N/A"
+            gen_real_str = f"{num_generated}/{num_real}"
+            status = "OK"
+            
+            row = f"{prefix}{grade:<8} {mean_dist_str:<12} {gen_real_str:<12} {status:<30}"
+        
+        print(row)
+    
+    print(separator)
+
+
+def _print_per_statistic_table(statistic_data: Dict, indent: int = 0):
+    """
+    Print per-statistic Wasserstein distances as a formatted table.
+    
+    Args:
+        statistic_data: Dictionary mapping statistic names to their distance metrics
+        indent: Indentation level
+    """
+    prefix = " " * indent
+    
+    # Table header
+    header = f"{prefix}{'Statistic':<20} {'Mean':<12} {'Std':<12} {'Min':<12} {'Max':<12}"
+    separator = f"{prefix}{'-' * 68}"
+    
+    print(separator)
+    print(header)
+    print(separator)
+    
+    # Define display order for statistics
+    stat_order = ['num_holds', 'num_start', 'num_end', 'num_middle', 'vertical_spread']
+    
+    # Print in defined order, then any remaining stats
+    displayed = set()
+    for stat_name in stat_order:
+        if stat_name in statistic_data:
+            stats = statistic_data[stat_name]
+            if stats is None:
+                row = f"{prefix}{stat_name:<20} {'N/A':<12} {'N/A':<12} {'N/A':<12} {'N/A':<12}"
+            else:
+                mean_val = stats.get('mean', 0.0)
+                std_val = stats.get('std', 0.0)
+                min_val = stats.get('min', 0.0)
+                max_val = stats.get('max', 0.0)
+                
+                row = f"{prefix}{stat_name:<20} {mean_val:<12.4f} {std_val:<12.4f} {min_val:<12.4f} {max_val:<12.4f}"
+            
+            print(row)
+            displayed.add(stat_name)
+    
+    # Print any remaining statistics not in the predefined order
+    for stat_name in sorted(statistic_data.keys()):
+        if stat_name not in displayed:
+            stats = statistic_data[stat_name]
+            if stats is None:
+                row = f"{prefix}{stat_name:<20} {'N/A':<12} {'N/A':<12} {'N/A':<12} {'N/A':<12}"
+            else:
+                mean_val = stats.get('mean', 0.0)
+                std_val = stats.get('std', 0.0)
+                min_val = stats.get('min', 0.0)
+                max_val = stats.get('max', 0.0)
+                
+                row = f"{prefix}{stat_name:<20} {mean_val:<12.4f} {std_val:<12.4f} {min_val:<12.4f} {max_val:<12.4f}"
+            
+            print(row)
     
     print(separator)
 

@@ -66,27 +66,24 @@ def evaluate_diversity(
     for grade_label in range(num_grades):
         logger.info(f"Generating samples for grade {grade_label}...")
         
-        # Generate problems for this grade
-        problems = generator.generate(
+        # Generate valid problems using retry logic (keeps trying until we get num_samples valid problems)
+        valid_problems = generator.generate_with_retry(
             grade_label=grade_label,
             num_samples=num_samples,
-            temperature=1.0,
-            validate=True
+            max_attempts=50,  # Increased from default 10 to handle difficult grades
+            temperature=1.0
         )
-        
-        # Extract valid problems
-        valid_problems = [p for p in problems if p.get('validation', {}).get('valid', True)]
         
         if len(valid_problems) < 2:
             logger.warning(
                 f"Grade {grade_label}: Insufficient valid problems "
-                f"({len(valid_problems)}/{num_samples}), skipping"
+                f"({len(valid_problems)}/{num_samples}), skipping (likely too few training examples)"
             )
             results_per_grade[grade_label] = {
                 'skipped': True,
                 'reason': 'insufficient_valid_problems',
                 'num_valid': len(valid_problems),
-                'num_generated': num_samples
+                'num_requested': num_samples
             }
             continue
         
@@ -107,7 +104,7 @@ def evaluate_diversity(
                 'skipped': True,
                 'reason': 'grid_conversion_failed',
                 'num_valid': len(valid_problems),
-                'num_generated': num_samples
+                'num_requested': num_samples
             }
             continue
         
@@ -130,7 +127,7 @@ def evaluate_diversity(
             'unique_problems': num_unique,
             'total_valid': len(grids),
             'uniqueness_ratio': uniqueness_ratio,
-            'num_generated': num_samples
+            'num_requested': num_samples
         }
         
         logger.info(

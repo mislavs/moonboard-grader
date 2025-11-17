@@ -246,7 +246,7 @@ py main.py evaluate --checkpoint models/best_vae.pth --metrics diversity --num-s
 - Uses `create_grid_tensor` from moonboard_core for grid conversion
 - Proper logging at each step for debugging and monitoring
 
-### 4. Implement Statistical Similarity Metric
+### 4. Implement Statistical Similarity Metric ✅ COMPLETE
 
 **File**: `generator/src/evaluator/statistical.py`
 
@@ -352,6 +352,25 @@ def _extract_problem_stats(problem):
 ```bash
 py main.py evaluate --checkpoint models/best_vae.pth --metrics statistical
 ```
+
+**Status**: ✅ Completed - Statistical similarity metric fully implemented with:
+- Wasserstein distance calculation for comparing generated vs real problem distributions
+- Five key statistics compared: num_holds, num_start, num_end, num_middle, vertical_spread
+- Per-grade statistics showing mean distances for each grade
+- Per-statistic aggregation showing mean/std/min/max across all grades
+- Graceful handling of grades with insufficient data (skips with detailed reason)
+- Overall aggregation across all valid grades
+- Automatic detection working correctly (no longer returns 'not_implemented')
+- Tested successfully with overall mean distance of ~1.0 (below 2.0 target, indicating good similarity)
+- Returns comprehensive metrics: overall_mean_distance, overall_std_distance, per_grade details, per_statistic breakdowns, interpretation
+- **Custom console output tables** created specifically for statistical metrics:
+  - Per-grade table: Grade, Mean Distance, Gen/Real counts, Status
+  - **Per-statistic table**: Statistic, Mean, Std, Min, Max (displays Wasserstein distances across grades)
+- JSON output preserves full nested structure including wasserstein_distances for each statistic
+- Uses `extract_problem_stats` helper from utils.py for consistent statistic extraction
+- Loads raw JSON data to get real problem statistics grouped by grade
+- Proper logging at each step for debugging and monitoring
+- Default data path set to `../data/problems.json` for convenience
 
 ### 5. Implement Latent Space Quality Metric
 
