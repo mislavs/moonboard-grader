@@ -410,10 +410,11 @@ def evaluate_command(args):
         checkpoint = torch.load(args.checkpoint, map_location=device)
         
         # Create model with checkpoint parameters
+        model_config = checkpoint['model_config']
         model = ConditionalVAE(
-            latent_dim=checkpoint['latent_dim'],
-            num_grades=checkpoint['num_grades'],
-            grade_embedding_dim=checkpoint['grade_embedding_dim']
+            latent_dim=model_config['latent_dim'],
+            num_grades=model_config['num_grades'],
+            grade_embedding_dim=model_config['grade_embedding_dim']
         )
         model.load_state_dict(checkpoint['model_state_dict'])
         model.to(device)
@@ -477,7 +478,10 @@ def _print_metric_results(results: Dict, indent: int = 0):
     prefix = " " * indent
     
     for key, value in results.items():
-        if isinstance(value, dict):
+        if key == 'per_grade_iou' and isinstance(value, dict):
+            print(f"{prefix}{key}:")
+            _print_grade_iou_table(value, indent + 2)
+        elif isinstance(value, dict):
             print(f"{prefix}{key}:")
             _print_metric_results(value, indent + 2)
         elif isinstance(value, (list, tuple)):
@@ -486,6 +490,36 @@ def _print_metric_results(results: Dict, indent: int = 0):
             print(f"{prefix}{key}: {value:.4f}")
         else:
             print(f"{prefix}{key}: {value}")
+
+
+def _print_grade_iou_table(grade_data: Dict, indent: int = 0):
+    """
+    Print per-grade IoU statistics as a formatted table.
+    
+    Args:
+        grade_data: Dictionary mapping grade labels to IoU statistics
+        indent: Indentation level
+    """
+    prefix = " " * indent
+    
+    # Table header
+    header = f"{prefix}{'Grade':<8} {'Mean IoU':<12} {'Std IoU':<12} {'Samples':<10}"
+    separator = f"{prefix}{'-' * 42}"
+    
+    print(separator)
+    print(header)
+    print(separator)
+    
+    # Sort grades by their keys for consistent display
+    for grade, stats in sorted(grade_data.items()):
+        mean_iou = stats.get('mean_iou', 0.0)
+        std_iou = stats.get('std_iou', 0.0)
+        num_samples = stats.get('num_samples', 0)
+        
+        row = f"{prefix}{grade:<8} {mean_iou:<12.4f} {std_iou:<12.4f} {num_samples:<10}"
+        print(row)
+    
+    print(separator)
 
 
 def main():
@@ -588,8 +622,8 @@ def main():
     evaluate_parser.add_argument(
         '--data',
         type=str,
-        default='../data/processed/moonboard_2016.json',
-        help='Path to dataset JSON file (default: ../data/processed/moonboard_2016.json)'
+        default='../data/problems.json',
+        help='Path to dataset JSON file (default: ../data/problems.json)'
     )
     evaluate_parser.add_argument(
         '--classifier-checkpoint',

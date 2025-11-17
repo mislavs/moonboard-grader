@@ -40,9 +40,7 @@ def get_metrics() -> List[str]:
             if not (isinstance(result, dict) and result.get('status') == 'not_implemented'):
                 available.append(metric_name)
         except Exception:
-            # Real metrics will throw exceptions with None params
-            # Placeholder metrics just return a dict
-            pass
+            available.append(metric_name)
     
     return available
 

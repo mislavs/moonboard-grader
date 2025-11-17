@@ -9,7 +9,7 @@ from src.dataset import create_data_loaders
 
 def load_data_loader(data_path: str, batch_size: int = 32, device: str = 'cpu'):
     """
-    Helper to load validation data loader.
+    Helper to load validation data loader and dataset.
     
     Args:
         data_path: Path to dataset JSON file
@@ -17,12 +17,12 @@ def load_data_loader(data_path: str, batch_size: int = 32, device: str = 'cpu'):
         device: Device to load data on
         
     Returns:
-        Validation data loader
+        Tuple of (val_loader, dataset) where dataset contains grade mappings
     """
     if data_path is None:
         raise ValueError("data_path is required for this metric")
     
-    _, val_loader, _ = create_data_loaders(
+    _, val_loader, dataset = create_data_loaders(
         data_path=data_path,
         batch_size=batch_size,
         train_split=0.8,
@@ -30,7 +30,7 @@ def load_data_loader(data_path: str, batch_size: int = 32, device: str = 'cpu'):
         num_workers=0
     )
     
-    return val_loader
+    return val_loader, dataset
 
 
 def extract_problem_stats(problem: Dict) -> Dict[str, float]:
