@@ -18,7 +18,8 @@ from src.vae import ConditionalVAE
 from src.dataset import create_data_loaders
 from src.vae_trainer import VAETrainer
 from src.generator import ProblemGenerator, format_problem_output
-from moonboard_core import decode_grade, get_filtered_grade_names, encode_grade
+from src.evaluator import run_evaluation, get_metrics
+from moonboard_core import get_filtered_grade_names, encode_grade
 
 # Setup logging
 logging.basicConfig(
@@ -360,6 +361,133 @@ def generate_command(args):
         sys.exit(1)
 
 
+def evaluate_command(args):
+    """
+    Evaluate the trained model with quality metrics.
+    
+    Args:
+        args: Command-line arguments
+    """
+    try:
+        # Set device
+        device = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
+        
+        # Print header
+        print("\n" + "=" * 50)
+        print("=== GENERATOR EVALUATION ===")
+        print("=" * 50)
+        print(f"Model: {args.checkpoint}")
+        print(f"Device: {device}")
+        print()
+        
+        # Check what's available
+        available_metrics = get_metrics()
+        
+        if available_metrics:
+            print(f"Available metrics: {', '.join(available_metrics)}")
+        else:
+            print("No metrics available yet.")
+        print()
+        
+        # Determine which metrics to run
+        if args.metrics:
+            requested_metrics = [m.strip() for m in args.metrics.split(',')]
+            metrics_to_run = [m for m in requested_metrics if m in available_metrics]
+        else:
+            metrics_to_run = available_metrics
+        
+        if not metrics_to_run:
+            if args.metrics and available_metrics:
+                print(f"Requested metrics not ready yet.")
+                print(f"Available: {', '.join(available_metrics)}")
+            else:
+                print("No metrics to evaluate yet.")
+            print()
+            return
+        
+        # Load model
+        print(f"Loading model from {args.checkpoint}...")
+        checkpoint = torch.load(args.checkpoint, map_location=device)
+        
+        # Create model with checkpoint parameters
+        model = ConditionalVAE(
+            latent_dim=checkpoint['latent_dim'],
+            num_grades=checkpoint['num_grades'],
+            grade_embedding_dim=checkpoint['grade_embedding_dim']
+        )
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.to(device)
+        model.eval()
+        
+        print(f"Model loaded successfully")
+        print(f"Running metrics: {', '.join(metrics_to_run)}")
+        print()
+        
+        # Run evaluation
+        results = run_evaluation(
+            model=model,
+            checkpoint_path=args.checkpoint,
+            data_path=args.data,
+            classifier_checkpoint=args.classifier_checkpoint,
+            metrics=metrics_to_run,
+            num_samples=args.num_samples,
+            device=device
+        )
+        
+        # Display results
+        print("=" * 50)
+        print("=== RESULTS ===")
+        print("=" * 50)
+        
+        for metric_name, metric_results in results.get('metrics', {}).items():
+            print(f"\n{metric_name.upper().replace('_', ' ')}:")
+            print("-" * 40)
+            _print_metric_results(metric_results, indent=2)
+        
+        print()
+        
+        # Save to JSON if requested
+        if args.output:
+            output_path = Path(args.output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(output_path, 'w') as f:
+                json.dump(results, f, indent=2)
+            
+            print(f"Results saved to: {output_path}")
+            print()
+        
+    except FileNotFoundError as e:
+        print(f"\n[!] {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n[!] Evaluation failed: {e}")
+        logger.error(f"Evaluation failed: {e}", exc_info=True)
+        sys.exit(1)
+
+
+def _print_metric_results(results: Dict, indent: int = 0):
+    """
+    Pretty print metric results recursively.
+    
+    Args:
+        results: Dictionary of results
+        indent: Indentation level
+    """
+    prefix = " " * indent
+    
+    for key, value in results.items():
+        if isinstance(value, dict):
+            print(f"{prefix}{key}:")
+            _print_metric_results(value, indent + 2)
+        elif isinstance(value, (list, tuple)):
+            print(f"{prefix}{key}: {value}")
+        elif isinstance(value, float):
+            print(f"{prefix}{key}: {value:.4f}")
+        else:
+            print(f"{prefix}{key}: {value}")
+
+
 def main():
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
@@ -448,6 +576,51 @@ def main():
         help='Force CPU usage even if CUDA is available'
     )
     generate_parser.set_defaults(func=generate_command)
+    
+    # Evaluate command
+    evaluate_parser = subparsers.add_parser('evaluate', help='Evaluate model quality')
+    evaluate_parser.add_argument(
+        '--checkpoint',
+        type=str,
+        required=True,
+        help='Path to model checkpoint file'
+    )
+    evaluate_parser.add_argument(
+        '--data',
+        type=str,
+        default='../data/processed/moonboard_2016.json',
+        help='Path to dataset JSON file (default: ../data/processed/moonboard_2016.json)'
+    )
+    evaluate_parser.add_argument(
+        '--classifier-checkpoint',
+        type=str,
+        default=None,
+        help='Path to classifier checkpoint (required for grade_conditioning metric)'
+    )
+    evaluate_parser.add_argument(
+        '--metrics',
+        type=str,
+        default=None,
+        help='Comma-separated list of metrics to run (default: all implemented)'
+    )
+    evaluate_parser.add_argument(
+        '--num-samples',
+        type=int,
+        default=100,
+        help='Number of samples per grade for generation-based metrics (default: 100)'
+    )
+    evaluate_parser.add_argument(
+        '--output',
+        type=str,
+        default=None,
+        help='Path to save JSON results (optional)'
+    )
+    evaluate_parser.add_argument(
+        '--cpu',
+        action='store_true',
+        help='Force CPU usage even if CUDA is available'
+    )
+    evaluate_parser.set_defaults(func=evaluate_command)
     
     # Parse arguments
     args = parser.parse_args()
