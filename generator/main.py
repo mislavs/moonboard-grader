@@ -507,6 +507,9 @@ def _print_metric_results(results: Dict, indent: int = 0):
         if key == 'per_grade_iou' and isinstance(value, dict):
             print(f"{prefix}{key}:")
             _print_grade_iou_table(value, indent + 2)
+        elif key == 'per_grade_centroids' and isinstance(value, dict):
+            print(f"{prefix}{key}:")
+            _print_grade_centroids_table(value, indent + 2)
         elif key == 'per_grade' and isinstance(value, dict):
             print(f"{prefix}{key}:")
             # Detect which type of per_grade data we have
@@ -715,6 +718,40 @@ def _print_per_statistic_table(statistic_data: Dict, indent: int = 0):
             print(row)
     
     print(separator)
+
+
+def _print_grade_centroids_table(centroid_data: Dict, indent: int = 0):
+    """
+    Print per-grade centroid statistics as a formatted table.
+    
+    Displays a summary of each grade's latent space centroid without
+    showing the full high-dimensional mean vectors.
+    
+    Args:
+        centroid_data: Dictionary mapping grade names to centroid statistics
+        indent: Indentation level
+    """
+    prefix = " " * indent
+    
+    # Table header
+    header = f"{prefix}{'Grade':<10} {'Latent Std':<15} {'Samples':<10}"
+    separator = f"{prefix}{'-' * 35}"
+    
+    print(separator)
+    print(header)
+    print(separator)
+    
+    # Grades are already strings, just sort them alphabetically
+    # (they should be in order since they come from a sorted numeric label list)
+    for grade_name, stats in sorted(centroid_data.items()):
+        latent_std = stats.get('std', 0.0)
+        count = stats.get('count', 0)
+        
+        row = f"{prefix}{grade_name:<10} {latent_std:<15.4f} {count:<10}"
+        print(row)
+    
+    print(separator)
+    print(f"{prefix}Note: Full {len(next(iter(centroid_data.values()))['mean'])}-dimensional centroid vectors available in JSON output")
 
 
 def main():
