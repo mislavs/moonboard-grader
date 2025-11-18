@@ -144,6 +144,201 @@ Uses `moonboard_core.validate_moves()`:
 
 Typical validation rate: 70-90%
 
+## Evaluation Metrics
+
+### Overview
+
+The evaluation system provides comprehensive quality assessment through five metrics, prioritized by reliability and usefulness.
+
+### Metric Implementations
+
+#### 1. Reconstruction Quality
+
+**Purpose**: Measure VAE encoding/decoding fidelity
+
+**Method**: Intersection over Union (IoU)
+
+```python
+def evaluate_reconstruction(model, val_loader, threshold=0.5):
+    # Encode and reconstruct validation problems
+    # Calculate IoU = intersection / union
+    # Per-channel: start, middle, end holds
+    # Per-grade: breakdown by difficulty
+```
+
+**Output**:
+- Overall mean_iou, std_iou
+- Per-channel IoU (start, middle, end)
+- Per-grade IoU statistics
+
+**Target**: >0.85 (excellent), >0.70 (good)
+
+**Technical notes**:
+- Uses sigmoid activation + thresholding
+- Batch processing for efficiency
+- Grade labels decoded from dataset mapping
+
+#### 2. Diversity
+
+**Purpose**: Ensure generated problems are unique and varied
+
+**Method**: Pairwise Hamming distance + uniqueness ratio
+
+```python
+def evaluate_diversity(generator, num_samples_per_grade=100):
+    # Generate problems at each grade
+    # Convert to grid representations
+    # Calculate pairwise Hamming distances
+    # Count exact duplicates
+    # Aggregate per-grade and overall
+```
+
+**Output**:
+- Overall mean diversity (Hamming distance)
+- Overall uniqueness ratio (unique / total)
+- Per-grade diversity statistics
+
+**Target**: >95% unique (excellent), >80% unique (good)
+
+**Technical notes**:
+- Uses `scipy.spatial.distance.pdist` with 'hamming' metric
+- Grids flattened to 1D arrays for comparison
+- Filters invalid problems before analysis
+
+#### 3. Statistical Similarity
+
+**Purpose**: Compare generated vs real problem distributions
+
+**Method**: Wasserstein distance on problem statistics
+
+```python
+def evaluate_statistical_similarity(generator, data_path, num_samples_per_grade=100):
+    # Load real dataset and group by grade
+    # Generate problems at matching grades
+    # Extract statistics: num_holds, num_start, num_end, num_middle, vertical_spread
+    # Calculate Wasserstein distance for each statistic
+    # Aggregate across grades
+```
+
+**Statistics extracted**:
+- `num_holds`: Total hold count
+- `num_start`: Start hold count
+- `num_end`: End hold count
+- `num_middle`: Middle hold count
+- `vertical_spread`: Range of row numbers (max - min)
+
+**Output**:
+- Overall mean distance (lower = better)
+- Per-grade Wasserstein distances
+- Per-statistic aggregation (mean, std, min, max)
+
+**Target**: <1.5 (excellent), <2.5 (good)
+
+**Technical notes**:
+- Uses `scipy.stats.wasserstein_distance`
+- Requires sufficient samples (≥10) per grade
+- Gracefully skips grades with insufficient data
+
+#### 4. Latent Space Quality
+
+**Purpose**: Assess learned representation structure
+
+**Method**: Silhouette score + grade separation
+
+```python
+def evaluate_latent_space(model, val_loader):
+    # Encode validation set to latent space
+    # Calculate silhouette score (grade clustering)
+    # Compute per-grade centroids and variance
+    # Measure distances between adjacent grade centroids
+```
+
+**Output**:
+- Silhouette score (-1 to 1, higher = better clustering)
+- Latent space statistics (mean, std)
+- Grade separation (centroid distances)
+- Per-grade centroids with sample counts
+
+**Target**: >0.3 (excellent), >0.0 (acceptable)
+
+**Technical notes**:
+- Uses `sklearn.metrics.silhouette_score`
+- Low/negative scores expected for reconstruction-focused VAEs
+- Centroids are 128-dimensional vectors (latent_dim)
+- Grade separation measures Euclidean distance between centroids
+
+#### 5. Grade Conditioning (Optional)
+
+**Purpose**: Validate grade-conditioned generation accuracy
+
+**Method**: Classifier prediction on generated problems
+
+⚠️ **WARNING**: Limited reliability metric due to classifier baseline (~35% exact, ~70% ±1)
+
+```python
+def evaluate_grade_conditioning(generator, classifier_checkpoint, num_samples_per_grade=100):
+    # Load classifier predictor
+    # Generate problems at each grade
+    # Classify each generated problem
+    # Calculate accuracy metrics (exact, ±1, ±2)
+```
+
+**Output**:
+- Overall exact, ±1, ±2 accuracy
+- Per-grade accuracy breakdowns
+- Warnings about classifier limitations
+
+**Interpretation**: Use for RELATIVE comparison between models, not absolute quality
+
+**Technical notes**:
+- Requires classifier checkpoint path
+- Gracefully skips if classifier not available
+- Uses `classifier.src.predictor.Predictor`
+- Results reflect classifier weakness, not just generator quality
+
+### Orchestrator Architecture
+
+**File**: `src/evaluator/orchestrator.py`
+
+**Design**:
+- `METRIC_FUNCTIONS`: Dispatch table mapping metric names to functions
+- `get_metrics()`: Auto-detects implemented metrics (checks for 'not_implemented' status)
+- `run_evaluation()`: Delegates to individual metric functions, aggregates results
+
+**Auto-detection logic**:
+```python
+# Metric is "ready" if it doesn't return {'status': 'not_implemented'}
+result = metric_func(...)
+is_ready = result.get('status') != 'not_implemented'
+```
+
+### CLI Integration
+
+**Command**: `py main.py evaluate`
+
+**Arguments**:
+- `--checkpoint`: VAE model checkpoint (required)
+- `--data`: Validation data path (default: `../data/problems.json`)
+- `--classifier-checkpoint`: Classifier for grade conditioning
+- `--metrics`: Comma-separated list (default: all available)
+- `--num-samples`: Samples per grade for generation metrics
+- `--output`: JSON output file
+- `--cpu`: Force CPU usage
+
+**Output formats**:
+- **Console**: Human-readable tables with interpretations
+- **JSON**: Complete nested structure for programmatic access
+
+### Expected Performance
+
+| Metric | Good | Excellent | Notes |
+|--------|------|-----------|-------|
+| Reconstruction IoU | >0.70 | >0.85 | Core VAE quality |
+| Diversity uniqueness | >80% | >95% | No mode collapse |
+| Statistical distance | <2.5 | <1.5 | Realistic problems |
+| Latent silhouette | >0.0 | >0.3 | May be negative |
+| Grade conditioning | N/A | N/A | Unreliable metric |
+
 ## CLI
 
 ### Train
@@ -166,6 +361,23 @@ py main.py generate \
   [--include-grade]
 ```
 
+### Evaluate
+
+```bash
+py main.py evaluate \
+  --checkpoint models/best_vae.pth \
+  [--data ../data/problems.json] \
+  [--metrics reconstruction,diversity,statistical,latent_space] \
+  [--classifier-checkpoint ../classifier/test_models/best_model.pth] \
+  [--num-samples 100] \
+  [--output results.json] \
+  [--cpu]
+```
+
+**Available metrics**: `reconstruction`, `diversity`, `statistical`, `latent_space`, `grade_conditioning`
+
+**Default behavior**: Runs all implemented metrics (auto-detected)
+
 ## Performance
 
 ### Expected Training Losses
@@ -181,6 +393,27 @@ py main.py generate \
 - Problems should be diverse at high temperature
 - Grade conditioning should produce appropriate difficulty
 
+### Evaluation Metrics
+
+See "Evaluation Metrics" section above for complete details.
+
+**Target scores for well-trained model:**
+
+| Metric | Target Range | Critical Threshold |
+|--------|--------------|-------------------|
+| Reconstruction IoU | 0.85-0.95 | >0.70 (minimum) |
+| Diversity uniqueness | 95-100% | >80% (minimum) |
+| Statistical distance | 0.5-1.5 | <2.5 (maximum) |
+| Latent silhouette | -0.1 to 0.2 | >-0.5 (acceptable) |
+| Grade conditioning | N/A | Unreliable metric |
+
+**Metric priorities** (most to least reliable):
+1. Reconstruction (core VAE quality)
+2. Diversity (mode collapse check)
+3. Statistical (realism check)
+4. Latent space (representation quality)
+5. Grade conditioning (limited reliability)
+
 ## Integration
 
 Depends on `moonboard_core`:
@@ -191,12 +424,36 @@ Depends on `moonboard_core`:
 
 ## Troubleshooting
 
+### Training
+
 **KL loss → 0**: Enable/increase KL annealing epochs
 
 **Poor reconstruction**: Reduce KL weight or increase model capacity
 
-**Invalid problems**: Use `--retry` or lower threshold
-
 **Out of memory**: Reduce batch size or use CPU
 
+### Generation
+
+**Invalid problems**: Use `--retry` or lower threshold
+
 **No diversity**: Increase temperature or check training data diversity
+
+**Too many/few holds**: Adjust threshold (0.3 = more, 0.7 = fewer)
+
+### Evaluation
+
+**Low reconstruction IoU (<0.5)**: Model undertrained or KL weight too high - retrain with adjusted config
+
+**Low diversity (<50% unique)**: Mode collapse - increase latent_dim or add more training data
+
+**High statistical distance (>5.0)**: Generated problems unrealistic - may need more epochs or better preprocessing
+
+**Very negative silhouette (<-0.5)**: Latent space not learning grade structure - check grade embedding or increase embedding_dim
+
+**Grade conditioning errors**: Ensure classifier checkpoint path is correct and classifier version matches
+
+**Evaluation OOM**: Reduce `--num-samples` (e.g., 50 or 20 instead of 100)
+
+**Missing dependencies**: Install scikit-learn for latent_space metric (`pip install scikit-learn`)
+
+**Classifier import errors**: Ensure classifier module is in Python path and dependencies installed

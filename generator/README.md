@@ -35,6 +35,12 @@ py main.py generate --checkpoint models/best_vae.pth --grade 6B+ --num-samples 1
 py main.py generate --checkpoint models/best_vae.pth --grade 7A --num-samples 10 --retry
 ```
 
+**Evaluate model quality:**
+
+```bash
+py main.py evaluate --checkpoint models/best_vae.pth --output results.json
+```
+
 ## Commands
 
 ### Train
@@ -78,6 +84,106 @@ py main.py generate --checkpoint models/best_vae.pth --grade 6C --threshold 0.3
 # Multiple grades
 py main.py generate --checkpoint models/best_vae.pth --grade-labels "0,2,4,6,8"
 ```
+
+### Evaluate
+
+Assess generator quality with comprehensive metrics:
+
+```bash
+# Run all metrics (no classifier needed for primary metrics)
+py main.py evaluate --checkpoint models/best_vae.pth --output results.json
+
+# Run specific metrics
+py main.py evaluate --checkpoint models/best_vae.pth --metrics reconstruction,diversity
+
+# Include optional grade conditioning (requires classifier)
+py main.py evaluate --checkpoint models/best_vae.pth --classifier-checkpoint ../classifier/test_models/best_model.pth --metrics grade_conditioning
+
+# Customize number of samples
+py main.py evaluate --checkpoint models/best_vae.pth --num-samples 50 --metrics diversity
+```
+
+#### Available Metrics
+
+**High Priority (No Classifier Required):**
+
+- **`reconstruction`**: IoU between original and reconstructed problems
+  - Target: >0.85 (excellent), >0.70 (good)
+  - Measures how well the VAE learns to encode/decode problems
+  - Per-channel breakdown (start/middle/end holds)
+  - Per-grade analysis
+
+- **`diversity`**: Uniqueness of generated problems
+  - Target: >95% unique (excellent), >80% unique (good)
+  - Pairwise Hamming distance between generated problems
+  - Ensures model produces varied problems, not duplicates
+
+- **`statistical`**: Similarity to real problem distributions
+  - Target: Wasserstein distance <1.5 (excellent), <2.5 (good)
+  - Compares statistics: num_holds, start/end holds, vertical spread
+  - Low distance = generated problems statistically similar to real ones
+
+**Medium Priority:**
+
+- **`latent_space`**: Quality of learned representations
+  - Target: Silhouette score >0.3 (excellent), >0.0 (acceptable)
+  - Measures grade clustering in latent space
+  - Note: Low scores expected for reconstruction-focused VAEs
+
+**Low Priority (Requires Classifier, Limited Reliability):**
+
+- **`grade_conditioning`**: Grade accuracy via classifier
+  - ⚠️ **WARNING**: Limited by classifier's 35% exact accuracy, 70% ±1 grade
+  - Use for RELATIVE comparison between models only
+  - Not a reliable absolute quality measure
+  - Requires `--classifier-checkpoint` argument
+
+#### Metric Options
+
+- `--checkpoint PATH`: VAE model checkpoint (required)
+- `--data PATH`: Path to validation data (default: `../data/problems.json`)
+- `--metrics METRICS`: Comma-separated list (default: all available)
+- `--num-samples N`: Samples per grade for generation metrics (default: 100)
+- `--output FILE`: Save results to JSON file
+- `--classifier-checkpoint PATH`: Classifier for grade conditioning metric
+- `--cpu`: Force CPU usage
+
+#### Examples
+
+```bash
+# Quick quality check
+py main.py evaluate --checkpoint models/best_vae.pth --metrics reconstruction
+
+# Full evaluation without classifier
+py main.py evaluate --checkpoint models/best_vae.pth
+
+# Complete evaluation with all metrics
+py main.py evaluate --checkpoint models/best_vae.pth --classifier-checkpoint ../classifier/test_models/best_model.pth --output full_eval.json
+
+# Compare model checkpoints
+py main.py evaluate --checkpoint models/epoch_10.pth --output epoch_10.json
+py main.py evaluate --checkpoint models/best_vae.pth --output best.json
+# Then compare the JSON files
+```
+
+#### Interpreting Results
+
+**Console Output:**
+- Human-readable tables for each metric
+- Overall scores and per-grade breakdowns
+- Warnings for metrics with limitations
+
+**JSON Output:**
+- Complete nested structure for programmatic access
+- Includes all raw data (centroid vectors, per-grade details, etc.)
+- Use for automated evaluation pipelines
+
+**What Good Scores Look Like:**
+- Reconstruction IoU: 0.85-0.95 (excellent model learning)
+- Diversity uniqueness: 95-100% (no duplicate generation)
+- Statistical distance: 0.5-1.5 (closely matches real problems)
+- Latent silhouette: -0.1 to 0.2 (expected for reconstruction VAEs)
+- Grade conditioning: Interpret with caution due to classifier limits
 
 ## Configuration
 
@@ -175,13 +281,27 @@ for problem in problems:
 
 ## Troubleshooting
 
-**Training too slow**: Use GPU with `device: "cuda"` in config
+**Training Issues:**
 
-**Invalid generated problems**: Use `--retry` flag or lower `--threshold 0.3`
+- **Training too slow**: Use GPU with `device: "cuda"` in config
+- **KL loss goes to zero**: Enable KL annealing in config
+- **Out of memory**: Reduce `batch_size` in config or use `--cpu`
+- **Poor reconstruction**: Reduce KL weight or increase model capacity
 
-**KL loss goes to zero**: Enable KL annealing in config
+**Generation Issues:**
 
-**Out of memory**: Reduce `batch_size` in config or use `--cpu`
+- **Invalid generated problems**: Use `--retry` flag or lower `--threshold 0.3`
+- **No diversity**: Increase temperature (try 1.5) or check training data diversity
+- **Too sparse/dense**: Adjust `--threshold` (0.3 = more holds, 0.7 = fewer holds)
+
+**Evaluation Issues:**
+
+- **Low reconstruction IoU (<0.5)**: Model may be undertrained or KL weight too high
+- **Low diversity (<50% unique)**: Increase latent_dim or check for mode collapse
+- **High statistical distance (>5.0)**: Generated problems differ from real ones - may need more training or better data
+- **Negative silhouette score**: Expected for reconstruction-focused VAEs (not a problem unless <-0.5)
+- **Grade conditioning fails**: Classifier checkpoint not found or incompatible - check path and versions
+- **Evaluation OOM**: Reduce `--num-samples` (try 50 or 20)
 
 ## Testing
 
