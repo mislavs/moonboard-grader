@@ -191,10 +191,22 @@ class GeneratorService:
         Returns:
             Dictionary with model information
         """
-        return {
+        info = {
             "model_path": str(self.model_path),
             "device": self.device,
             "model_exists": self.model_path.exists(),
             "is_loaded": self.is_loaded
         }
+        
+        # Add filtering metadata if model is loaded
+        if self.is_loaded and self._generator is not None:
+            info["grade_offset"] = getattr(self._generator, 'grade_offset', 0)
+            info["min_grade_index"] = getattr(self._generator, 'min_grade_index', None)
+            info["max_grade_index"] = getattr(self._generator, 'max_grade_index', None)
+            if info["min_grade_index"] is not None and info["max_grade_index"] is not None:
+                info["filtered"] = True
+            else:
+                info["filtered"] = False
+        
+        return info
 

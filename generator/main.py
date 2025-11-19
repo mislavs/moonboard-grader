@@ -114,6 +114,11 @@ def train_command(args):
         print(f"   Unique grades: {num_grades}")
         print(f"   Grade range: {', '.join(dataset.grade_names)}")
         
+        # Extract filtering metadata from dataset
+        grade_offset = dataset.grade_offset
+        min_grade_index = dataset.min_grade_index
+        max_grade_index = dataset.max_grade_index
+        
         # Create model
         print(f"\n🧠 Creating model...")
         model_config = config['model']
@@ -135,7 +140,10 @@ def train_command(args):
             train_loader=train_loader,
             val_loader=val_loader,
             config=training_config,
-            device=device
+            device=device,
+            grade_offset=grade_offset,
+            min_grade_index=min_grade_index,
+            max_grade_index=max_grade_index
         )
         
         # Load checkpoint if resuming

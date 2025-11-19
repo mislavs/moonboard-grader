@@ -46,6 +46,8 @@ class MoonBoardDataset(Dataset):
         self.transform = transform
         self.min_grade_index = min_grade_index
         self.max_grade_index = max_grade_index
+        # Store grade_offset for checkpoint metadata
+        self.grade_offset = min_grade_index if min_grade_index is not None else 0
         
         # Load and filter dataset
         logger.info(f"Loading dataset from {data_path}")

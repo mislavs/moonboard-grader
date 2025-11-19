@@ -105,6 +105,11 @@ class ProblemGenerator:
         self.model.eval()
         self.device = device
         self.threshold = threshold
+        
+        # Grade filtering metadata (set when loading from checkpoint)
+        self.grade_offset = 0
+        self.min_grade_index = None
+        self.max_grade_index = None
     
     @classmethod
     def from_checkpoint(
@@ -162,11 +167,25 @@ class ProblemGenerator:
             # Load weights
             model.load_state_dict(model_state)
             
+            # Extract filtering metadata from checkpoint (backward compatible)
+            grade_offset = checkpoint.get('grade_offset', 0)
+            min_grade_index = checkpoint.get('min_grade_index', None)
+            max_grade_index = checkpoint.get('max_grade_index', None)
+            
             logger.info(f"Loaded model from {checkpoint_path}")
             logger.info(f"  Epoch: {checkpoint.get('epoch', 'unknown')}")
             logger.info(f"  Latent dim: {model_config.get('latent_dim', 128)}")
+            if min_grade_index is not None and max_grade_index is not None:
+                from moonboard_core.grade_encoder import decode_grade
+                logger.info(f"  Filtered model: grades {decode_grade(min_grade_index)}-{decode_grade(max_grade_index)}")
             
-            return cls(model, device=device, threshold=threshold)
+            # Create instance and store metadata
+            instance = cls(model, device=device, threshold=threshold)
+            instance.grade_offset = grade_offset
+            instance.min_grade_index = min_grade_index
+            instance.max_grade_index = max_grade_index
+            
+            return instance
             
         except (KeyError, RuntimeError) as e:
             raise RuntimeError(f"Failed to load checkpoint: {e}")

@@ -5,7 +5,7 @@ Training loop for the Conditional VAE.
 import logging
 import time
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 import torch
 import torch.optim as optim
@@ -36,13 +36,21 @@ class VAETrainer:
         train_loader, 
         val_loader, 
         config: Dict, 
-        device: str = 'cpu'
+        device: str = 'cpu',
+        grade_offset: int = 0,
+        min_grade_index: Optional[int] = None,
+        max_grade_index: Optional[int] = None
     ):
         self.model = model.to(device)
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.config = config
         self.device = device
+        
+        # Grade filtering metadata (for checkpoint saving)
+        self.grade_offset = grade_offset
+        self.min_grade_index = min_grade_index
+        self.max_grade_index = max_grade_index
         
         # Training hyperparameters
         self.learning_rate = config.get('learning_rate', 1e-3)
@@ -257,7 +265,10 @@ class VAETrainer:
                 'latent_dim': self.model.latent_dim,
                 'num_grades': self.model.num_grades,
                 'grade_embedding_dim': self.model.grade_embedding_dim,
-            }
+            },
+            'grade_offset': self.grade_offset,
+            'min_grade_index': self.min_grade_index,
+            'max_grade_index': self.max_grade_index
         }
         
         checkpoint_path = self.checkpoint_dir / filename
