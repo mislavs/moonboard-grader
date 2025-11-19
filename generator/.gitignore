@@ -23,6 +23,7 @@ models/*.pth
 models/*.pt
 models/*.ckpt
 !models/.gitkeep
+models/*.png
 
 # Training outputs
 logs/
