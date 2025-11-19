@@ -56,23 +56,27 @@ def unloaded_predictor_service(tmp_path: Path) -> PredictorService:
 
 
 @pytest.fixture
-def app_with_loaded_model(predictor_service: PredictorService) -> Generator:
+def app_with_loaded_model(predictor_service: PredictorService, generator_service) -> Generator:
     """Create test app with loaded model."""
     app = create_application()
     set_predictor_service(predictor_service)
+    set_generator_service(generator_service)
     yield app
     # Cleanup
     set_predictor_service(None)
+    set_generator_service(None)
 
 
 @pytest.fixture
-def app_with_unloaded_model(unloaded_predictor_service: PredictorService) -> Generator:
+def app_with_unloaded_model(unloaded_predictor_service: PredictorService, unloaded_generator_service) -> Generator:
     """Create test app with unloaded model."""
     app = create_application()
     set_predictor_service(unloaded_predictor_service)
+    set_generator_service(unloaded_generator_service)
     yield app
     # Cleanup
     set_predictor_service(None)
+    set_generator_service(None)
 
 
 @pytest.fixture
@@ -223,7 +227,6 @@ def generator_service(mock_generator, tmp_path: Path) -> GeneratorService:
     service = GeneratorService(model_path=model_path, device="cpu")
     service._generator = mock_generator
     service._is_loaded = True
-    service._min_grade_index = 2  # Matches the filtered training (6A+)
     
     return service
 

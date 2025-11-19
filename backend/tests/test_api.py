@@ -34,6 +34,7 @@ class TestHealthEndpoint:
         data = response.json()
         assert data["status"] == "healthy"
         assert data["model_loaded"] is True
+        assert data["generator_model_loaded"] is True
     
     def test_health_with_unloaded_model(self, client_with_unloaded_model):
         """Test health check when model is not loaded."""
@@ -41,8 +42,9 @@ class TestHealthEndpoint:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["status"] == "healthy"
+        assert data["status"] == "degraded"  # Service is degraded when models not loaded
         assert data["model_loaded"] is False
+        assert data["generator_model_loaded"] is False
 
 
 class TestModelInfoEndpoint:
@@ -711,7 +713,7 @@ class TestGenerationEndpoint:
         # Note: The service converts grade string to label and calls generate_with_retry
         mock_generator.generate_with_retry.assert_called_once()
         call_args = mock_generator.generate_with_retry.call_args
-        assert call_args.kwargs['grade_label'] == 0  # 6A+ maps to label 0 in filtered model (starting from min_grade_index=2)
+        assert call_args.kwargs['grade_label'] == 2  # 6A+ is at global index 2 (no remapping)
         assert call_args.kwargs['temperature'] == 1.0
         assert call_args.kwargs['max_attempts'] == 10
     

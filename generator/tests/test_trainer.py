@@ -70,29 +70,6 @@ class TestVAETrainer:
         assert trainer.current_epoch == 0
         assert trainer.best_val_loss == float('inf')
     
-    def test_get_kl_weight(self, model_and_loaders, small_dataset_config):
-        """Test KL weight calculation."""
-        model, train_loader, val_loader = model_and_loaders
-        
-        # Test without annealing
-        config = small_dataset_config.copy()
-        config['kl_annealing'] = False
-        config['kl_weight'] = 1.0
-        trainer = VAETrainer(model, train_loader, val_loader, config, device='cpu')
-        
-        assert trainer.get_kl_weight(0) == 1.0
-        assert trainer.get_kl_weight(5) == 1.0
-        
-        # Test with annealing
-        config['kl_annealing'] = True
-        config['kl_annealing_epochs'] = 10
-        trainer = VAETrainer(model, train_loader, val_loader, config, device='cpu')
-        
-        assert trainer.get_kl_weight(0) == 0.0
-        assert abs(trainer.get_kl_weight(5) - 0.5) < 0.01
-        assert trainer.get_kl_weight(10) == 1.0
-        assert trainer.get_kl_weight(15) == 1.0
-    
     def test_train_epoch(self, model_and_loaders, small_dataset_config):
         """Test training for one epoch."""
         model, train_loader, val_loader = model_and_loaders

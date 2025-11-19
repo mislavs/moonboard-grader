@@ -140,10 +140,11 @@ class TestHealthResponseModel:
     
     def test_valid_health_response(self):
         """Test creating a valid health response."""
-        response = HealthResponse(status="healthy", model_loaded=True)
+        response = HealthResponse(status="healthy", model_loaded=True, generator_model_loaded=True)
         
         assert response.status == "healthy"
         assert response.model_loaded is True
+        assert response.generator_model_loaded is True
 
 
 class TestModelInfoResponseModel:

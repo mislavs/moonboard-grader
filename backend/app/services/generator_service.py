@@ -30,8 +30,8 @@ def _get_generator_classes():
 
 def _get_grade_functions():
     """Import and return grade encoding functions (lazy import)."""
-    from moonboard_core import encode_grade, decode_grade, remap_label
-    return encode_grade, decode_grade, remap_label
+    from moonboard_core import encode_grade, decode_grade
+    return encode_grade, decode_grade
 
 
 class GeneratorService:
@@ -53,7 +53,6 @@ class GeneratorService:
         self.device = device or settings.device
         self._generator: Optional[Any] = None  # ProblemGenerator instance
         self._is_loaded = False
-        self._min_grade_index: int = 0  # For filtered models, the offset for label remapping
         
     def load_model(self) -> None:
         """
@@ -74,61 +73,24 @@ class GeneratorService:
         try:
             import torch
             
-            # Load checkpoint to extract data config
+            # Load checkpoint to check model configuration
             checkpoint = torch.load(
                 str(self.model_path),
                 map_location=self.device,
                 weights_only=False
             )
             
-            # Extract min_grade_index for label remapping (for filtered models)
-            # Check both 'data_config' and 'config.data' for compatibility
-            if 'data_config' in checkpoint:
-                data_config = checkpoint['data_config']
-            elif 'config' in checkpoint and 'data' in checkpoint['config']:
-                data_config = checkpoint['config']['data']
-            else:
-                data_config = {}
+            # Log model info for debugging
+            model_config = checkpoint.get('model_config', {})
+            num_grades = model_config.get('num_grades', 'unknown')
+            logger.info(f"Model has num_grades={num_grades} (should be 19 for new models)")
             
-            # Get min_grade_index from config, or infer from model architecture
-            if 'min_grade_index' in data_config:
-                self._min_grade_index = data_config['min_grade_index']
-            else:
-                # Infer num_grades from model state dict (grade_embedding.weight shape)
-                model_state = checkpoint.get('model_state_dict', {})
-                if 'grade_embedding.weight' in model_state:
-                    num_grades = model_state['grade_embedding.weight'].shape[0]
-                    logger.info(f"Inferred num_grades={num_grades} from model state")
-                else:
-                    # Fallback to model_config
-                    model_config = checkpoint.get('model_config', {})
-                    num_grades = model_config.get('num_grades', 17)
-                
-                if num_grades == 1:
-                    # Single grade model - likely 6A+ only (index 2)
-                    self._min_grade_index = 2
-                    logger.info("Detected single-grade model, assuming 6A+ only (min_grade_index=2)")
-                elif num_grades == 10:
-                    # Filtered model (6A+ to 7C) - most common case
-                    self._min_grade_index = 2  # 6A+ is at index 2 in full grade list
-                    logger.info("Detected 10-grade model, assuming filtered 6A+ to 7C (min_grade_index=2)")
-                elif num_grades == 17:
-                    # Full model with all grades except extremes
-                    self._min_grade_index = 1  # Starts at 6A (index 1)
-                    logger.info("Detected 17-grade model (min_grade_index=1)")
-                elif num_grades == 19:
-                    # Full model with all grades including 5+
-                    self._min_grade_index = 0
-                    logger.info("Detected 19-grade model, full range 5+ to 8C+ (min_grade_index=0)")
-                else:
-                    # Unknown configuration, assume no offset
-                    self._min_grade_index = 0
-                    logger.warning(
-                        f"Unknown num_grades={num_grades}, assuming min_grade_index=0. "
-                        "Generation may fail if model was trained on filtered grades."
-                    )
-            
-            logger.info(f"Model min_grade_index={self._min_grade_index}")
+            if num_grades != 19:
+                logger.warning(
+                    f"Model has {num_grades} grades instead of expected 19. "
+                    "This may be an old model trained before the grade mapping fix. "
+                    "Consider retraining with the updated code."
+                )
             
             ProblemGenerator, _ = _get_generator_classes()
             self._generator = ProblemGenerator.from_checkpoint(
@@ -168,23 +130,19 @@ class GeneratorService:
         
         try:
             # Import grade encoding functions
-            encode_grade, decode_grade, remap_label = _get_grade_functions()
+            encode_grade, decode_grade = _get_grade_functions()
             _, format_problem_output = _get_generator_classes()
             
-            # Encode grade to full label index
-            full_grade_label = encode_grade(grade)
-            
-            # Remap to filtered model index if needed
-            model_grade_label = remap_label(full_grade_label, self._min_grade_index)
+
+            grade_label = encode_grade(grade)
             
             logger.info(
-                f"Generating problem at grade {grade} "
-                f"(full label {full_grade_label}, model label {model_grade_label})"
+                f"Generating problem at grade {grade} (label {grade_label})"
             )
             
             # Generate with retry to ensure valid problem
             problems = self._generator.generate_with_retry(
-                grade_label=model_grade_label,
+                grade_label=grade_label,
                 num_samples=1,
                 max_attempts=max_attempts,
                 temperature=temperature

@@ -84,13 +84,23 @@ class TestMoonBoardDataset:
     
     def test_custom_grade_filter(self, data_path):
         """Test dataset with grade filtering (6A to 6B+)."""
+        from moonboard_core.grade_encoder import get_all_grades
+        
         # Filter to grades 1-4 (6A, 6A+, 6B, 6B+)
         dataset = MoonBoardDataset(data_path, min_grade_index=1, max_grade_index=4)
         
-        assert dataset.get_num_grades() == 4
-        # Check grade names are correct
-        assert '6A' in dataset.grade_names
-        assert '6B+' in dataset.grade_names
+        assert dataset.get_num_grades() == len(get_all_grades())
+        # Check grade names include all grades (not just filtered ones)
+        assert dataset.grade_names == get_all_grades()
+        # But the actual dataset only contains filtered grades
+        # Verify by checking labels in the dataset
+        labels_in_dataset = set()
+        for i in range(min(100, len(dataset))):  # Check first 100 items
+            _, label = dataset[i]
+            labels_in_dataset.add(label)
+        # All labels should be within the filtered range
+        for label in labels_in_dataset:
+            assert 1 <= label <= 4, f"Label {label} outside filtered range [1, 4]"
     
     def test_multiple_items(self, dataset):
         """Test getting multiple items from the dataset."""
@@ -101,6 +111,35 @@ class TestMoonBoardDataset:
             if isinstance(grade_label, torch.Tensor):
                 grade_label = grade_label.item()
             assert 0 <= grade_label < len(dataset.grade_to_label)
+    
+    def test_grade_label_consistency(self, data_path):
+        """Ensure dataset uses same grade labels as moonboard_core."""
+        from moonboard_core.grade_encoder import encode_grade, get_all_grades
+        
+        # Create dataset
+        dataset = MoonBoardDataset(data_path)
+        
+        # Verify grade_names matches global list
+        assert dataset.grade_names == get_all_grades(), \
+            "Dataset grade_names should match global moonboard_core grade list"
+        
+        # Verify specific grades map to same index everywhere
+        test_grades = ["6A", "6B", "6B+", "7A"]
+        for grade in test_grades:
+            global_idx = encode_grade(grade)
+            dataset_idx = dataset.grade_to_label[grade]
+            assert global_idx == dataset_idx, \
+                f"Grade {grade} has inconsistent indices: global={global_idx}, dataset={dataset_idx}"
+        
+        # Verify the mapping is bijective (no collisions)
+        assert len(dataset.grade_to_label) == len(dataset.label_to_grade), \
+            "Grade mappings should be bijective"
+        
+        # Verify all grades can be decoded
+        for label in range(len(dataset.grade_names)):
+            grade_name = dataset.label_to_grade[label]
+            assert grade_name in dataset.grade_to_label, \
+                f"Label {label} maps to {grade_name} which is not in grade_to_label"
 
 
 class TestDataLoaders:

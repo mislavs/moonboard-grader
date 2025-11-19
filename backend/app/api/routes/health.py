@@ -36,18 +36,21 @@ async def health_check(
     
     Returns the service status and whether the models are loaded.
     Status will be "healthy" if both models are loaded, "degraded" otherwise.
+    
+    Note: This endpoint requires both services to be initialized.
+    It will return 503 if services are not set up.
     """
     predictor_loaded = predictor_service.is_loaded
     generator_loaded = generator_service.is_loaded
     
     # Determine overall status
     if predictor_loaded and generator_loaded:
-        status = "healthy"
+        status_value = "healthy"
     else:
-        status = "degraded"
+        status_value = "degraded"
     
     return HealthResponse(
-        status=status,
+        status=status_value,
         model_loaded=predictor_loaded,
         generator_model_loaded=generator_loaded
     )

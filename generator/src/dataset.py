@@ -8,7 +8,7 @@ from typing import Optional, Tuple, Callable, List, Dict
 import torch
 from torch.utils.data import Dataset
 from moonboard_core.data_processor import load_dataset, filter_dataset_by_grades
-from moonboard_core.grade_encoder import get_filtered_grade_names, decode_grade
+from moonboard_core.grade_encoder import get_filtered_grade_names, decode_grade, get_all_grades
 
 logger = logging.getLogger(__name__)
 
@@ -66,17 +66,19 @@ class MoonBoardDataset(Dataset):
         return full_dataset
     
     def _build_grade_mappings(self) -> Tuple[List[str], Dict[str, int], Dict[int, str]]:
-        """Build grade name and label mappings."""
-        if self.min_grade_index is not None and self.max_grade_index is not None:
-            # Filtered range
-            grade_names = get_filtered_grade_names(self.min_grade_index, self.max_grade_index)
-        else:
-            # Full dataset
-            all_labels = sorted(set(label for _, label in self.dataset))
-            grade_names = [decode_grade(label) for label in all_labels]
+        """
+        Build grade name and label mappings using moonboard_core as source of truth.
         
+        Always uses the full global grade list to ensure consistent label indices
+        across training and inference, regardless of which grades are in the dataset.
+        """
+        # Always use full global grade list (19 grades: 5+ through 8C+)
+        grade_names = get_all_grades()
+        
+        # Create bidirectional mappings using global indices
         grade_to_label = {grade: idx for idx, grade in enumerate(grade_names)}
         label_to_grade = {idx: grade for idx, grade in enumerate(grade_names)}
+        
         return grade_names, grade_to_label, label_to_grade
         
     def __len__(self):
@@ -92,35 +94,21 @@ class MoonBoardDataset(Dataset):
             
         Returns:
             grid_tensor: Tensor of shape (3, 18, 11) with hold positions
-            grade_label: Integer label for the grade (always 0-based, remapped if filtered)
+            grade_label: Integer label for the grade (global moonboard_core index, not remapped)
         """
         # Get grid and label from processed dataset
-        grid_array, original_label = self.dataset[idx]
+        grid_array, grade_label = self.dataset[idx]
         
         # Convert to PyTorch tensor
         grid_tensor = torch.from_numpy(grid_array).float()
         
-        # Always remap label to 0-based index using the grade mapping
-        # This ensures labels are always in range [0, num_grades-1]
-        if self.min_grade_index is not None:
-            # Filtered: remap by subtracting offset
-            grade_label = original_label - self.min_grade_index
-        else:
-            # Not filtered: convert original label to grade string, then map to 0-based index
-            grade_str = decode_grade(original_label)
-            if grade_str not in self.grade_to_label:
-                raise ValueError(
-                    f"Grade '{grade_str}' (label {original_label}) not found in dataset. "
-                    f"Available grades: {list(self.grade_to_label.keys())}"
-                )
-            grade_label = self.grade_to_label[grade_str]
-        
-        # Validate label is within bounds (safety check)
+        # Validate label is within global range
         num_grades = len(self.grade_to_label)
         if grade_label < 0 or grade_label >= num_grades:
+            grade_str = decode_grade(grade_label)
             raise ValueError(
-                f"Invalid grade label {grade_label} (original: {original_label}). "
-                f"Must be in range [0, {num_grades-1}]"
+                f"Invalid grade label {grade_label} ({grade_str}). "
+                f"Must be in global range [0, {num_grades-1}]"
             )
         
         # Apply transform if provided

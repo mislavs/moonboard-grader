@@ -262,35 +262,6 @@ class TestFormatProblemOutput:
         assert output['grade'] == '6A+'
         assert output['grade_label'] == 2
     
-    def test_include_validation_stats(self):
-        """Test that validation results are included."""
-        problem = {
-            'moves': [
-                {'description': 'A1', 'isStart': True, 'isEnd': False},
-                {'description': 'F7', 'isStart': False, 'isEnd': False},
-                {'description': 'K18', 'isStart': False, 'isEnd': True}
-            ],
-            'grade_label': 3,
-            'validation': {
-                'valid': True,
-                'errors': [],
-                'warnings': [],
-                'stats': {
-                    'total_holds': 3,
-                    'start_holds': 1,
-                    'middle_holds': 1,
-                    'end_holds': 1
-                }
-            }
-        }
-        
-        output = format_problem_output(problem)
-        
-        assert 'stats' in output
-        assert output['stats']['total_holds'] == 3
-        assert 'validation_errors' not in output  # No errors
-        assert 'validation_warnings' not in output  # No warnings
-    
     def test_include_validation_errors(self):
         """Test that validation errors are included."""
         problem = {

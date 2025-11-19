@@ -13,7 +13,6 @@ data:
 # Model architecture
 model:
   latent_dim: 128
-  num_grades: 1  # Will be automatically set to 1 since we filter to one grade
   grade_embedding_dim: 32
 
 # Training hyperparameters

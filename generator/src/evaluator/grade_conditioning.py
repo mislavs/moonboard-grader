@@ -89,23 +89,7 @@ def evaluate_grade_conditioning(
     
     # Get number of grades from model
     num_grades = model.num_grades
-    
-    # Load dataset to get grade mappings (we don't need the data loader itself)
-    # This is needed to convert numeric labels to grade names (e.g., "6A+")
-    try:
-        from ..dataset import MoonBoardDataset
         
-        # Load dataset metadata for grade mapping
-        # Use the project data directory
-        dataset = None
-        data_path = Path(__file__).parents[3] / 'data' / 'problems.json'
-        if data_path.exists():
-            dataset = MoonBoardDataset(str(data_path))
-            logger.debug(f"Loaded dataset for grade mapping from {data_path}")
-    except Exception as e:
-        logger.warning(f"Could not load dataset for grade mapping: {e}")
-        dataset = None
-    
     # Results per grade
     results_per_grade = {}
     
@@ -210,25 +194,18 @@ def evaluate_grade_conditioning(
         )
     
     # Convert numeric labels to grade names for per_grade results
+    from moonboard_core.grade_encoder import decode_grade
+    
     per_grade_with_names = {}
     for grade_label, stats in results_per_grade.items():
-        if dataset is not None:
-            grade_name = dataset.get_grade_from_label(int(grade_label))
-            if grade_name is None:
-                grade_name = f"Grade_{int(grade_label)}"
-        else:
-            grade_name = f"Grade_{int(grade_label)}"
+        # Use global decoder directly
+        grade_name = decode_grade(int(grade_label))
         
         # Convert prediction_distribution numeric labels to grade names
         if 'prediction_distribution' in stats:
             pred_dist_with_names = {}
             for pred_label, count in stats['prediction_distribution'].items():
-                if dataset is not None:
-                    pred_grade_name = dataset.get_grade_from_label(int(pred_label))
-                    if pred_grade_name is None:
-                        pred_grade_name = f"Grade_{int(pred_label)}"
-                else:
-                    pred_grade_name = f"Grade_{int(pred_label)}"
+                pred_grade_name = decode_grade(int(pred_label))
                 pred_dist_with_names[pred_grade_name] = count
             stats['prediction_distribution'] = pred_dist_with_names
         

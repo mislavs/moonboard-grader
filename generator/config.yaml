@@ -10,14 +10,13 @@ data:
 # Model architecture
 model:
   latent_dim: 128
-  num_grades: 17  # Will be determined from data automatically
   grade_embedding_dim: 32
 
 # Training hyperparameters
 training:
   num_epochs: 50
-  learning_rate: 0.001
-  kl_weight: 0.1  # Reduced from 1.0 to prevent KL from dominating
+  learning_rate: 0.0005
+  kl_weight: 0.01  # Reduced from 1.0 to prevent KL from dominating
   kl_annealing: true  # Gradually increase KL weight from 0.01 to kl_weight
   kl_annealing_epochs: 10  # Number of epochs to anneal over
 
