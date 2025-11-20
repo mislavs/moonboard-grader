@@ -533,6 +533,9 @@ def _print_metric_results(results: Dict, indent: int = 0):
                 elif 'exact_accuracy' in sample_value or 'tolerance_1_accuracy' in sample_value:
                     # Grade conditioning metric
                     _print_grade_conditioning_table(value, indent + 2)
+                elif 'exact_match_percent' in sample_value or 'off_by_one_percent' in sample_value:
+                    # Classifier check metric
+                    _print_classifier_check_table(value, indent + 2)
                 else:
                     # Unknown format, print as nested dict
                     _print_metric_results(value, indent + 2)
@@ -727,6 +730,53 @@ def _print_per_statistic_table(statistic_data: Dict, indent: int = 0):
                 row = f"{prefix}{stat_name:<20} {mean_val:<12.4f} {std_val:<12.4f} {min_val:<12.4f} {max_val:<12.4f}"
             
             print(row)
+    
+    print(separator)
+
+
+def _print_classifier_check_table(grade_data: Dict, indent: int = 0):
+    """
+    Print classifier check statistics as a formatted table.
+    
+    Args:
+        grade_data: Dictionary mapping grade names to classifier check metrics
+        indent: Indentation level
+    """
+    prefix = " " * indent
+    
+    # Table header
+    header = f"{prefix}{'Grade':<8} {'Exact':<10} {'Off±1':<10} {'Off±2':<10} {'Off>2':<10} {'Classified':<15}"
+    separator = f"{prefix}{'-' * 63}"
+    
+    print(separator)
+    print(header)
+    print(separator)
+    
+    # Sort grades by their keys for consistent display
+    for grade, stats in sorted(grade_data.items()):
+        exact = stats.get('exact_match_percent', 0.0)
+        off1 = stats.get('off_by_one_percent', 0.0)
+        off2 = stats.get('off_by_two_percent', 0.0)
+        off_more = stats.get('off_more_percent', 0.0)
+        generated = stats.get('generated_count', 0)
+        classified = stats.get('classified_count', 0)
+        
+        exact_str = f"{exact:.1f}%"
+        off1_str = f"{off1:.1f}%"
+        off2_str = f"{off2:.1f}%"
+        off_more_str = f"{off_more:.1f}%"
+        classified_str = f"{classified}/{generated}"
+        
+        row = f"{prefix}{grade:<8} {exact_str:<10} {off1_str:<10} {off2_str:<10} {off_more_str:<10} {classified_str:<15}"
+        print(row)
+        
+        # Print prediction distribution if available
+        if 'prediction_distribution' in stats and stats['prediction_distribution']:
+            pred_dist = stats['prediction_distribution']
+            # Sort by count (descending) and format as: "Predicted: 6B(35), 6A+(28), 6C(20)"
+            sorted_preds = sorted(pred_dist.items(), key=lambda x: x[1], reverse=True)
+            pred_str = ", ".join([f"{pred}({count})" for pred, count in sorted_preds[:5]])  # Top 5
+            print(f"{prefix}  └─ Predicted: {pred_str}")
     
     print(separator)
 

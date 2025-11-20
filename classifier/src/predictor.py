@@ -348,27 +348,44 @@ class Predictor:
         results = []
         probs_array = probabilities.cpu().numpy()
         
+        # Import for unmapping
+        from moonboard_core.grade_encoder import unmap_label, get_filtered_grade_names
+        
         for sample_probs in probs_array:
             # Get predicted class and confidence
             predicted_label = int(np.argmax(sample_probs))
             confidence = float(sample_probs[predicted_label])
             
+            if self.grade_offset > 0:
+                # Model outputs 0-10 (for 11 classes), need to map back to original indices
+                unmapped_label = unmap_label(predicted_label, self.grade_offset)
+            else:
+                unmapped_label = predicted_label
+            
             # Get all probabilities as dict
             all_probs = {}
-            for label, prob in enumerate(sample_probs):
-                grade = decode_grade(label)
+            for model_label, prob in enumerate(sample_probs):
+                if self.grade_offset > 0:
+                    original_label = unmap_label(model_label, self.grade_offset)
+                    grade = decode_grade(original_label)
+                else:
+                    grade = decode_grade(model_label)
                 all_probs[grade] = float(prob)
             
             # Get top-k predictions
             top_k_indices = np.argsort(sample_probs)[-return_top_k:][::-1]
-            top_k_predictions = [
-                (decode_grade(int(idx)), float(sample_probs[idx]))
-                for idx in top_k_indices
-            ]
+            top_k_predictions = []
+            for idx in top_k_indices:
+                if self.grade_offset > 0:
+                    original_label = unmap_label(int(idx), self.grade_offset)
+                    grade = decode_grade(original_label)
+                else:
+                    grade = decode_grade(int(idx))
+                top_k_predictions.append((grade, float(sample_probs[idx])))
             
             results.append({
-                'predicted_grade': decode_grade(predicted_label),
-                'predicted_label': predicted_label,
+                'predicted_grade': decode_grade(unmapped_label),
+                'predicted_label': unmapped_label,
                 'confidence': confidence,
                 'all_probabilities': all_probs,
                 'top_k_predictions': top_k_predictions
