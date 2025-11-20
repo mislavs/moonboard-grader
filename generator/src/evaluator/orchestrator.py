@@ -9,7 +9,6 @@ from .diversity import evaluate_diversity
 from .statistical import evaluate_statistical_similarity
 from .latent_space import evaluate_latent_space
 from .latent_visualization import evaluate_latent_visualization
-from .grade_conditioning import evaluate_grade_conditioning
 from .classifier_check import evaluate_classifier_check
 
 
@@ -20,7 +19,6 @@ METRIC_FUNCTIONS = {
     'statistical': evaluate_statistical_similarity,
     'latent_space': evaluate_latent_space,
     'latent_visualization': evaluate_latent_visualization,
-    'grade_conditioning': evaluate_grade_conditioning,
     'classifier_check': evaluate_classifier_check
 }
 
@@ -46,8 +44,6 @@ def get_metrics() -> List[str]:
             elif metric_name == 'latent_visualization':
                 result = metric_func(None, None, 'cpu', None)
             elif metric_name in ['statistical']:
-                result = metric_func(None, None, None, 'cpu')
-            elif metric_name in ['grade_conditioning']:
                 result = metric_func(None, None, None, 'cpu')
             elif metric_name in ['classifier_check']:
                 result = metric_func(None, None, None, None, 'cpu')
@@ -110,8 +106,6 @@ def run_evaluation(
             results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, device)
         elif metric == 'latent_visualization':
             results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, device, checkpoint_path)
-        elif metric == 'grade_conditioning':
-            results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, classifier_checkpoint, num_samples, device)
         elif metric == 'classifier_check':
             results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, checkpoint_path, classifier_checkpoint, num_samples, device)
     

@@ -530,9 +530,6 @@ def _print_metric_results(results: Dict, indent: int = 0):
                 elif 'wasserstein_distances' in sample_value or 'mean_distance' in sample_value:
                     # Statistical metric
                     _print_grade_statistical_table(value, indent + 2)
-                elif 'exact_accuracy' in sample_value or 'tolerance_1_accuracy' in sample_value:
-                    # Grade conditioning metric
-                    _print_grade_conditioning_table(value, indent + 2)
                 elif 'exact_match_percent' in sample_value or 'off_by_one_percent' in sample_value:
                     # Classifier check metric
                     _print_classifier_check_table(value, indent + 2)
@@ -815,63 +812,6 @@ def _print_grade_centroids_table(centroid_data: Dict, indent: int = 0):
     print(f"{prefix}Note: Full {len(next(iter(centroid_data.values()))['mean'])}-dimensional centroid vectors available in JSON output")
 
 
-def _print_grade_conditioning_table(grade_data: Dict, indent: int = 0):
-    """
-    Print per-grade conditioning accuracy statistics as a formatted table.
-    
-    Args:
-        grade_data: Dictionary mapping grade names to conditioning accuracy metrics
-        indent: Indentation level
-    """
-    prefix = " " * indent
-    
-    # Table header
-    header = f"{prefix}{'Grade':<8} {'Exact':<12} {'±1':<12} {'±2':<12} {'Valid/Req':<15} {'Status':<25}"
-    separator = f"{prefix}{'-' * 84}"
-    
-    print(separator)
-    print(header)
-    print(separator)
-    
-    # Sort grades by their keys for consistent display
-    for grade, stats in sorted(grade_data.items()):
-        if stats.get('skipped', False):
-            # Skipped grade
-            reason = stats.get('reason', 'unknown')
-            num_valid = stats.get('num_valid', 0)
-            num_requested = stats.get('num_requested', stats.get('num_generated', 0))  # Fallback for old data
-            status = f"SKIPPED ({reason[:15]}...)" if len(reason) > 15 else f"SKIPPED ({reason})"
-            row = f"{prefix}{grade:<8} {'-':<12} {'-':<12} {'-':<12} {f'{num_valid}/{num_requested}':<15} {status:<25}"
-        else:
-            # Valid grade
-            exact_acc = stats.get('exact_accuracy', 0.0)
-            tol1_acc = stats.get('tolerance_1_accuracy', 0.0)
-            tol2_acc = stats.get('tolerance_2_accuracy', 0.0)
-            num_valid = stats.get('num_valid', 0)
-            num_requested = stats.get('num_requested', stats.get('num_generated', 0))  # Fallback for old data
-            num_classified = stats.get('num_classified', num_valid)
-            
-            exact_str = f"{exact_acc:.1f}%"
-            tol1_str = f"{tol1_acc:.1f}%"
-            tol2_str = f"{tol2_acc:.1f}%"
-            valid_str = f"{num_classified}/{num_requested}"
-            status = "OK"
-            
-            row = f"{prefix}{grade:<8} {exact_str:<12} {tol1_str:<12} {tol2_str:<12} {valid_str:<15} {status:<25}"
-        
-        print(row)
-        
-        # Print prediction distribution if available
-        if 'prediction_distribution' in stats and stats['prediction_distribution']:
-            pred_dist = stats['prediction_distribution']
-            # Format as: "Predicted: 6A+(2), 6B(1), 6C(3)"
-            sorted_preds = sorted(pred_dist.items(), key=lambda x: x[1], reverse=True)
-            pred_str = ", ".join([f"{pred}({count})" for pred, count in sorted_preds])
-            print(f"{prefix}{'':8}   -> Predicted as: {pred_str}")
-    
-    print(separator)
-
-
 def main():
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
@@ -979,7 +919,7 @@ def main():
         '--classifier-checkpoint',
         type=str,
         default=None,
-        help='Path to classifier checkpoint (required for grade_conditioning metric)'
+        help='Path to classifier checkpoint (required for classifier_check metric)'
     )
     evaluate_parser.add_argument(
         '--metrics',
