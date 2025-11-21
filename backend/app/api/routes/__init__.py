@@ -17,4 +17,3 @@ router.include_router(problems_router)
 router.include_router(generation_router)
 
 __all__ = ["router"]
-

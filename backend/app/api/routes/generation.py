@@ -20,24 +20,27 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/generate", response_model=GenerateResponse, tags=["Generation"])
+@router.post(
+    "/generate", response_model=GenerateResponse, tags=["Generation"]
+)
 async def generate_problem(
     request: GenerateRequest,
     generator_service: GeneratorService = Depends(get_loaded_generator)
 ):
     """
     Generate a new climbing problem at the specified grade.
-    
-    Uses a Conditional VAE model to generate novel problems. The endpoint
-    will retry generation until a valid problem is produced (or max attempts reached).
-    
+
+    Uses a Conditional VAE model to generate novel problems.
+    The endpoint will retry generation until a valid problem is produced
+    (or max attempts reached).
+
     Args:
         request: Generation parameters including grade and temperature
         generator_service: Injected generator service (dependency)
-        
+
     Returns:
         Generated problem with moves, grade, and statistics
-        
+
     Raises:
         HTTPException: If model is not loaded or generation fails
     """
@@ -45,14 +48,14 @@ async def generate_problem(
         logger.info(
             f"Generation request received for grade {request.grade}"
         )
-        
+
         # Generate problem with retry logic
         result = generator_service.generate_problem(
             grade=request.grade,
             temperature=request.temperature,
             max_attempts=10
         )
-        
+
         # Convert moves to ProblemMove schema
         moves = [
             ProblemMove(
@@ -62,19 +65,20 @@ async def generate_problem(
             )
             for move in result['moves']
         ]
-        
+
         # Build response
         response = GenerateResponse(
             moves=moves,
             grade=request.grade
         )
-        
+
         logger.info(
-            f"Successfully generated problem with {len(moves)} moves at grade {request.grade}"
+            f"Successfully generated problem with {len(moves)} moves "
+            f"at grade {request.grade}"
         )
-        
+
         return response
-        
+
     except ValueError as e:
         logger.error(f"Invalid generation parameters: {e}")
         raise HTTPException(
@@ -87,4 +91,3 @@ async def generate_problem(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Problem generation failed: {str(e)}"
         )
-

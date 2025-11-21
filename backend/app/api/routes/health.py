@@ -33,22 +33,22 @@ async def health_check(
 ):
     """
     Health check endpoint.
-    
+
     Returns the service status and whether the models are loaded.
     Status will be "healthy" if both models are loaded, "degraded" otherwise.
-    
+
     Note: This endpoint requires both services to be initialized.
     It will return 503 if services are not set up.
     """
     predictor_loaded = predictor_service.is_loaded
     generator_loaded = generator_service.is_loaded
-    
+
     # Determine overall status
     if predictor_loaded and generator_loaded:
         status_value = "healthy"
     else:
         status_value = "degraded"
-    
+
     return HealthResponse(
         status=status_value,
         model_loaded=predictor_loaded,
@@ -62,7 +62,7 @@ async def model_info(
 ):
     """
     Get information about the loaded model.
-    
+
     Returns model path, device, and existence status.
     """
     info = predictor_service.get_model_info()
@@ -71,4 +71,3 @@ async def model_info(
         device=info["device"],
         model_exists=info["model_exists"]
     )
-

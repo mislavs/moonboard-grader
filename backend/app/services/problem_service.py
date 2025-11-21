@@ -17,14 +17,17 @@ logger = logging.getLogger(__name__)
 # Import grade encoder from moonboard_core for consistent grade ordering
 try:
     import sys
+
     # Add moonboard_core to path if not already there
     moonboard_core_path = Path(__file__).parent.parent.parent.parent / "moonboard_core"
-    if moonboard_core_path.exists() and str(moonboard_core_path.parent) not in sys.path:
-        sys.path.insert(0, str(moonboard_core_path.parent))
+    core_parent = str(moonboard_core_path.parent)
+    if moonboard_core_path.exists() and core_parent not in sys.path:
+        sys.path.insert(0, core_parent)
     from moonboard_core.grade_encoder import encode_grade  # type: ignore
 except ImportError as e:
     logger.warning(f"Failed to import grade_encoder: {e}")
     # Fallback if moonboard_core not installed
+
     def encode_grade(grade: str) -> int:
         raise NotImplementedError("Grade encoder not available")
 
@@ -32,25 +35,26 @@ except ImportError as e:
 class ProblemService:
     """
     Service class for managing problem data.
-    
+
     Handles loading problem data from JSON and providing access methods.
     """
-    
+
     def __init__(self, problems_path: Optional[Path] = None):
         """
         Initialize the problem service.
-        
+
         Args:
-            problems_path: Path to the problems JSON file. Defaults to settings.problems_data_path
+            problems_path: Path to the problems JSON file.
+                Defaults to settings.problems_data_path
         """
         self.problems_path = problems_path or settings.problems_data_path
         self._problems_cache: Optional[List[Dict[str, Any]]] = None
         logger.info(f"ProblemService initialized with path: {self.problems_path}")
-    
+
     def _load_problems(self) -> None:
         """
         Load problems from JSON file into cache.
-        
+
         Raises:
             FileNotFoundError: If problems file doesn't exist
             json.JSONDecodeError: If JSON is invalid
@@ -60,145 +64,151 @@ class ProblemService:
             raise FileNotFoundError(
                 f"Problems data file not found at {self.problems_path}"
             )
-        
+
         logger.info(f"Loading problems from {self.problems_path}...")
-        
+
         try:
-            with open(self.problems_path, 'r', encoding='utf-8') as f:
+            with open(self.problems_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            
-            if 'data' not in data:
+
+            if "data" not in data:
                 raise KeyError("Problems JSON must have a 'data' key")
-            
-            self._problems_cache = data['data']
+
+            self._problems_cache = data["data"]
             logger.info(f"Loaded {len(self._problems_cache)} problems successfully")
-            
+
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON in problems file: {e}")
             raise
         except Exception as e:
             logger.error(f"Failed to load problems: {e}")
             raise
-    
+
     def _ensure_loaded(self) -> None:
         """Ensure problems are loaded into cache."""
         if self._problems_cache is None:
             self._load_problems()
-    
+
     @staticmethod
     def _extract_api_id(problem: Dict[str, Any]) -> Optional[int]:
         """
         Extract API ID from problem data.
-        
+
         Args:
             problem: Raw problem dictionary
-            
+
         Returns:
             API ID if present, None otherwise
         """
-        return problem.get('apiId')
-    
+        return problem.get("apiId")
+
     @staticmethod
     def _parse_problem_moves(moves_data: List[Dict[str, Any]]) -> List[ProblemMove]:
         """
         Parse raw move data into ProblemMove objects.
-        
+
         Args:
             moves_data: List of raw move dictionaries
-            
+
         Returns:
             List of ProblemMove objects
         """
         return [
             ProblemMove(
-                description=move.get('description', ''),
-                isStart=move.get('isStart', False),
-                isEnd=move.get('isEnd', False)
+                description=move.get("description", ""),
+                isStart=move.get("isStart", False),
+                isEnd=move.get("isEnd", False),
             )
             for move in moves_data
         ]
-    
+
     @staticmethod
-    def _is_grade_in_range(grade: str, grade_from: Optional[str], grade_to: Optional[str]) -> bool:
+    def _is_grade_in_range(
+        grade: str, grade_from: Optional[str], grade_to: Optional[str]
+    ) -> bool:
         """
         Check if a grade falls within the specified range.
-        
+
         Args:
             grade: The grade to check
             grade_from: Minimum grade (inclusive), None for no lower bound
             grade_to: Maximum grade (inclusive), None for no upper bound
-            
+
         Returns:
             True if grade is in range, False otherwise
         """
         try:
             grade_value = encode_grade(grade)
-            
+
             if grade_from is not None:
                 min_value = encode_grade(grade_from)
                 if grade_value < min_value:
                     return False
-            
+
             if grade_to is not None:
                 max_value = encode_grade(grade_to)
                 if grade_value > max_value:
                     return False
-            
+
             return True
         except (ValueError, NotImplementedError):
             # Invalid grade, exclude from results
             return False
-    
+
     def _create_problem_detail(self, problem: Dict[str, Any]) -> ProblemDetail:
         """
         Create ProblemDetail from raw problem data.
-        
+
         Args:
             problem: Raw problem dictionary
-            
+
         Returns:
             ProblemDetail object
         """
         api_id = self._extract_api_id(problem)
-        moves = self._parse_problem_moves(problem.get('moves', []))
-        
+        moves = self._parse_problem_moves(problem.get("moves", []))
+
         return ProblemDetail(
             id=api_id,
-            name=problem.get('name', 'Unnamed'),
-            grade=problem.get('grade', 'Unknown'),
-            setby=problem.get('setby', ''),
-            repeats=problem.get('repeats', 0),
-            isBenchmark=problem.get('isBenchmark', False),
-            moves=moves
+            name=problem.get("name", "Unnamed"),
+            grade=problem.get("grade", "Unknown"),
+            setby=problem.get("setby", ""),
+            repeats=problem.get("repeats", 0),
+            isBenchmark=problem.get("isBenchmark", False),
+            moves=moves,
         )
-    
+
     def get_all_problems(
-        self, 
-        page: int = 1, 
-        page_size: int = 20, 
+        self,
+        page: int = 1,
+        page_size: int = 20,
         benchmarks_only: Optional[bool] = None,
         grade_from: Optional[str] = None,
-        grade_to: Optional[str] = None
+        grade_to: Optional[str] = None,
     ) -> tuple[List[ProblemListItem], int]:
         """
-        Get list of all problems with basic info (ID, name, grade), with pagination support.
-        
+        Get list of all problems with basic info (ID, name, grade),
+        with pagination support.
+
         Args:
             page: Page number (1-indexed). Defaults to 1.
             page_size: Number of items per page. Defaults to 20.
-            benchmarks_only: Optional filter - True for only benchmarks, False for only non-benchmarks, None for all.
-            grade_from: Minimum grade (inclusive). Defaults to None (no lower bound).
-            grade_to: Maximum grade (inclusive). Defaults to None (no upper bound).
-        
+            benchmarks_only: Optional filter - True for only benchmarks,
+                False for only non-benchmarks, None for all.
+            grade_from: Minimum grade (inclusive).
+                Defaults to None (no lower bound).
+            grade_to: Maximum grade (inclusive).
+                Defaults to None (no upper bound).
+
         Returns:
             Tuple of (paginated list of ProblemListItem objects, total count)
-            
+
         Raises:
             FileNotFoundError: If problems file doesn't exist
             Exception: If loading or processing fails
         """
         self._ensure_loaded()
-        
+
         result = []
         for idx, problem in enumerate(self._problems_cache):
             try:
@@ -206,54 +216,56 @@ class ProblemService:
                 if api_id is None:
                     logger.warning(f"Problem at index {idx} missing apiId, skipping")
                     continue
-                
+
                 # Apply benchmark filter if specified
-                is_benchmark = problem.get('isBenchmark', False)
+                is_benchmark = problem.get("isBenchmark", False)
                 if benchmarks_only is not None:
                     if benchmarks_only and not is_benchmark:
                         continue
                     if not benchmarks_only and is_benchmark:
                         continue
-                
+
                 # Apply grade range filter if specified
-                problem_grade = problem.get('grade', 'Unknown')
+                problem_grade = problem.get("grade", "Unknown")
                 if grade_from is not None or grade_to is not None:
                     if not self._is_grade_in_range(problem_grade, grade_from, grade_to):
                         continue
-                
-                result.append(ProblemListItem(
-                    id=api_id,
-                    name=problem.get('name', 'Unnamed'),
-                    grade=problem_grade,
-                    isBenchmark=is_benchmark
-                ))
+
+                result.append(
+                    ProblemListItem(
+                        id=api_id,
+                        name=problem.get("name", "Unnamed"),
+                        grade=problem_grade,
+                        isBenchmark=is_benchmark,
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Error processing problem at index {idx}: {e}")
                 continue
-        
+
         # Calculate pagination
         total = len(result)
         offset = (page - 1) * page_size
-        paginated_result = result[offset:offset + page_size]
-        
+        paginated_result = result[offset : offset + page_size]
+
         return paginated_result, total
-    
+
     def get_problem_by_id(self, api_id: int) -> Optional[ProblemDetail]:
         """
         Get complete problem details by API ID.
-        
+
         Args:
             api_id: The API ID (problem.apiId) to search for
-            
+
         Returns:
             ProblemDetail object if found, None otherwise
-            
+
         Raises:
             FileNotFoundError: If problems file doesn't exist
             Exception: If loading fails
         """
         self._ensure_loaded()
-        
+
         # Find problem by problem.apiId
         for problem in self._problems_cache:
             if self._extract_api_id(problem) == api_id:
@@ -262,29 +274,29 @@ class ProblemService:
                 except Exception as e:
                     logger.error(f"Error processing problem with apiId {api_id}: {e}")
                     raise
-        
+
         # Problem not found
         return None
-    
+
     def reload(self) -> None:
         """
         Force reload of problems from disk.
-        
+
         Useful for testing or if the file has been updated.
         """
         self._problems_cache = None
         self._load_problems()
-    
+
     @property
     def is_loaded(self) -> bool:
         """Check if problems are loaded in cache."""
         return self._problems_cache is not None
-    
+
     @property
     def problem_count(self) -> int:
         """Get count of loaded problems."""
         return len(self._problems_cache) if self._problems_cache else 0
-    
+
     @staticmethod
     def _moves_to_key(move_list: List[ProblemMove]) -> tuple:
         """
@@ -292,35 +304,33 @@ class ProblemService:
         Sorted to make order-independent.
         """
         sorted_moves = sorted(
-            [(m.description, m.isStart, m.isEnd) for m in move_list],
-            key=lambda x: x[0]
+            [(m.description, m.isStart, m.isEnd) for m in move_list], key=lambda x: x[0]
         )
         return tuple(sorted_moves)
-    
+
     def find_duplicate_by_moves(self, moves: List[ProblemMove]) -> Optional[int]:
         """
         Find a problem with identical moves.
-        
+
         Uses linear search through all problems - O(n) complexity.
         Performance: ~100-200ms worst case for 44K problems.
-        
+
         Args:
             moves: List of ProblemMove objects to match
-            
+
         Returns:
             API ID of the matching problem, or None if not found
         """
         self._ensure_loaded()
-        
+
         target_key = self._moves_to_key(moves)
-        
+
         # Linear search through all problems
         for problem in self._problems_cache:
-            problem_moves = self._parse_problem_moves(problem.get('moves', []))
+            problem_moves = self._parse_problem_moves(problem.get("moves", []))
             problem_key = self._moves_to_key(problem_moves)
-            
+
             if problem_key == target_key:
                 return self._extract_api_id(problem)
-        
-        return None
 
+        return None

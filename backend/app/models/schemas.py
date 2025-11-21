@@ -10,11 +10,17 @@ from typing import List, Optional
 
 class Move(BaseModel):
     """Represents a single climbing hold/move for prediction requests."""
-    
-    description: str = Field(..., description="Hold position (e.g., 'A1', 'B5')")
-    isStart: bool = Field(default=False, description="Whether this is a starting hold")
-    isEnd: bool = Field(default=False, description="Whether this is a finishing hold")
-    
+
+    description: str = Field(
+        ..., description="Hold position (e.g., 'A1', 'B5')"
+    )
+    isStart: bool = Field(
+        default=False, description="Whether this is a starting hold"
+    )
+    isEnd: bool = Field(
+        default=False, description="Whether this is a finishing hold"
+    )
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -28,10 +34,17 @@ class Move(BaseModel):
 
 class ProblemRequest(BaseModel):
     """Request body for grade prediction."""
-    
-    moves: List[Move] = Field(..., description="List of holds/moves in the problem")
-    top_k: int = Field(default=3, ge=1, le=10, description="Number of top predictions to return")
-    
+
+    moves: List[Move] = Field(
+        ..., description="List of holds/moves in the problem"
+    )
+    top_k: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Number of top predictions to return"
+    )
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -48,21 +61,25 @@ class ProblemRequest(BaseModel):
 
 class TopKPrediction(BaseModel):
     """A single top-k prediction."""
-    
+
     grade: str = Field(..., description="Predicted grade")
-    probability: float = Field(..., ge=0.0, le=1.0, description="Prediction probability")
+    probability: float = Field(
+        ..., ge=0.0, le=1.0, description="Prediction probability"
+    )
 
 
 class PredictionResponse(BaseModel):
     """Response body for grade prediction."""
-    
+
     predicted_grade: str = Field(..., description="Most likely grade")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in prediction")
+    confidence: float = Field(
+        ..., ge=0.0, le=1.0, description="Confidence in prediction"
+    )
     top_k_predictions: List[TopKPrediction] = Field(
-        ..., 
+        ...,
         description="Top K most likely grades"
     )
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -80,21 +97,29 @@ class PredictionResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     """Health check response."""
-    
+
     status: str = Field(..., description="Service status")
-    model_loaded: bool = Field(..., description="Whether the predictor model is loaded")
-    generator_model_loaded: bool = Field(..., description="Whether the generator model is loaded")
-    
+    model_loaded: bool = Field(
+        ..., description="Whether the predictor model is loaded"
+    )
+    generator_model_loaded: bool = Field(
+        ..., description="Whether the generator model is loaded"
+    )
+
     model_config = ConfigDict(protected_namespaces=())
 
 
 class ModelInfoResponse(BaseModel):
     """Model information response."""
-    
+
     model_path: str = Field(..., description="Path to the loaded model")
-    device: str = Field(..., description="Device used for inference (cpu/cuda)")
-    model_exists: bool = Field(..., description="Whether the model file exists")
-    
+    device: str = Field(
+        ..., description="Device used for inference (cpu/cuda)"
+    )
+    model_exists: bool = Field(
+        ..., description="Whether the model file exists"
+    )
+
     model_config = ConfigDict(protected_namespaces=())
 
 
@@ -105,11 +130,17 @@ class ModelInfoResponse(BaseModel):
 
 class ProblemMove(BaseModel):
     """Move data from the problems JSON file (read-only from database)."""
-    
-    description: str = Field(..., description="Hold position (e.g., 'A1', 'B5')")
-    isStart: bool = Field(..., description="Whether this is a starting hold")
-    isEnd: bool = Field(..., description="Whether this is a finishing hold")
-    
+
+    description: str = Field(
+        ..., description="Hold position (e.g., 'A1', 'B5')"
+    )
+    isStart: bool = Field(
+        ..., description="Whether this is a starting hold"
+    )
+    isEnd: bool = Field(
+        ..., description="Whether this is a finishing hold"
+    )
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -122,13 +153,17 @@ class ProblemMove(BaseModel):
 
 
 class ProblemListItem(BaseModel):
-    """Basic problem information for list endpoint (lightweight response)."""
-    
+    """
+    Basic problem information for list endpoint (lightweight response).
+    """
+
     id: int = Field(..., description="Unique identifier for the problem")
     name: str = Field(..., description="Problem name")
     grade: str = Field(..., description="Problem grade")
-    isBenchmark: bool = Field(..., description="Whether this is a benchmark problem")
-    
+    isBenchmark: bool = Field(
+        ..., description="Whether this is a benchmark problem"
+    )
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -143,15 +178,21 @@ class ProblemListItem(BaseModel):
 
 class ProblemDetail(BaseModel):
     """Complete problem data for detail endpoint."""
-    
+
     id: int = Field(..., description="Unique identifier for the problem")
     name: str = Field(..., description="Problem name")
     grade: str = Field(..., description="Problem grade")
     setby: str = Field(..., description="Name of who set the problem")
-    repeats: int = Field(..., description="Number of times the problem has been repeated")
-    isBenchmark: bool = Field(..., description="Whether this is a benchmark problem")
-    moves: List[ProblemMove] = Field(..., description="List of moves in the problem")
-    
+    repeats: int = Field(
+        ..., description="Number of times the problem has been repeated"
+    )
+    isBenchmark: bool = Field(
+        ..., description="Whether this is a benchmark problem"
+    )
+    moves: List[ProblemMove] = Field(
+        ..., description="List of moves in the problem"
+    )
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -180,13 +221,17 @@ class ProblemDetail(BaseModel):
 
 class PaginatedProblemsResponse(BaseModel):
     """Paginated response for problems list endpoint."""
-    
-    items: List[ProblemListItem] = Field(..., description="List of problems for current page")
-    total: int = Field(..., description="Total number of problems across all pages")
+
+    items: List[ProblemListItem] = Field(
+        ..., description="List of problems for current page"
+    )
+    total: int = Field(
+        ..., description="Total number of problems across all pages"
+    )
     page: int = Field(..., ge=1, description="Current page number (1-indexed)")
     page_size: int = Field(..., ge=1, description="Number of items per page")
     total_pages: int = Field(..., ge=0, description="Total number of pages")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -213,9 +258,11 @@ class PaginatedProblemsResponse(BaseModel):
 
 class DuplicateCheckRequest(BaseModel):
     """Request body for checking duplicate problems."""
-    
-    moves: List[ProblemMove] = Field(..., description="List of moves to check for duplicates")
-    
+
+    moves: List[ProblemMove] = Field(
+        ..., description="List of moves to check for duplicates"
+    )
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -230,9 +277,13 @@ class DuplicateCheckRequest(BaseModel):
 
 class DuplicateCheckResponse(BaseModel):
     """Response for duplicate check endpoint."""
-    
-    exists: bool = Field(..., description="Whether a problem with these moves exists")
-    problem_id: Optional[int] = Field(None, description="ID of the matching problem if found")
+
+    exists: bool = Field(
+        ..., description="Whether a problem with these moves exists"
+    )
+    problem_id: Optional[int] = Field(
+        None, description="ID of the matching problem if found"
+    )
 
 
 # ============================================================================
@@ -242,10 +293,17 @@ class DuplicateCheckResponse(BaseModel):
 
 class GenerateRequest(BaseModel):
     """Request body for problem generation."""
-    
-    grade: str = Field(..., description="Font grade for the problem (e.g., '6A+', '7B')")
-    temperature: float = Field(default=1.0, ge=0.1, le=2.0, description="Sampling temperature (higher = more random)")
-    
+
+    grade: str = Field(
+        ..., description="Font grade for the problem (e.g., '6A+', '7B')"
+    )
+    temperature: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=2.0,
+        description="Sampling temperature (higher = more random)"
+    )
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -258,10 +316,14 @@ class GenerateRequest(BaseModel):
 
 class GenerateResponse(BaseModel):
     """Response body for problem generation."""
-    
-    moves: List[ProblemMove] = Field(..., description="List of moves in the generated problem")
-    grade: str = Field(..., description="Grade of the generated problem")
-    
+
+    moves: List[ProblemMove] = Field(
+        ..., description="List of moves in the generated problem"
+    )
+    grade: str = Field(
+        ..., description="Grade of the generated problem"
+    )
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {

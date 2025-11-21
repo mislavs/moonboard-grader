@@ -24,10 +24,10 @@ _generator_service: Optional[GeneratorService] = None
 def get_predictor_service() -> PredictorService:
     """
     Dependency that returns the predictor service.
-    
+
     Returns:
         PredictorService instance
-        
+
     Raises:
         HTTPException: If service is not initialized
     """
@@ -42,7 +42,7 @@ def get_predictor_service() -> PredictorService:
 def set_predictor_service(service: PredictorService) -> None:
     """
     Set the global predictor service instance.
-    
+
     Args:
         service: PredictorService instance to set
     """
@@ -53,15 +53,15 @@ def set_predictor_service(service: PredictorService) -> None:
 def get_loaded_predictor() -> PredictorService:
     """
     Dependency that returns a loaded predictor service.
-    
+
     Returns:
         Loaded PredictorService instance
-        
+
     Raises:
         HTTPException: If model is not loaded
     """
     service = get_predictor_service()
-    
+
     if not service.is_loaded:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -70,17 +70,17 @@ def get_loaded_predictor() -> PredictorService:
                 "exists in the models/ directory and restart the server."
             )
         )
-    
+
     return service
 
 
 def get_problem_service() -> ProblemService:
     """
     Dependency that returns the problem service.
-    
+
     Returns:
         ProblemService instance
-        
+
     Raises:
         HTTPException: If service is not initialized
     """
@@ -95,7 +95,7 @@ def get_problem_service() -> ProblemService:
 def set_problem_service(service: ProblemService) -> None:
     """
     Set the global problem service instance.
-    
+
     Args:
         service: ProblemService instance to set
     """
@@ -106,10 +106,10 @@ def set_problem_service(service: ProblemService) -> None:
 def get_generator_service() -> GeneratorService:
     """
     Dependency that returns the generator service.
-    
+
     Returns:
         GeneratorService instance
-        
+
     Raises:
         HTTPException: If service is not initialized
     """
@@ -124,7 +124,7 @@ def get_generator_service() -> GeneratorService:
 def set_generator_service(service: GeneratorService) -> None:
     """
     Set the global generator service instance.
-    
+
     Args:
         service: GeneratorService instance to set
     """
@@ -135,23 +135,23 @@ def set_generator_service(service: GeneratorService) -> None:
 def get_loaded_generator() -> GeneratorService:
     """
     Dependency that returns a loaded generator service.
-    
+
     Returns:
         Loaded GeneratorService instance
-        
+
     Raises:
         HTTPException: If model is not loaded
     """
     service = get_generator_service()
-    
+
     if not service.is_loaded:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
-                "Generator model not loaded. Please ensure generator_model.pth "
-                "exists in the models/ directory and restart the server."
+                "Generator model not loaded. Please ensure "
+                "generator_model.pth exists in the models/ directory "
+                "and restart the server."
             )
         )
-    
-    return service
 
+    return service
