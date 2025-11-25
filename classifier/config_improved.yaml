@@ -8,9 +8,9 @@ model:
   
   # ResidualCNN specific parameters
   use_attention: true  # Enable spatial and channel attention
-  dropout_conv: 0.1    # Dropout in convolutional layers
-  dropout_fc1: 0.3     # Dropout after first FC layer (reduced from 0.5)
-  dropout_fc2: 0.4     # Dropout after second FC layer (reduced from 0.5)
+  dropout_conv: 0.15   # Dropout in convolutional layers (increased to combat overfitting)
+  dropout_fc1: 0.4     # Dropout after first FC layer (increased to combat overfitting)
+  dropout_fc2: 0.5     # Dropout after second FC layer (increased to combat overfitting)
 
 # Training Configuration
 training:
@@ -19,7 +19,7 @@ training:
   num_epochs: 150
   early_stopping_patience: 10  # Increased from 8
   optimizer: "adam"
-  weight_decay: 0.0005  # Reduced from 0.001 to reduce overfitting
+  weight_decay: 0.002   # Increased to combat overfitting (was 0.0005)
   
   # Loss function configuration (NEW)
   loss_type: "focal_ordinal"  # Options: "ce", "focal", "ordinal", "focal_ordinal", "label_smoothing"

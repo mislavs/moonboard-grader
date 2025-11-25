@@ -67,14 +67,26 @@ class FocalLoss(nn.Module):
         Returns:
             Loss value (scalar if reduction='mean'/'sum', tensor if 'none')
         """
-        # Compute cross entropy
-        ce_loss = F.cross_entropy(inputs, targets, reduction='none', weight=self.alpha)
+        # Get true class probabilities via softmax
+        probs = F.softmax(inputs, dim=1)
+        p_t = probs.gather(1, targets.unsqueeze(1)).squeeze(1)
         
-        # Get probabilities
-        p = torch.exp(-ce_loss)
+        # Compute unweighted cross-entropy (needed for base loss)
+        ce_loss = F.cross_entropy(inputs, targets, reduction='none')
         
-        # Compute focal loss
-        focal_loss = (1 - p) ** self.gamma * ce_loss
+        # Compute focal modulation: (1 - p_t)^gamma
+        # This correctly down-weights easy examples (high p_t) and focuses on hard ones
+        focal_weight = (1 - p_t) ** self.gamma
+        
+        # Apply focal modulation to CE loss
+        focal_loss = focal_weight * ce_loss
+        
+        # Apply class weights (alpha) if provided
+        if self.alpha is not None:
+            # Ensure alpha is on the same device as inputs
+            alpha = self.alpha.to(inputs.device)
+            alpha_t = alpha.gather(0, targets)
+            focal_loss = alpha_t * focal_loss
         
         # Apply reduction
         if self.reduction == 'mean':
