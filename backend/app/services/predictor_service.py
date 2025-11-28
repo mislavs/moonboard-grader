@@ -21,9 +21,7 @@ class PredictorService:
     Handles model lifecycle and provides prediction interface.
     """
 
-    def __init__(
-        self, model_path: Optional[Path] = None, device: Optional[str] = None
-    ):
+    def __init__(self, model_path: Optional[Path] = None, device: Optional[str] = None):
         """
         Initialize the predictor service.
 
@@ -52,15 +50,11 @@ class PredictorService:
                 "Please add model_for_inference.pth to the models/ directory."
             )
 
-        logger.info(
-            f"Loading model from {self.model_path} "
-            f"on device {self.device}..."
-        )
+        logger.info(f"Loading model from {self.model_path} on device {self.device}...")
 
         try:
             self._predictor = Predictor(
-                checkpoint_path=str(self.model_path),
-                device=self.device
+                checkpoint_path=str(self.model_path), device=self.device
             )
             self._is_loaded = True
             logger.info("Model loaded successfully!")
@@ -69,9 +63,7 @@ class PredictorService:
             self._is_loaded = False
             raise
 
-    def predict(
-        self, problem: Dict[str, Any], top_k: int = 3
-    ) -> Dict[str, Any]:
+    def predict(self, problem: Dict[str, Any], top_k: int = 3) -> Dict[str, Any]:
         """
         Make a prediction for a climbing problem.
 
@@ -90,16 +82,45 @@ class PredictorService:
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
         try:
-            result = self._predictor.predict(
-                problem=problem,
-                return_top_k=top_k
-            )
+            result = self._predictor.predict(problem=problem, return_top_k=top_k)
             return result
         except ValueError as e:
             logger.error(f"Invalid problem data: {e}")
             raise
         except Exception as e:
             logger.error(f"Prediction failed: {e}")
+            raise
+
+    def predict_with_attention(
+        self, problem: Dict[str, Any], top_k: int = 3
+    ) -> Dict[str, Any]:
+        """
+        Make a prediction with attention map for visualization.
+
+        Args:
+            problem: Problem data with moves
+            top_k: Number of top predictions to return
+
+        Returns:
+            Dictionary with prediction results including attention_map
+
+        Raises:
+            RuntimeError: If model is not loaded
+            ValueError: If problem data is invalid
+        """
+        if not self.is_loaded:
+            raise RuntimeError("Model not loaded. Call load_model() first.")
+
+        try:
+            result = self._predictor.predict_with_attention(
+                problem=problem, return_top_k=top_k
+            )
+            return result
+        except ValueError as e:
+            logger.error(f"Invalid problem data: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Prediction with attention failed: {e}")
             raise
 
     @property
@@ -123,5 +144,5 @@ class PredictorService:
             "model_path": str(self.model_path),
             "device": self.device,
             "model_exists": self.model_path.exists(),
-            "is_loaded": self.is_loaded
+            "is_loaded": self.is_loaded,
         }

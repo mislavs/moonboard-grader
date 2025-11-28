@@ -19,7 +19,7 @@ from moonboard_core.grade_encoder import get_all_grades, get_num_grades
 
 
 def evaluate_model(model: torch.nn.Module, dataloader: torch.utils.data.DataLoader, 
-                   device: str = 'cpu') -> Dict:
+                   device: str = 'cpu', use_amp: bool = True) -> Dict:
     """
     Evaluate a model on a dataset and return comprehensive metrics.
     
@@ -27,6 +27,7 @@ def evaluate_model(model: torch.nn.Module, dataloader: torch.utils.data.DataLoad
         model: PyTorch model to evaluate
         dataloader: DataLoader with evaluation data
         device: Device to run evaluation on ('cpu' or 'cuda')
+        use_amp: Whether to use automatic mixed precision (CUDA only, default True)
         
     Returns:
         Dictionary containing:
@@ -50,42 +51,54 @@ def evaluate_model(model: torch.nn.Module, dataloader: torch.utils.data.DataLoad
     model.eval()
     model.to(device)
     
-    all_predictions = []
-    all_labels = []
+    # Collect tensors instead of lists - much more efficient
+    all_predictions_tensors = []
+    all_labels_tensors = []
     total_loss = 0.0
     num_batches = 0
     
     criterion = torch.nn.CrossEntropyLoss()
     
-    with torch.no_grad():
-        for batch_idx, (inputs, labels) in enumerate(dataloader):
-            inputs = inputs.to(device)
-            labels = labels.to(device)
+    # Use AMP for CUDA devices (significant speedup for modern GPUs)
+    use_autocast = use_amp and device == 'cuda' and torch.cuda.is_available()
+    
+    # inference_mode is faster than no_grad for pure inference
+    with torch.inference_mode():
+        for inputs, labels in dataloader:
+            # Non-blocking transfer for better pipelining (when using pinned memory)
+            inputs = inputs.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
             
-            # Forward pass
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            # Use automatic mixed precision for faster inference on CUDA
+            if use_autocast:
+                with torch.amp.autocast('cuda'):
+                    outputs = model(inputs)
+                    # Loss needs float32, but autocast handles this automatically
+                    loss = criterion(outputs, labels)
+            else:
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
             
-            # Get predictions
-            _, predicted = torch.max(outputs, 1)
+            # Get predictions - argmax is slightly faster than max for just getting indices
+            predicted = outputs.argmax(dim=1)
             
-            # Store results
-            all_predictions.extend(predicted.cpu().numpy().tolist())
-            all_labels.extend(labels.cpu().numpy().tolist())
+            # Keep tensors on CPU but don't convert to list yet
+            all_predictions_tensors.append(predicted.cpu())
+            all_labels_tensors.append(labels.cpu())
             total_loss += loss.item()
             num_batches += 1
     
     if num_batches == 0:
         raise ValueError("dataloader is empty")
     
-    # Convert to numpy arrays for metric calculations
-    predictions = np.array(all_predictions)
-    labels = np.array(all_labels)
+    # Single concatenation at the end - much faster than extend() in loop
+    predictions = torch.cat(all_predictions_tensors).numpy()
+    labels_arr = torch.cat(all_labels_tensors).numpy()
     
     # Calculate metrics
-    exact_acc = calculate_exact_accuracy(predictions, labels)
-    tol1_acc = calculate_tolerance_accuracy(predictions, labels, tolerance=1)
-    tol2_acc = calculate_tolerance_accuracy(predictions, labels, tolerance=2)
+    exact_acc = calculate_exact_accuracy(predictions, labels_arr)
+    tol1_acc = calculate_tolerance_accuracy(predictions, labels_arr, tolerance=1)
+    tol2_acc = calculate_tolerance_accuracy(predictions, labels_arr, tolerance=2)
     avg_loss = total_loss / num_batches
     
     return {
@@ -94,8 +107,8 @@ def evaluate_model(model: torch.nn.Module, dataloader: torch.utils.data.DataLoad
         'tolerance_2_accuracy': tol2_acc,
         'avg_loss': avg_loss,
         'predictions': predictions.tolist(),
-        'labels': labels.tolist(),
-        'num_samples': len(labels)
+        'labels': labels_arr.tolist(),
+        'num_samples': len(labels_arr)
     }
 
 

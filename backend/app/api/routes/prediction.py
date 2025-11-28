@@ -47,8 +47,8 @@ async def predict_grade(
     }
 
     try:
-        # Make prediction
-        result = predictor_service.predict(
+        # Make prediction with attention map
+        result = predictor_service.predict_with_attention(
             problem=problem_dict,
             top_k=request.top_k
         )
@@ -63,7 +63,8 @@ async def predict_grade(
         response = PredictionResponse(
             predicted_grade=result['predicted_grade'],
             confidence=result['confidence'],
-            top_k_predictions=top_k_formatted
+            top_k_predictions=top_k_formatted,
+            attention_map=result.get('attention_map')
         )
 
         return response

@@ -1,24 +1,39 @@
-import { useState, useEffect } from 'react';
-import MoonBoard from './MoonBoard';
-import LoadingSpinner from './LoadingSpinner';
-import ErrorMessage from './ErrorMessage';
-import CreateModeControls from './CreateModeControls';
-import PredictionDisplay from './PredictionDisplay';
-import DuplicateCheckResult from './DuplicateCheckResult';
-import { usePrediction } from '../hooks/usePrediction';
-import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
-import { useBackendHealth } from '../hooks/useBackendHealth';
-import { useGeneration } from '../hooks/useGeneration';
-import type { Move } from '../types/problem';
-import { ERROR_MESSAGES } from '../config/api';
-import { AVAILABLE_GRADES } from '../constants/grades';
+import { useState, useEffect } from "react";
+import MoonBoard from "./MoonBoard";
+import LoadingSpinner from "./LoadingSpinner";
+import ErrorMessage from "./ErrorMessage";
+import CreateModeControls from "./CreateModeControls";
+import PredictionDisplay from "./PredictionDisplay";
+import DuplicateCheckResult from "./DuplicateCheckResult";
+import CruxHighlightToggle from "./CruxHighlightToggle";
+import { usePrediction } from "../hooks/usePrediction";
+import { useDuplicateCheck } from "../hooks/useDuplicateCheck";
+import { useBackendHealth } from "../hooks/useBackendHealth";
+import { useGeneration } from "../hooks/useGeneration";
+import type { Move } from "../types/problem";
+import { ERROR_MESSAGES } from "../config/api";
+import { AVAILABLE_GRADES } from "../constants/grades";
 
 export default function CreateMode() {
   const [createdMoves, setCreatedMoves] = useState<Move[]>([]);
-  const [selectedGrade, setSelectedGrade] = useState<string>(AVAILABLE_GRADES[0]);
+  const [selectedGrade, setSelectedGrade] = useState<string>(
+    AVAILABLE_GRADES[0]
+  );
+  const [showAttention, setShowAttention] = useState(false);
   const { prediction, predicting, error, predict, reset } = usePrediction();
-  const { duplicate, checking, error: duplicateError, checkForDuplicate, reset: resetDuplicate } = useDuplicateCheck();
-  const { generating, error: generateError, generate, reset: resetGenerate } = useGeneration();
+  const {
+    duplicate,
+    checking,
+    error: duplicateError,
+    checkForDuplicate,
+    reset: resetDuplicate,
+  } = useDuplicateCheck();
+  const {
+    generating,
+    error: generateError,
+    generate,
+    reset: resetGenerate,
+  } = useGeneration();
   const backendHealthy = useBackendHealth();
 
   // Clear duplicate result when moves change
@@ -47,7 +62,7 @@ export default function CreateMode() {
     reset();
     resetDuplicate();
     resetGenerate();
-    
+
     // Generate new problem with selected grade
     const result = await generate(selectedGrade);
     if (result) {
@@ -83,9 +98,7 @@ export default function CreateMode() {
             <ErrorMessage message={generateError} />
           )}
 
-          {generating && (
-            <LoadingSpinner message="Generating boulder..." />
-          )}
+          {generating && <LoadingSpinner message="Generating boulder..." />}
 
           {duplicateError && !checking && (
             <ErrorMessage message={duplicateError} />
@@ -99,24 +112,28 @@ export default function CreateMode() {
             />
           )}
 
-          {checking && (
-            <LoadingSpinner message="Checking for duplicates..." />
-          )}
+          {checking && <LoadingSpinner message="Checking for duplicates..." />}
 
           {/* Prediction Error */}
-          {error && !predicting && (
-            <ErrorMessage message={error} />
-          )}
+          {error && !predicting && <ErrorMessage message={error} />}
 
           {/* Prediction Display */}
           {prediction && !predicting && (
-            <PredictionDisplay prediction={prediction} />
+            <>
+              <PredictionDisplay prediction={prediction} />
+
+              {/* Crux Highlight Toggle */}
+              {prediction.attention_map && (
+                <CruxHighlightToggle
+                  checked={showAttention}
+                  onChange={setShowAttention}
+                />
+              )}
+            </>
           )}
 
           {/* Loading State for Prediction */}
-          {predicting && (
-            <LoadingSpinner message="Predicting grade..." />
-          )}
+          {predicting && <LoadingSpinner message="Predicting grade..." />}
         </div>
 
         {/* Right Panel: MoonBoard */}
@@ -125,10 +142,11 @@ export default function CreateMode() {
             moves={createdMoves}
             mode="create"
             onMovesChange={setCreatedMoves}
+            attentionMap={prediction?.attention_map}
+            showAttention={showAttention}
           />
         </div>
       </div>
     </div>
   );
 }
-

@@ -13,6 +13,7 @@ export interface PredictionResponse {
   predicted_grade: string;
   confidence: number;
   top_k_predictions: TopKPrediction[];
+  attention_map?: number[][];
 }
 
 export interface PredictionRequest {

@@ -79,6 +79,10 @@ class PredictionResponse(BaseModel):
         ...,
         description="Top K most likely grades"
     )
+    attention_map: Optional[List[List[float]]] = Field(
+        None,
+        description="18x11 attention heatmap showing model focus areas (0-1 values)"
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -89,7 +93,8 @@ class PredictionResponse(BaseModel):
                     {"grade": "6B+", "probability": 0.87},
                     {"grade": "6C", "probability": 0.09},
                     {"grade": "6B", "probability": 0.03}
-                ]
+                ],
+                "attention_map": None
             }
         }
     )
