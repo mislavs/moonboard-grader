@@ -135,7 +135,14 @@ export default function AttentionHeatmap({
       className="absolute inset-0 pointer-events-none"
       style={{ zIndex: 1 }}
     >
-      {cells}
+      <defs>
+        <filter id="heatmap-blur" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="12" />
+        </filter>
+      </defs>
+      <g filter="url(#heatmap-blur)">
+        {cells}
+      </g>
     </svg>
   );
 }
