@@ -119,17 +119,7 @@ export default function CreateMode() {
 
           {/* Prediction Display */}
           {prediction && !predicting && (
-            <>
-              <PredictionDisplay prediction={prediction} />
-
-              {/* Crux Highlight Toggle */}
-              {prediction.attention_map && (
-                <CruxHighlightToggle
-                  checked={showAttention}
-                  onChange={setShowAttention}
-                />
-              )}
-            </>
+            <PredictionDisplay prediction={prediction} />
           )}
 
           {/* Loading State for Prediction */}
@@ -137,7 +127,7 @@ export default function CreateMode() {
         </div>
 
         {/* Right Panel: MoonBoard */}
-        <div>
+        <div className="flex flex-col gap-4">
           <MoonBoard
             moves={createdMoves}
             mode="create"
@@ -145,6 +135,14 @@ export default function CreateMode() {
             attentionMap={prediction?.attention_map}
             showAttention={showAttention}
           />
+
+          {/* Crux Highlight Toggle */}
+          {prediction?.attention_map && (
+            <CruxHighlightToggle
+              checked={showAttention}
+              onChange={setShowAttention}
+            />
+          )}
         </div>
       </div>
     </div>

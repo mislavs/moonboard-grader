@@ -2,7 +2,7 @@
  * Custom hook for managing grade prediction state and logic
  */
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { predictGrade, ApiError } from '../services/api';
 import type { Move } from '../types/problem';
 import type { PredictionResponse } from '../types/prediction';
@@ -13,7 +13,7 @@ export function usePrediction() {
   const [predicting, setPredicting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const predict = async (moves: Move[]) => {
+  const predict = useCallback(async (moves: Move[]) => {
     if (moves.length === 0) {
       return;
     }
@@ -32,12 +32,12 @@ export function usePrediction() {
     } finally {
       setPredicting(false);
     }
-  };
+  }, []);
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setPrediction(null);
     setError(null);
-  };
+  }, []);
 
   return {
     prediction,

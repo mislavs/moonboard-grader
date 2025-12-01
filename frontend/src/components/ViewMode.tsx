@@ -3,7 +3,9 @@ import MoonBoard from './MoonBoard';
 import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
 import ProblemNavigator from './ProblemNavigator';
+import CruxHighlightToggle from './CruxHighlightToggle';
 import { fetchProblem, ApiError } from '../services/api';
+import { usePrediction } from '../hooks/usePrediction';
 import type { Problem } from '../types/problem';
 import { ERROR_MESSAGES } from '../config/api';
 
@@ -12,6 +14,9 @@ export default function ViewMode() {
   const [problem, setProblem] = useState<Problem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAttention, setShowAttention] = useState(false);
+  
+  const { prediction, predicting, predict, reset: resetPrediction } = usePrediction();
 
   useEffect(() => {
     async function loadProblem() {
@@ -38,6 +43,26 @@ export default function ViewMode() {
     loadProblem();
   }, [selectedProblemId]);
 
+  // Reset prediction when problem changes
+  useEffect(() => {
+    resetPrediction();
+  }, [selectedProblemId, resetPrediction]);
+
+  // Auto-fetch heatmap when problem loads and toggle is on
+  useEffect(() => {
+    if (showAttention && problem && !predicting && !prediction?.attention_map) {
+      predict(problem.moves);
+    }
+  }, [problem, showAttention, predicting, prediction?.attention_map, predict]);
+
+  // Fetch attention map when toggle is turned on
+  const handleToggleAttention = async (checked: boolean) => {
+    setShowAttention(checked);
+    if (checked && problem && !prediction?.attention_map) {
+      await predict(problem.moves);
+    }
+  };
+
   const handleProblemSelect = (problemId: number) => {
     setSelectedProblemId(problemId);
   };
@@ -62,17 +87,32 @@ export default function ViewMode() {
         </div>
 
         {/* Right Panel: MoonBoard */}
-        <div className="flex flex-col relative">
-          {error && <ErrorMessage message={error} />}
+        <div className="flex flex-col gap-4">
+          <div className="relative">
+            {error && <ErrorMessage message={error} />}
+            {problem && !error && (
+              <MoonBoard
+                problem={problem}
+                mode="view"
+                attentionMap={prediction?.attention_map}
+                showAttention={showAttention}
+              />
+            )}
+            
+            {/* Loading Overlay */}
+            {(loading || predicting) && (
+              <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center z-10">
+                <LoadingSpinner message={predicting ? "Loading heatmap..." : "Loading problem..."} />
+              </div>
+            )}
+          </div>
+
+          {/* Crux Highlight Toggle */}
           {problem && !error && (
-            <MoonBoard problem={problem} mode="view" />
-          )}
-          
-          {/* Loading Overlay */}
-          {loading && (
-            <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center z-10">
-              <LoadingSpinner message="Loading problem..." />
-            </div>
+            <CruxHighlightToggle
+              checked={showAttention}
+              onChange={handleToggleAttention}
+            />
           )}
         </div>
       </div>
