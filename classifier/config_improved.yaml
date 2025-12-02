@@ -29,7 +29,11 @@ training:
   
   # Class weighting
   use_class_weights: true
-  max_class_weight: 5.0
+  max_class_weight: 10.0
+  
+  # Balanced sampling (addresses class imbalance at batch level)
+  use_balanced_sampling: true
+  balanced_sampling_strategy: "sqrt"  # Options: "sqrt" (recommended), "inverse"
   
   # Learning rate scheduler
   use_scheduler: true

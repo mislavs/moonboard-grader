@@ -11,6 +11,7 @@ from pathlib import Path
 from datetime import datetime
 import torch
 from torch import nn, optim
+from torch.utils.data import DataLoader, WeightedRandomSampler
 import numpy as np
 from sklearn.utils.class_weight import compute_class_weight
 
@@ -146,13 +147,60 @@ def train_command(args):
     
     # Create data loaders
     batch_size = config['training']['batch_size']
-    train_loader, val_loader, test_loader = create_data_loaders(
-        train_dataset, val_dataset, test_dataset, batch_size
-    )
+    
+    # Check if balanced sampling is enabled
+    use_balanced_sampling = config['training'].get('use_balanced_sampling', False)
+    
+    # Get num_classes early for balanced sampling
+    num_classes = config['model']['num_classes']
+    
+    if use_balanced_sampling:
+        # Calculate sample weights for balanced sampling
+        train_labels = train_dataset.labels
+        class_counts = np.bincount(train_labels, minlength=num_classes)
+        
+        # Avoid division by zero for classes not present
+        class_counts = np.maximum(class_counts, 1)
+        
+        # Use sqrt balancing by default (less aggressive than full inverse)
+        # Full inverse: 1/count, Sqrt: 1/sqrt(count)
+        sampling_strategy = config['training'].get('balanced_sampling_strategy', 'sqrt')
+        
+        if sampling_strategy == 'sqrt':
+            class_weights_sampling = 1.0 / np.sqrt(class_counts)
+        elif sampling_strategy == 'inverse':
+            class_weights_sampling = 1.0 / class_counts
+        else:
+            raise ValueError(f"Unknown sampling strategy: {sampling_strategy}")
+        
+        # Assign weight to each sample based on its class
+        sample_weights = class_weights_sampling[train_labels]
+        sample_weights = torch.DoubleTensor(sample_weights)
+        
+        # Create weighted sampler
+        sampler = WeightedRandomSampler(
+            weights=sample_weights,
+            num_samples=len(train_dataset),
+            replacement=True
+        )
+        
+        # Create train loader with sampler (can't use shuffle with sampler)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler)
+        
+        # Create val/test loaders normally
+        _, val_loader, test_loader = create_data_loaders(
+            train_dataset, val_dataset, test_dataset, batch_size
+        )
+        
+        print(f"\n⚖️  Using balanced sampling ({sampling_strategy} strategy)")
+        print(f"   Effective class weight range: {class_weights_sampling.min():.3f} - {class_weights_sampling.max():.3f}")
+    else:
+        train_loader, val_loader, test_loader = create_data_loaders(
+            train_dataset, val_dataset, test_dataset, batch_size
+        )
     
     # Create model
     model_type = config['model']['type']
-    num_classes = config['model']['num_classes']
     print(f"\n🧠 Creating model: {model_type.upper()}")
     
     # Extract model-specific parameters from config
