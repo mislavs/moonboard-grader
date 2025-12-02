@@ -44,6 +44,8 @@ checkpoint:
 device: "cuda"  # or "cpu"
 ```
 
+See the [Configuration Reference](#configuration-reference) section below for detailed explanations of all available parameters.
+
 ### 2. Evaluating a Model
 
 Evaluate a trained model on a test dataset:
@@ -278,6 +280,232 @@ history = trainer.fit(num_epochs=100, early_stopping_patience=10)
 predictor = Predictor("models/best_model.pth")
 result = predictor.predict({"moves": [...]})
 print(f"Predicted: {result['predicted_grade']}")
+```
+
+## Configuration Reference
+
+This section provides detailed explanations for all available parameters in the configuration YAML file.
+
+### Model Configuration
+
+```yaml
+model:
+  type: "cnn"
+  num_classes: 19
+  use_attention: true
+  dropout_conv: 0.15
+  dropout_fc1: 0.4
+  dropout_fc2: 0.5
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `type` | string | `"cnn"` | Model architecture type. Options: `"fc"` (fully connected), `"cnn"` (convolutional), `"residual_cnn"` (residual CNN with attention), `"deep_residual_cnn"` (deeper residual variant) |
+| `num_classes` | int | `19` | Number of output grade classes. Use `19` for full range (5+ to 8C+), or fewer when filtering grades |
+| `use_attention` | bool | `false` | Enable spatial and channel attention mechanisms. Only applicable to `residual_cnn` and `deep_residual_cnn` models |
+| `dropout_conv` | float | `0.1` | Dropout rate applied in convolutional layers. Range: 0.0-1.0. Higher values reduce overfitting |
+| `dropout_fc1` | float | `0.3` | Dropout rate after the first fully connected layer. Range: 0.0-1.0 |
+| `dropout_fc2` | float | `0.4` | Dropout rate after the second fully connected layer. Range: 0.0-1.0 |
+
+### Training Configuration
+
+```yaml
+training:
+  learning_rate: 0.0003
+  batch_size: 64
+  num_epochs: 150
+  early_stopping_patience: 8
+  optimizer: "adam"
+  weight_decay: 0.001
+  use_class_weights: true
+  max_class_weight: 5.0
+  use_scheduler: true
+  scheduler_factor: 0.3
+  scheduler_patience: 3
+  label_smoothing: 0.1
+  gradient_clip: 1.0
+  loss_type: "focal_ordinal"
+  focal_gamma: 2.0
+  ordinal_weight: 0.5
+  ordinal_alpha: 2.0
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `learning_rate` | float | `0.001` | Initial learning rate for the optimizer. Lower values (e.g., 0.0003) often work better for fine-grained classification |
+| `batch_size` | int | `32` | Number of samples per training batch. Larger batches train faster but use more memory |
+| `num_epochs` | int | `100` | Maximum number of training epochs. Training may stop earlier due to early stopping |
+| `early_stopping_patience` | int | `10` | Number of epochs to wait for validation improvement before stopping training |
+| `optimizer` | string | `"adam"` | Optimizer algorithm. Options: `"adam"` (adaptive learning rates), `"sgd"` (stochastic gradient descent) |
+| `weight_decay` | float | `0.0` | L2 regularization coefficient. Higher values (e.g., 0.001-0.002) help prevent overfitting |
+| `use_class_weights` | bool | `false` | Apply class weights to handle imbalanced grade distribution. Recommended for Moonboard data |
+| `max_class_weight` | float | `5.0` | Maximum class weight to prevent extreme weighting of rare grades. Only used when `use_class_weights` is true |
+| `use_scheduler` | bool | `false` | Enable learning rate scheduler that reduces LR when validation loss plateaus |
+| `scheduler_factor` | float | `0.5` | Factor by which LR is reduced when scheduler triggers. New LR = old LR × factor |
+| `scheduler_patience` | int | `5` | Number of epochs to wait before reducing LR if no improvement |
+| `label_smoothing` | float | `0.0` | Label smoothing coefficient (0.0-1.0). Values like 0.1 help prevent overconfident predictions |
+| `gradient_clip` | float | `null` | Maximum gradient norm for gradient clipping. Values like 1.0 help stabilize training |
+| `loss_type` | string | `"ce"` | Loss function type. Options: `"ce"` (cross-entropy), `"focal"` (focal loss for class imbalance), `"ordinal"` (ordinal regression), `"focal_ordinal"` (combined), `"label_smoothing"` |
+| `focal_gamma` | float | `2.0` | Focusing parameter for focal loss. Higher values focus more on hard examples. Range: 1.5-3.0 |
+| `ordinal_weight` | float | `0.5` | Weight for the ordinal component when using combined losses. Range: 0.0-1.0 |
+| `ordinal_alpha` | float | `2.0` | Distance penalty for ordinal loss. Controls how much to penalize predictions far from the true grade |
+
+### Data Configuration
+
+```yaml
+data:
+  path: "../data/problems.json"
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  random_seed: 42
+  filter_grades: true
+  min_grade_index: 2
+  max_grade_index: 11
+  filter_repeats: false
+  min_repeats: 1
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `path` | string | required | Path to the training data JSON file |
+| `train_ratio` | float | `0.7` | Proportion of data used for training. Must sum to 1.0 with val_ratio and test_ratio |
+| `val_ratio` | float | `0.15` | Proportion of data used for validation during training |
+| `test_ratio` | float | `0.15` | Proportion of data used for final evaluation |
+| `random_seed` | int | `42` | Seed for reproducible data splits. Change to get different train/val/test splits |
+| `filter_grades` | bool | `false` | Enable grade filtering to train on a subset of grades |
+| `min_grade_index` | int | `0` | Minimum grade index to include (0=5+, 1=6A, 2=6A+, ...). Only used when `filter_grades` is true |
+| `max_grade_index` | int | `18` | Maximum grade index to include (18=8C+). Only used when `filter_grades` is true |
+| `filter_repeats` | bool | `false` | Enable filtering by number of times a problem has been repeated/logged |
+| `min_repeats` | int | `0` | Minimum number of repeats required. 0 = include all, 1 = exclude zero-repeat routes |
+
+### Checkpoint Configuration
+
+```yaml
+checkpoint:
+  dir: "models"
+  save_best: true
+  save_final: true
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dir` | string | `"models"` | Directory to save model checkpoints and artifacts |
+| `save_best` | bool | `true` | Save the best model (based on validation loss) as `best_model.pth` |
+| `save_final` | bool | `true` | Save the final model after training completes as `final_model.pth` |
+
+### Device Configuration
+
+```yaml
+device: "cuda"
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `device` | string | `"cuda"` | Computation device. Options: `"cuda"` (GPU, recommended), `"cpu"` (slower but always available) |
+
+### Evaluation Configuration
+
+```yaml
+evaluation:
+  tolerance_levels: [1, 2]
+  save_confusion_matrix: true
+  confusion_matrix_path: "models/confusion_matrix.png"
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `tolerance_levels` | list[int] | `[1, 2]` | List of tolerance levels for accuracy calculation. `[1, 2]` means compute ±1 and ±2 grade accuracy |
+| `save_confusion_matrix` | bool | `false` | Automatically save confusion matrix visualization after training |
+| `confusion_matrix_path` | string | `"confusion_matrix.png"` | File path for saving the confusion matrix image |
+
+### Prediction Configuration
+
+```yaml
+prediction:
+  top_k: 3
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `top_k` | int | `3` | Number of top predictions to return with probabilities |
+
+### Example Configurations
+
+**Basic CNN Training:**
+```yaml
+model:
+  type: "cnn"
+  num_classes: 19
+
+training:
+  learning_rate: 0.001
+  batch_size: 32
+  num_epochs: 100
+  early_stopping_patience: 10
+
+data:
+  path: "../data/problems.json"
+
+device: "cuda"
+```
+
+**Advanced Training with Focal Loss and Attention:**
+```yaml
+model:
+  type: "residual_cnn"
+  num_classes: 10
+  use_attention: true
+  dropout_conv: 0.15
+  dropout_fc1: 0.4
+  dropout_fc2: 0.5
+
+training:
+  learning_rate: 0.0003
+  batch_size: 64
+  num_epochs: 150
+  early_stopping_patience: 10
+  optimizer: "adam"
+  weight_decay: 0.002
+  loss_type: "focal_ordinal"
+  focal_gamma: 2.0
+  ordinal_weight: 0.5
+  use_class_weights: true
+  max_class_weight: 5.0
+  use_scheduler: true
+  gradient_clip: 1.0
+
+data:
+  path: "../data/problems.json"
+  filter_grades: true
+  min_grade_index: 2   # 6A+
+  max_grade_index: 11  # 7C
+
+device: "cuda"
+```
+
+**Training on Filtered Popular Problems:**
+```yaml
+model:
+  type: "cnn"
+  num_classes: 10
+
+training:
+  learning_rate: 0.0003
+  batch_size: 64
+  num_epochs: 150
+  use_class_weights: true
+  max_class_weight: 10.0
+
+data:
+  path: "../data/problems.json"
+  filter_grades: true
+  min_grade_index: 2
+  max_grade_index: 11
+  filter_repeats: true
+  min_repeats: 1  # Only include problems that have been logged at least once
+
+device: "cuda"
 ```
 
 ## Next Steps
