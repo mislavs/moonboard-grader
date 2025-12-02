@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 from src.evaluator import (
     evaluate_model,
     calculate_exact_accuracy,
+    calculate_macro_accuracy,
     calculate_tolerance_accuracy,
     generate_confusion_matrix,
     plot_confusion_matrix,
@@ -145,6 +146,65 @@ class TestCalculateToleranceAccuracy:
         """Test that empty arrays raise error."""
         with pytest.raises(ValueError, match="empty"):
             calculate_tolerance_accuracy(np.array([]), np.array([]), tolerance=1)
+
+
+class TestCalculateMacroAccuracy:
+    """Tests for macro-averaged (balanced) accuracy calculation."""
+    
+    def test_perfect_accuracy(self):
+        """Test 100% macro accuracy when all predictions match."""
+        predictions = np.array([0, 1, 2, 0, 1, 2])
+        labels = np.array([0, 1, 2, 0, 1, 2])
+        accuracy = calculate_macro_accuracy(predictions, labels)
+        assert accuracy == 100.0
+    
+    def test_balanced_classes_equals_micro(self):
+        """Test that macro equals micro when classes are balanced."""
+        # 2 samples per class, all correct
+        predictions = np.array([0, 0, 1, 1, 2, 2])
+        labels = np.array([0, 0, 1, 1, 2, 2])
+        macro_acc = calculate_macro_accuracy(predictions, labels)
+        micro_acc = calculate_exact_accuracy(predictions, labels)
+        assert macro_acc == micro_acc == 100.0
+    
+    def test_imbalanced_classes_macro_lower_than_micro(self):
+        """Test that macro < micro when majority class dominates."""
+        # Class 0: 8 samples, all correct (100%)
+        # Class 1: 2 samples, all wrong (0%)
+        predictions = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        labels = np.array([0, 0, 0, 0, 0, 0, 0, 0, 1, 1])
+        
+        macro_acc = calculate_macro_accuracy(predictions, labels)
+        micro_acc = calculate_exact_accuracy(predictions, labels)
+        
+        # Micro: 8/10 = 80%
+        # Macro: (100% + 0%) / 2 = 50%
+        assert micro_acc == 80.0
+        assert macro_acc == 50.0
+        assert macro_acc < micro_acc
+    
+    def test_all_wrong_majority_class_prediction(self):
+        """Test macro accuracy when model only predicts majority class."""
+        # All predicted as 0, but true labels are 0, 1, 2 (one each)
+        predictions = np.array([0, 0, 0])
+        labels = np.array([0, 1, 2])
+        
+        macro_acc = calculate_macro_accuracy(predictions, labels)
+        # Class 0: 1/1 = 100%, Class 1: 0/1 = 0%, Class 2: 0/1 = 0%
+        # Macro = (100 + 0 + 0) / 3 = 33.33%
+        assert pytest.approx(macro_acc, rel=0.01) == 33.33
+    
+    def test_empty_arrays(self):
+        """Test that empty arrays raise error."""
+        with pytest.raises(ValueError, match="empty"):
+            calculate_macro_accuracy(np.array([]), np.array([]))
+    
+    def test_mismatched_lengths(self):
+        """Test that mismatched lengths raise error."""
+        predictions = np.array([0, 1, 2])
+        labels = np.array([0, 1])
+        with pytest.raises(ValueError, match="same length"):
+            calculate_macro_accuracy(predictions, labels)
 
 
 class TestGenerateConfusionMatrix:
@@ -408,6 +468,7 @@ class TestGetMetricsSummary:
         summary = get_metrics_summary(predictions, labels)
         
         assert 'exact_accuracy' in summary
+        assert 'macro_accuracy' in summary
         assert 'tolerance_1_accuracy' in summary
         assert 'tolerance_2_accuracy' in summary
         assert 'mean_absolute_error' in summary
@@ -422,6 +483,7 @@ class TestGetMetricsSummary:
         summary = get_metrics_summary(predictions, labels)
         
         assert summary['exact_accuracy'] == 100.0
+        assert summary['macro_accuracy'] == 100.0
         assert summary['tolerance_1_accuracy'] == 100.0
         assert summary['mean_absolute_error'] == 0.0
         assert summary['num_samples'] == 5
@@ -445,6 +507,7 @@ class TestEvaluateModel:
         results = evaluate_model(model, dataloader, device='cpu')
         
         assert 'exact_accuracy' in results
+        assert 'macro_accuracy' in results
         assert 'tolerance_1_accuracy' in results
         assert 'tolerance_2_accuracy' in results
         assert 'avg_loss' in results

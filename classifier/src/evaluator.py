@@ -13,7 +13,7 @@ import torch
 from typing import Dict, List, Tuple, Optional
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import precision_recall_fscore_support, confusion_matrix
+from sklearn.metrics import precision_recall_fscore_support, confusion_matrix, balanced_accuracy_score
 
 from moonboard_core.grade_encoder import get_all_grades, get_num_grades
 
@@ -32,6 +32,7 @@ def evaluate_model(model: torch.nn.Module, dataloader: torch.utils.data.DataLoad
     Returns:
         Dictionary containing:
             - exact_accuracy: Percentage of exact grade matches
+            - macro_accuracy: Macro-averaged accuracy (balanced accuracy)
             - tolerance_1_accuracy: Percentage within ±1 grade
             - tolerance_2_accuracy: Percentage within ±2 grades
             - avg_loss: Average cross-entropy loss
@@ -51,7 +52,6 @@ def evaluate_model(model: torch.nn.Module, dataloader: torch.utils.data.DataLoad
     model.eval()
     model.to(device)
     
-    # Collect tensors instead of lists - much more efficient
     all_predictions_tensors = []
     all_labels_tensors = []
     total_loss = 0.0
@@ -59,10 +59,8 @@ def evaluate_model(model: torch.nn.Module, dataloader: torch.utils.data.DataLoad
     
     criterion = torch.nn.CrossEntropyLoss()
     
-    # Use AMP for CUDA devices (significant speedup for modern GPUs)
     use_autocast = use_amp and device == 'cuda' and torch.cuda.is_available()
     
-    # inference_mode is faster than no_grad for pure inference
     with torch.inference_mode():
         for inputs, labels in dataloader:
             # Non-blocking transfer for better pipelining (when using pinned memory)
@@ -79,7 +77,7 @@ def evaluate_model(model: torch.nn.Module, dataloader: torch.utils.data.DataLoad
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
             
-            # Get predictions - argmax is slightly faster than max for just getting indices
+            # Get predictions
             predicted = outputs.argmax(dim=1)
             
             # Keep tensors on CPU but don't convert to list yet
@@ -91,18 +89,19 @@ def evaluate_model(model: torch.nn.Module, dataloader: torch.utils.data.DataLoad
     if num_batches == 0:
         raise ValueError("dataloader is empty")
     
-    # Single concatenation at the end - much faster than extend() in loop
     predictions = torch.cat(all_predictions_tensors).numpy()
     labels_arr = torch.cat(all_labels_tensors).numpy()
     
     # Calculate metrics
     exact_acc = calculate_exact_accuracy(predictions, labels_arr)
+    macro_acc = calculate_macro_accuracy(predictions, labels_arr)
     tol1_acc = calculate_tolerance_accuracy(predictions, labels_arr, tolerance=1)
     tol2_acc = calculate_tolerance_accuracy(predictions, labels_arr, tolerance=2)
     avg_loss = total_loss / num_batches
     
     return {
         'exact_accuracy': exact_acc,
+        'macro_accuracy': macro_acc,
         'tolerance_1_accuracy': tol1_acc,
         'tolerance_2_accuracy': tol2_acc,
         'avg_loss': avg_loss,
@@ -180,6 +179,36 @@ def calculate_tolerance_accuracy(predictions: np.ndarray, labels: np.ndarray,
     accuracy = (within_tolerance / len(labels)) * 100.0
     
     return float(accuracy)
+
+
+def calculate_macro_accuracy(predictions: np.ndarray, labels: np.ndarray) -> float:
+    """
+    Calculate macro-averaged accuracy (balanced accuracy).
+    
+    This treats all classes equally regardless of their frequency.
+    It is the average of per-class accuracies (recall for each class).
+    
+    Args:
+        predictions: Array of predicted labels
+        labels: Array of true labels
+        
+    Returns:
+        Macro accuracy as percentage (0-100)
+        
+    Raises:
+        ValueError: If arrays have different lengths or are empty
+    """
+    predictions = np.asarray(predictions)
+    labels = np.asarray(labels)
+    
+    if len(predictions) == 0:
+        raise ValueError("predictions array is empty")
+    
+    if len(predictions) != len(labels):
+        raise ValueError(f"predictions ({len(predictions)}) and labels ({len(labels)}) must have same length")
+    
+    # balanced_accuracy_score computes the average of recall for each class
+    return float(balanced_accuracy_score(labels, predictions) * 100.0)
 
 
 def generate_confusion_matrix(predictions: np.ndarray, labels: np.ndarray, 
@@ -379,12 +408,14 @@ def get_metrics_summary(
     Args:
         predictions: Array of predicted labels
         labels: Array of true labels
+        grade_names: List of grade names (default: use get_all_grades())
         
     Returns:
         Dictionary with all metrics including accuracies, MAE, and per-grade metrics
     """
     return {
         'exact_accuracy': calculate_exact_accuracy(predictions, labels),
+        'macro_accuracy': calculate_macro_accuracy(predictions, labels),
         'tolerance_1_accuracy': calculate_tolerance_accuracy(predictions, labels, tolerance=1),
         'tolerance_2_accuracy': calculate_tolerance_accuracy(predictions, labels, tolerance=2),
         'mean_absolute_error': calculate_mean_absolute_error(predictions, labels),

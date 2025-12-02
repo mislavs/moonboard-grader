@@ -326,10 +326,11 @@ def train_command(args):
     test_metrics = evaluate_model(model, test_loader, device)
     
     print(f"\n🎯 Test Set Results:")
-    print(f"   Exact Accuracy:  {test_metrics['exact_accuracy']:.2f}%")
+    print(f"   Exact Accuracy:    {test_metrics['exact_accuracy']:.2f}%")
+    print(f"   Macro Accuracy:    {test_metrics['macro_accuracy']:.2f}%")
     print(f"   ±1 Grade Accuracy: {test_metrics['tolerance_1_accuracy']:.2f}%")
     print(f"   ±2 Grade Accuracy: {test_metrics['tolerance_2_accuracy']:.2f}%")
-    print(f"   Loss: {test_metrics['avg_loss']:.4f}")
+    print(f"   Loss:              {test_metrics['avg_loss']:.4f}")
     
     # Generate unique timestamp for this training session
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

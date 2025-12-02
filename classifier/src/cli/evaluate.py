@@ -144,10 +144,11 @@ def evaluate_command(args):
     metrics = evaluate_model(predictor.model, eval_loader, device)
     
     print(f"\n🎯 Evaluation Results:")
-    print(f"   Exact Accuracy:     {metrics['exact_accuracy']:.2f}%")
-    print(f"   ±1 Grade Accuracy:  {metrics['tolerance_1_accuracy']:.2f}%")
-    print(f"   ±2 Grade Accuracy:  {metrics['tolerance_2_accuracy']:.2f}%")
-    print(f"   Loss:               {metrics['avg_loss']:.4f}")
+    print(f"   Exact Accuracy:    {metrics['exact_accuracy']:.2f}%")
+    print(f"   Macro Accuracy:    {metrics['macro_accuracy']:.2f}%")
+    print(f"   ±1 Grade Accuracy: {metrics['tolerance_1_accuracy']:.2f}%")
+    print(f"   ±2 Grade Accuracy: {metrics['tolerance_2_accuracy']:.2f}%")
+    print(f"   Loss:              {metrics['avg_loss']:.4f}")
     
     # Get detailed metrics
     print(f"\n📊 Detailed Metrics:")

@@ -94,6 +94,7 @@ from .trainer import (
 from .evaluator import (
     evaluate_model,
     calculate_exact_accuracy,
+    calculate_macro_accuracy,
     calculate_tolerance_accuracy,
     generate_confusion_matrix,
     plot_confusion_matrix,
@@ -173,6 +174,7 @@ __all__ = [
     # Evaluator functions
     'evaluate_model',
     'calculate_exact_accuracy',
+    'calculate_macro_accuracy',
     'calculate_tolerance_accuracy',
     'generate_confusion_matrix',
     'plot_confusion_matrix',
