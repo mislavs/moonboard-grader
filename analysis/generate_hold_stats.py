@@ -107,13 +107,8 @@ def analyze_holds(problems: list) -> dict:
         
         # Calculate grade statistics
         min_grade_idx = min(grades)
-        mean_grade_idx = mean(grades)
-        median_grade_idx = median(grades)
-        
-        # Convert to discrete grades
-        min_grade, min_grade_idx_discrete = GRADES[min_grade_idx], min_grade_idx
-        mean_grade, mean_grade_idx_discrete = index_to_grade(mean_grade_idx)
-        median_grade, median_grade_idx_discrete = index_to_grade(median_grade_idx)
+        mean_grade, _ = index_to_grade(mean(grades))
+        median_grade, _ = index_to_grade(median(grades))
         
         # Calculate grade distribution
         grade_distribution = defaultdict(int)
@@ -121,8 +116,8 @@ def analyze_holds(problems: list) -> dict:
             grade_distribution[GRADES[g]] += 1
         
         hold_stats[pos] = {
-            'minGrade': min_grade,
-            'minGradeIndex': min_grade_idx_discrete,
+            'minGrade': GRADES[min_grade_idx],
+            'minGradeIndex': min_grade_idx,
             'meanGrade': mean_grade,
             'medianGrade': median_grade,
             'frequency': len(grades),

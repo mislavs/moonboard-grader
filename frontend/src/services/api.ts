@@ -4,6 +4,7 @@
 
 import type { Problem, Move } from '../types/problem';
 import type { PredictionResponse, PredictionRequest } from '../types/prediction';
+import type { BoardAnalyticsResponse } from '../types/analytics';
 import { API_BASE_URL, ERROR_MESSAGES } from '../config/api';
 
 export class ApiError extends Error {
@@ -181,5 +182,12 @@ export async function generateProblem(
     },
     body: JSON.stringify({ grade, temperature }),
   });
+}
+
+/**
+ * Fetch board analytics data including hold statistics and heatmaps
+ */
+export async function fetchBoardAnalytics(): Promise<BoardAnalyticsResponse> {
+  return apiFetch<BoardAnalyticsResponse>(`${API_BASE_URL}/analytics/board`);
 }
 

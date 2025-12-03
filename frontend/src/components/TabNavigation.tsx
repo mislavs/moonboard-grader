@@ -1,12 +1,13 @@
 interface TabNavigationProps {
-  activeMode: 'view' | 'create';
-  onModeChange: (mode: 'view' | 'create') => void;
+  activeMode: 'view' | 'create' | 'analytics';
+  onModeChange: (mode: 'view' | 'create' | 'analytics') => void;
 }
 
 export default function TabNavigation({ activeMode, onModeChange }: TabNavigationProps) {
   const tabs = [
     { id: 'view' as const, label: 'Browse Problems' },
     { id: 'create' as const, label: 'Create Problem' },
+    { id: 'analytics' as const, label: 'Board Analytics' },
   ];
 
   return (

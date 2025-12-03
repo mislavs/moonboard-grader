@@ -2,8 +2,9 @@ import { useState } from 'react';
 import TabNavigation from './components/TabNavigation';
 import ViewMode from './components/ViewMode';
 import CreateMode from './components/CreateMode';
+import AnalyticsMode from './components/AnalyticsMode';
 
-type Mode = 'view' | 'create';
+type Mode = 'view' | 'create' | 'analytics';
 
 function App() {
   const [mode, setMode] = useState<Mode>('view');
@@ -22,7 +23,9 @@ function App() {
 
       <TabNavigation activeMode={mode} onModeChange={setMode} />
 
-      {mode === 'view' ? <ViewMode /> : <CreateMode />}
+      {mode === 'view' && <ViewMode />}
+      {mode === 'create' && <CreateMode />}
+      {mode === 'analytics' && <AnalyticsMode />}
     </div>
   );
 }
