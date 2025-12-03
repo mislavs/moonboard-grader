@@ -5,7 +5,7 @@ Defines all data schemas used by the API endpoints.
 """
 
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 
 class Move(BaseModel):
@@ -340,4 +340,104 @@ class GenerateResponse(BaseModel):
                 "grade": "6A+"
             }
         }
+    )
+
+
+# ============================================================================
+# Board Analytics Schemas
+# ============================================================================
+
+
+class HoldStats(BaseModel):
+    """Statistics for a single hold position on the board."""
+
+    minGrade: str = Field(
+        ..., description="Minimum grade of problems using this hold"
+    )
+    minGradeIndex: int = Field(
+        ..., description="Index of minimum grade (0-18)"
+    )
+    meanGrade: str = Field(
+        ..., description="Mean grade (rounded to nearest discrete grade)"
+    )
+    medianGrade: str = Field(
+        ..., description="Median grade of problems using this hold"
+    )
+    frequency: int = Field(
+        ..., description="Total number of problems using this hold"
+    )
+    asStart: int = Field(
+        ..., description="Number of times used as a start hold"
+    )
+    asMiddle: int = Field(
+        ..., description="Number of times used as a middle hold"
+    )
+    asEnd: int = Field(
+        ..., description="Number of times used as an end hold"
+    )
+    gradeDistribution: Dict[str, int] = Field(
+        ..., description="Count of problems by grade"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "minGrade": "6A+",
+                "minGradeIndex": 2,
+                "meanGrade": "6B+",
+                "medianGrade": "6B+",
+                "frequency": 1119,
+                "asStart": 0,
+                "asMiddle": 1119,
+                "asEnd": 0,
+                "gradeDistribution": {
+                    "6A+": 284,
+                    "6B": 177,
+                    "6B+": 171,
+                    "6C": 152
+                }
+            }
+        }
+    )
+
+
+class AnalyticsMeta(BaseModel):
+    """Metadata about the analytics data."""
+
+    totalProblems: int = Field(
+        ..., description="Total problems analyzed (after filtering)"
+    )
+    totalProblemsUnfiltered: int = Field(
+        ..., description="Total problems before filtering"
+    )
+    minRepeatsFilter: int = Field(
+        ..., description="Minimum repeats filter applied"
+    )
+
+
+class AnalyticsHeatmaps(BaseModel):
+    """Pre-computed 18x11 heatmaps for visualization."""
+
+    meanGrade: List[List[float]] = Field(
+        ..., description="18x11 normalized mean grade heatmap (0-1)"
+    )
+    minGrade: List[List[float]] = Field(
+        ..., description="18x11 normalized min grade heatmap (0-1)"
+    )
+    frequency: List[List[float]] = Field(
+        ..., description="18x11 normalized frequency heatmap (0-1)"
+    )
+
+
+class BoardAnalyticsResponse(BaseModel):
+    """Response containing all board analytics data."""
+
+    holds: Dict[str, HoldStats] = Field(
+        ..., description="Statistics for each hold position (keyed by position like 'F7')"
+    )
+    heatmaps: AnalyticsHeatmaps = Field(
+        ..., description="Pre-computed heatmaps for visualization"
+    )
+    meta: AnalyticsMeta = Field(
+        ..., description="Metadata about the analytics"
     )

@@ -178,3 +178,6 @@ secrets.json
 .env.local
 .env.*.local
 
+# Generated analytics data
+data/hold_stats.json
+
