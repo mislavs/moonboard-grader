@@ -28,6 +28,16 @@ public readonly record struct Hold(int X, int Y, bool IsStart, bool IsEnd)
     /// </summary>
     public string Description => $"{(char)('A' + X)}{Y + 1}";
 
+    /// <summary>
+    /// Calculates the Euclidean distance to another hold.
+    /// </summary>
+    public double DistanceTo(Hold other)
+    {
+        var dx = other.X - X;
+        var dy = other.Y - Y;
+        return Math.Sqrt(dx * dx + dy * dy);
+    }
+
     private static (int X, int Y) ParseCoordinates(string description)
     {
         if (string.IsNullOrWhiteSpace(description) || description.Length < 2)

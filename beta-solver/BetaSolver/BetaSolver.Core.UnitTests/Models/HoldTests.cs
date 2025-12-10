@@ -86,4 +86,59 @@ public class HoldTests
         // Assert
         hold.Description.Should().Be(description);
     }
+
+    [Fact]
+    public void DistanceTo_SameHold_ReturnsZero()
+    {
+        // Arrange
+        var hold = new Hold("E5");
+
+        // Act
+        var distance = hold.DistanceTo(hold);
+
+        // Assert
+        distance.Should().Be(0);
+    }
+
+    [Fact]
+    public void DistanceTo_HorizontalMove_ReturnsCorrectDistance()
+    {
+        // Arrange
+        var from = new Hold("A5");
+        var to = new Hold("D5");  // 3 units to the right
+
+        // Act
+        var distance = from.DistanceTo(to);
+
+        // Assert
+        distance.Should().Be(3);
+    }
+
+    [Fact]
+    public void DistanceTo_VerticalMove_ReturnsCorrectDistance()
+    {
+        // Arrange
+        var from = new Hold("E1");
+        var to = new Hold("E5");  // 4 units up
+
+        // Act
+        var distance = from.DistanceTo(to);
+
+        // Assert
+        distance.Should().Be(4);
+    }
+
+    [Fact]
+    public void DistanceTo_DiagonalMove_ReturnsCorrectDistance()
+    {
+        // Arrange
+        var from = new Hold("A1");
+        var to = new Hold("D4");  // 3 right, 3 up
+
+        // Act
+        var distance = from.DistanceTo(to);
+
+        // Assert
+        distance.Should().BeApproximately(Math.Sqrt(18), 0.0001);
+    }
 }

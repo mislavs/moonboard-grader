@@ -3,7 +3,7 @@
 ## Progress
 
 - [x] **Step 1**: Define Data Models
-- [ ] **Step 2**: Implement Scoring Function
+- [x] **Step 2**: Implement Scoring Function
 - [ ] **Step 3**: Implement DP Core Algorithm
 - [ ] **Step 4**: Implement Entry Point (CLI)
 
