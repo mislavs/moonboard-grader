@@ -1,5 +1,12 @@
 # Implementation Plan: Dynamic Programming Beta Sequence Generator
 
+## Progress
+
+- [x] **Step 1**: Define Data Models
+- [ ] **Step 2**: Implement Scoring Function
+- [ ] **Step 3**: Implement DP Core Algorithm
+- [ ] **Step 4**: Implement Entry Point (CLI)
+
 ## Overview
 
 **Goal**: Build an algorithm that determines the optimal hand sequence (beta) for completing a MoonBoard climbing problem. Given a set of holds with positions and start/end markers, the algorithm outputs which hand (left or right) should grab each hold and in what order.
@@ -15,7 +22,7 @@
 
 ---
 
-## Step 1: Define Data Models
+## Step 1: Define Data Models ✅
 
 ### 1.1 Hold Representation
 Create a Hold class/struct/record with:

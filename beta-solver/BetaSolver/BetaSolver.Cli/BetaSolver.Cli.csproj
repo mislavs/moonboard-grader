@@ -8,4 +8,8 @@
         <RootNamespace>BetaSolver</RootNamespace>
     </PropertyGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="..\BetaSolver.Core\BetaSolver.Core.csproj" />
+    </ItemGroup>
+
 </Project>
