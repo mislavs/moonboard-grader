@@ -136,4 +136,66 @@ public class ProblemTests
         // Assert
         result.Should().Be("Test Problem (6B+) - 3 holds");
     }
+
+    [Fact]
+    public void StartHoldIndices_SingleStart_ReturnsCorrectIndex()
+    {
+        // Arrange
+        var holds = new[]
+        {
+            new Hold("J4", isStart: true),
+            new Hold("G6"),
+            new Hold("F18", isEnd: true)
+        };
+        var problem = new Problem("Test", "6B+", holds);
+
+        // Act
+        var indices = problem.StartHoldIndices;
+
+        // Assert
+        indices.Should().HaveCount(1);
+        indices[0].Should().Be(0); // J4 is at index 0 after sorting
+    }
+
+    [Fact]
+    public void StartHoldIndices_TwoStarts_ReturnsCorrectIndices()
+    {
+        // Arrange
+        var holds = new[]
+        {
+            new Hold("D5", isStart: true),
+            new Hold("F5", isStart: true),
+            new Hold("E10"),
+            new Hold("F18", isEnd: true)
+        };
+        var problem = new Problem("Test", "6B+", holds);
+
+        // Act
+        var indices = problem.StartHoldIndices;
+
+        // Assert
+        indices.Should().HaveCount(2);
+        indices.Should().BeEquivalentTo([0, 1]); // Both starts at Y=4, sorted by X
+    }
+
+    [Fact]
+    public void StartHoldIndices_StartsNotAtBottom_ReturnsCorrectIndices()
+    {
+        // Arrange: start hold is not the lowest Y coordinate
+        var holds = new[]
+        {
+            new Hold("E3"),                      // Y = 2 (lowest but not start)
+            new Hold("J4", isStart: true),       // Y = 3 (start)
+            new Hold("G6"),
+            new Hold("F18", isEnd: true)
+        };
+        var problem = new Problem("Test", "6B+", holds);
+
+        // Act
+        var indices = problem.StartHoldIndices;
+
+        // Assert
+        indices.Should().HaveCount(1);
+        indices[0].Should().Be(1); // J4 is at index 1 after sorting by Y
+    }
 }

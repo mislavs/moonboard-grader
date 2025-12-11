@@ -34,6 +34,15 @@ public sealed class Problem
     /// Gets the end holds.
     /// </summary>
     public IEnumerable<Hold> EndHolds => Holds.Where(h => h.IsEnd);
+    
+    /// <summary>
+    /// Gets the indices of start holds in the Holds list.
+    /// </summary>
+    public IReadOnlyList<int> StartHoldIndices => Holds
+        .Select((h, i) => (h, i))
+        .Where(x => x.h.IsStart)
+        .Select(x => x.i)
+        .ToList();
 
     public Problem(string name, string grade, IEnumerable<Hold> holds, int? apiId = null)
     {
@@ -45,8 +54,7 @@ public sealed class Problem
         Holds = holds
             .OrderBy(h => h.Y)
             .ThenBy(h => h.X)
-            .ToList()
-            .AsReadOnly();
+            .ToList();
         
         ValidateProblem();
     }
