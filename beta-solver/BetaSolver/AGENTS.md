@@ -11,11 +11,17 @@
 
 - each file should have one empty line at the end
 
-# Class conventions
+# Code conventions
+
+## General
+
+- prefer primary constructors
+
+## Classes
 
 - each class should be in its own file
 - classes should be `sealed` unless they are designed for inheritance
 
-# Test conventions
+## Tests
 
 - test should follow the arrange-act-assert pattern
