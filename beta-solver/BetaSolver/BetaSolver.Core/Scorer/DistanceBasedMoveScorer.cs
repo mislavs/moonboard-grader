@@ -22,9 +22,9 @@ public sealed class DistanceBasedMoveScorer : IMoveScorer
 
     /// <summary>
     /// Decay rate for cross-body moves beyond threshold.
-    /// At rate 0.25: 2 units crossing → ~78%, 3 units → ~60%, 4 units → ~47%
+    /// At rate 0.8: 2 units crossing → ~45%, 3 units → ~20%, 4 units → ~9%
     /// </summary>
-    private const double CrossBodyDecayRate = 0.25;
+    private const double CrossBodyDecayRate = 0.8;
 
     /// <summary>
     /// Calculates the ease factor for completing a move (0-1 range).

@@ -4,7 +4,7 @@
 
 - [x] **Step 1**: Define Data Models
 - [x] **Step 2**: Implement Scoring Function
-- [ ] **Step 3**: Implement DP Core Algorithm
+- [x] **Step 3**: Implement DP Core Algorithm
 - [ ] **Step 4**: Implement Entry Point (CLI)
 
 ## Overview
@@ -141,7 +141,7 @@ Convert multiplicative scores to additive by taking logarithms:
 
 ---
 
-## Step 3: Implement DP Core Algorithm
+## Step 3: Implement DP Core Algorithm ✅
 
 ### 3.1 State Definition
 A state is a tuple of three elements:
