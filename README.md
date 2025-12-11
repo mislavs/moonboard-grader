@@ -40,6 +40,13 @@ Orchestration layer that runs the entire application stack.
 - Simplified deployment and development
 - **Tech**: .NET Aspire, C#
 
+### 6. Beta Solver
+Experimental algorithm that finds the best beta for a climbing problem.
+- Uses dynamic programming with memoization
+- Evaluates all possible hand sequences to find the best path
+- Move scoring based on multiple factors
+- **Tech**: C#, .NET
+
 ## Quick Start
 
 See individual README files in each component directory for detailed setup instructions:
@@ -48,4 +55,5 @@ See individual README files in each component directory for detailed setup instr
 - `frontend/README.md` - Run the web interface
 - `generator/README.md` - Generate synthetic climbing problems
 - `aspire-app/` - Run the full application stack with Aspire
+- `beta-solver/` - Compute optimal beta sequences for problems
 
