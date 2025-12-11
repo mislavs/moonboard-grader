@@ -70,7 +70,6 @@ def calculate_grade_weights(problems: list) -> dict:
             grade_counts[grade] += 1
     
     total_problems = sum(grade_counts.values())
-    num_grades = len(grade_counts)
     
     if total_problems == 0:
         return {g: 1.0 for g in GRADES}
