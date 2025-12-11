@@ -358,10 +358,10 @@ class HoldStats(BaseModel):
         ..., description="Index of minimum grade (0-18)"
     )
     meanGrade: str = Field(
-        ..., description="Mean grade (rounded to nearest discrete grade)"
+        ..., description="Weighted mean grade (corrected for dataset imbalance)"
     )
     medianGrade: str = Field(
-        ..., description="Median grade of problems using this hold"
+        ..., description="Weighted median grade of problems using this hold"
     )
     frequency: int = Field(
         ..., description="Total number of problems using this hold"
@@ -377,6 +377,9 @@ class HoldStats(BaseModel):
     )
     gradeDistribution: Dict[str, int] = Field(
         ..., description="Count of problems by grade"
+    )
+    gradeDistributionNormalized: Dict[str, float] = Field(
+        ..., description="Grade ratio vs dataset distribution (>1 = over-represented, <1 = under-represented)"
     )
 
     model_config = ConfigDict(
@@ -395,6 +398,12 @@ class HoldStats(BaseModel):
                     "6B": 177,
                     "6B+": 171,
                     "6C": 152
+                },
+                "gradeDistributionNormalized": {
+                    "6A+": 1.2,
+                    "6B": 0.9,
+                    "6B+": 1.0,
+                    "6C": 0.8
                 }
             }
         }

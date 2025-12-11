@@ -14,12 +14,42 @@ interface HoldDetailsPanelProps {
 }
 
 /**
- * Simple bar chart for grade distribution
+ * Get color class based on normalized ratio
+ * >1 = over-represented (warmer colors), <1 = under-represented (cooler colors)
+ */
+function getNormalizedColor(ratio: number): string {
+  if (ratio >= 2.0) return "bg-orange-500";
+  if (ratio >= 1.5) return "bg-amber-500";
+  if (ratio >= 1.2) return "bg-yellow-500";
+  if (ratio >= 0.8) return "bg-blue-500";
+  if (ratio >= 0.5) return "bg-sky-500";
+  return "bg-cyan-500";
+}
+
+/**
+ * Get badge style for normalized indicator
+ */
+function getNormalizedBadge(
+  ratio: number
+): { text: string; className: string } | null {
+  if (ratio >= 2.0)
+    return { text: `${ratio.toFixed(1)}×`, className: "bg-orange-500/20 text-orange-300" };
+  if (ratio >= 1.5)
+    return { text: `${ratio.toFixed(1)}×`, className: "bg-amber-500/20 text-amber-300" };
+  if (ratio <= 0.5)
+    return { text: `${ratio.toFixed(1)}×`, className: "bg-cyan-500/20 text-cyan-300" };
+  return null;
+}
+
+/**
+ * Simple bar chart for grade distribution with normalized indicators
  */
 function GradeDistributionChart({
   distribution,
+  distributionNormalized,
 }: {
   distribution: Record<string, number>;
+  distributionNormalized: Record<string, number>;
 }) {
   // Sort grades by frequency and take top entries
   const sortedGrades = Object.entries(distribution)
@@ -32,18 +62,55 @@ function GradeDistributionChart({
 
   return (
     <div className="space-y-1.5">
-      {sortedGrades.map(([grade, count]) => (
-        <div key={grade} className="flex items-center gap-2 text-sm">
-          <span className="w-10 text-gray-400 font-mono">{grade}</span>
-          <div className="flex-1 h-4 bg-gray-700 rounded overflow-hidden">
-            <div
-              className="h-full bg-blue-500 rounded transition-all duration-300"
-              style={{ width: `${(count / maxCount) * 100}%` }}
-            />
+      {sortedGrades.map(([grade, count]) => {
+        const normalizedRatio = distributionNormalized[grade] ?? 1;
+        const barColor = getNormalizedColor(normalizedRatio);
+        const badge = getNormalizedBadge(normalizedRatio);
+
+        return (
+          <div key={grade} className="flex items-center gap-2 text-sm">
+            <span className="w-10 text-gray-400 font-mono">{grade}</span>
+            <div className="flex-1 h-4 bg-gray-700 rounded overflow-hidden relative group">
+              <div
+                className={`h-full ${barColor} rounded transition-all duration-300`}
+                style={{ width: `${(count / maxCount) * 100}%` }}
+              />
+              {/* Tooltip showing normalized ratio */}
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-xs text-white font-medium bg-gray-900/80 px-1.5 py-0.5 rounded">
+                  {normalizedRatio.toFixed(1)}× vs dataset
+                </span>
+              </div>
+            </div>
+            <span className="w-10 text-right text-gray-400">{count}</span>
+            {/* Badge for significant over/under-representation */}
+            {badge ? (
+              <span
+                className={`text-xs px-1.5 py-0.5 rounded font-medium ${badge.className}`}
+              >
+                {badge.text}
+              </span>
+            ) : (
+              <span className="w-10" /> // Spacer for alignment
+            )}
           </div>
-          <span className="w-10 text-right text-gray-400">{count}</span>
-        </div>
-      ))}
+        );
+      })}
+      {/* Legend */}
+      <div className="flex items-center gap-3 mt-3 pt-2 border-t border-gray-700 text-xs text-gray-500">
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded bg-orange-500" />
+          Over-rep
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded bg-blue-500" />
+          Expected
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded bg-cyan-500" />
+          Under-rep
+        </span>
+      </div>
     </div>
   );
 }
@@ -159,7 +226,10 @@ export default function HoldDetailsPanel({
         <h4 className="text-sm font-semibold text-gray-300 mb-2">
           Grade Distribution
         </h4>
-        <GradeDistributionChart distribution={stats.gradeDistribution} />
+        <GradeDistributionChart
+          distribution={stats.gradeDistribution}
+          distributionNormalized={stats.gradeDistributionNormalized}
+        />
       </div>
     </div>
   );

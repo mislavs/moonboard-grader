@@ -12,6 +12,7 @@ export interface HoldStats {
   asMiddle: number;
   asEnd: number;
   gradeDistribution: Record<string, number>;
+  gradeDistributionNormalized: Record<string, number>;
 }
 
 export interface AnalyticsMeta {

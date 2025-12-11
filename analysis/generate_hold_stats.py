@@ -14,7 +14,7 @@ Output:
 """
 
 import json
-from collections import defaultdict
+from collections import defaultdict, Counter
 from statistics import mean, median
 from pathlib import Path
 
@@ -32,6 +32,9 @@ COLUMNS = "ABCDEFGHIJK"
 ROWS = 18
 MIN_REPEATS = 5  # Minimum repeats to include a problem
 
+# Global grade weights (calculated from dataset distribution)
+GRADE_WEIGHTS = {}  # Populated by calculate_grade_weights()
+
 
 def load_problems(json_path: Path) -> list:
     """Load problems from JSON file."""
@@ -47,6 +50,79 @@ def filter_problems(problems: list, min_repeats: int) -> list:
     return filtered
 
 
+def calculate_grade_weights(problems: list) -> dict:
+    """
+    Calculate inverse frequency weights for each grade.
+    
+    This helps correct for dataset imbalance where easy grades are over-represented.
+    Rarer grades get higher weights, more common grades get lower weights.
+    
+    Returns:
+        Dictionary mapping grade string to its weight
+    """
+    global GRADE_WEIGHTS
+    
+    # Count problems by grade
+    grade_counts = Counter()
+    for problem in problems:
+        grade = problem.get('grade')
+        if grade in GRADE_TO_INDEX:
+            grade_counts[grade] += 1
+    
+    total_problems = sum(grade_counts.values())
+    
+    if total_problems == 0:
+        return {g: 1.0 for g in GRADES}
+    
+    # Calculate inverse frequency weights
+    # Weight = (total / count) normalized so average weight = 1.0
+    raw_weights = {}
+    for grade in GRADES:
+        count = grade_counts.get(grade, 0)
+        if count > 0:
+            raw_weights[grade] = total_problems / count
+        else:
+            raw_weights[grade] = 0.0  # No weight for grades not in dataset
+    
+    # Normalize so average weight across present grades is 1.0
+    present_weights = [w for w in raw_weights.values() if w > 0]
+    if present_weights:
+        avg_weight = sum(present_weights) / len(present_weights)
+        GRADE_WEIGHTS = {g: (w / avg_weight if w > 0 else 0.0) 
+                         for g, w in raw_weights.items()}
+    else:
+        GRADE_WEIGHTS = {g: 1.0 for g in GRADES}
+    
+    print(f"\nGrade distribution and weights:")
+    for grade in GRADES:
+        count = grade_counts.get(grade, 0)
+        weight = GRADE_WEIGHTS.get(grade, 0)
+        if count > 0:
+            print(f"  {grade}: {count:5d} problems, weight: {weight:.3f}")
+    
+    return GRADE_WEIGHTS
+
+
+def get_dataset_grade_distribution(problems: list) -> dict:
+    """
+    Get the overall grade distribution of the dataset.
+    
+    Returns:
+        Dictionary mapping grade string to its proportion in the dataset
+    """
+    grade_counts = Counter()
+    for problem in problems:
+        grade = problem.get('grade')
+        if grade in GRADE_TO_INDEX:
+            grade_counts[grade] += 1
+    
+    total = sum(grade_counts.values())
+    if total == 0:
+        return {}
+    
+    return {grade: count / total for grade, count in grade_counts.items()}
+
+
 def index_to_grade(index: float) -> tuple[str, int]:
     """
     Convert a grade index (possibly float) to the nearest discrete grade.
@@ -60,9 +136,74 @@ def index_to_grade(index: float) -> tuple[str, int]:
     return GRADES[rounded_index], rounded_index
 
 
-def analyze_holds(problems: list) -> dict:
+def calculate_weighted_mean(grade_indices: list) -> float:
+    """
+    Calculate weighted mean grade index using inverse frequency weights.
+    
+    Args:
+        grade_indices: List of grade indices for problems using a hold
+        
+    Returns:
+        Weighted mean grade index
+    """
+    if not grade_indices or not GRADE_WEIGHTS:
+        return mean(grade_indices) if grade_indices else 0.0
+    
+    weighted_sum = 0.0
+    weight_total = 0.0
+    
+    for idx in grade_indices:
+        grade = GRADES[idx]
+        weight = GRADE_WEIGHTS.get(grade, 1.0)
+        weighted_sum += idx * weight
+        weight_total += weight
+    
+    return weighted_sum / weight_total if weight_total > 0 else mean(grade_indices)
+
+
+def calculate_weighted_median(grade_indices: list) -> int:
+    """
+    Calculate weighted median grade index using inverse frequency weights.
+    
+    Args:
+        grade_indices: List of grade indices for problems using a hold
+        
+    Returns:
+        Weighted median grade index (integer)
+    """
+    if not grade_indices or not GRADE_WEIGHTS:
+        return round(median(grade_indices)) if grade_indices else 0
+    
+    # Create weighted list of (grade_index, cumulative_weight)
+    grade_counts = Counter(grade_indices)
+    sorted_grades = sorted(grade_counts.keys())
+    
+    # Calculate cumulative weights
+    cumulative = []
+    running_total = 0.0
+    for idx in sorted_grades:
+        grade = GRADES[idx]
+        weight = GRADE_WEIGHTS.get(grade, 1.0)
+        count = grade_counts[idx]
+        running_total += weight * count
+        cumulative.append((idx, running_total))
+    
+    # Find the median (50% point)
+    half_total = running_total / 2.0
+    for idx, cum_weight in cumulative:
+        if cum_weight >= half_total:
+            return idx
+    
+    return sorted_grades[-1] if sorted_grades else 0
+
+
+def analyze_holds(problems: list, dataset_distribution: dict) -> dict:
     """
     Analyze all holds and calculate statistics for each position.
+    
+    Args:
+        problems: List of problems to analyze
+        dataset_distribution: Overall grade distribution of the dataset
     
     Returns:
         Dictionary mapping hold position (e.g., "F7") to stats
@@ -107,13 +248,34 @@ def analyze_holds(problems: list) -> dict:
         
         # Calculate grade statistics
         min_grade_idx = min(grades)
-        mean_grade, _ = index_to_grade(mean(grades))
-        median_grade, _ = index_to_grade(median(grades))
         
-        # Calculate grade distribution
+        # Weighted mean (corrects for dataset imbalance)
+        weighted_mean_idx = calculate_weighted_mean(grades)
+        mean_grade, _ = index_to_grade(weighted_mean_idx)
+        
+        # Weighted median (corrects for dataset imbalance)
+        weighted_median_idx = calculate_weighted_median(grades)
+        median_grade = GRADES[weighted_median_idx]
+        
+        # Calculate grade distribution (raw counts)
         grade_distribution = defaultdict(int)
         for g in grades:
             grade_distribution[GRADES[g]] += 1
+        
+        # Calculate normalized grade distribution (ratio vs dataset)
+        # >1 means over-represented, <1 means under-represented
+        total_uses = len(grades)
+        grade_distribution_normalized = {}
+        for grade_str, count in grade_distribution.items():
+            hold_proportion = count / total_uses
+            dataset_proportion = dataset_distribution.get(grade_str, 0)
+            if dataset_proportion > 0:
+                # Ratio: how much more/less frequent this grade is for this hold
+                grade_distribution_normalized[grade_str] = round(
+                    hold_proportion / dataset_proportion, 2
+                )
+            else:
+                grade_distribution_normalized[grade_str] = 0.0
         
         hold_stats[pos] = {
             'minGrade': GRADES[min_grade_idx],
@@ -125,6 +287,7 @@ def analyze_holds(problems: list) -> dict:
             'asMiddle': data['as_middle'],
             'asEnd': data['as_end'],
             'gradeDistribution': dict(grade_distribution),
+            'gradeDistributionNormalized': grade_distribution_normalized,
         }
     
     return hold_stats
@@ -136,6 +299,8 @@ def generate_heatmaps(hold_stats: dict) -> dict:
     
     Each heatmap is normalized to 0-1 range.
     Grid layout: [row][col] where row 0 = row 1, col 0 = column A
+    
+    The meanGrade heatmap uses weighted mean values (already corrected for dataset imbalance when stored in stats; no additional weighting is applied here).
     
     Returns:
         Dictionary with keys: 'meanGrade', 'minGrade', 'frequency'
@@ -216,9 +381,16 @@ def main():
     
     filtered_problems = filter_problems(problems, MIN_REPEATS)
     
+    # Calculate grade weights to correct for dataset imbalance
+    print("\nCalculating grade weights...")
+    calculate_grade_weights(filtered_problems)
+    
+    # Get dataset-wide grade distribution for normalization
+    dataset_distribution = get_dataset_grade_distribution(filtered_problems)
+    
     # Analyze holds
-    print("Analyzing hold statistics...")
-    hold_stats = analyze_holds(filtered_problems)
+    print("\nAnalyzing hold statistics...")
+    hold_stats = analyze_holds(filtered_problems, dataset_distribution)
     print(f"Analyzed {len(hold_stats)} unique hold positions")
     
     # Generate heatmaps
@@ -246,13 +418,13 @@ def main():
     print(f"Problems analyzed: {len(filtered_problems)}")
     print(f"Unique holds: {len(hold_stats)}")
     
-    # Find easiest and hardest holds by mean grade
+    # Find easiest and hardest holds by weighted mean grade
     sorted_by_mean = sorted(hold_stats.items(), key=lambda x: GRADE_TO_INDEX[x[1]['meanGrade']])
-    print(f"\nEasiest holds (by mean grade):")
+    print(f"\nEasiest holds (by weighted mean grade):")
     for pos, stats in sorted_by_mean[:5]:
         print(f"  {pos}: {stats['meanGrade']} (freq: {stats['frequency']})")
     
-    print(f"\nHardest holds (by mean grade):")
+    print(f"\nHardest holds (by weighted mean grade):")
     for pos, stats in sorted_by_mean[-5:]:
         print(f"  {pos}: {stats['meanGrade']} (freq: {stats['frequency']})")
     
@@ -260,7 +432,7 @@ def main():
     sorted_by_freq = sorted(hold_stats.items(), key=lambda x: x[1]['frequency'], reverse=True)
     print(f"\nMost used holds:")
     for pos, stats in sorted_by_freq[:5]:
-        print(f"  {pos}: {stats['frequency']} problems ({stats['meanGrade']} mean)")
+        print(f"  {pos}: {stats['frequency']} problems ({stats['meanGrade']} weighted mean)")
     
     print(f"\nOutput saved to: {output_path}")
 
