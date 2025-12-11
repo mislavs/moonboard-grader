@@ -23,7 +23,9 @@ public sealed class DpBetaSolverTests
         // White Jughaul
         { ["F5*", "I8", "H10", "K13", "K15", "K17", "H18!"], ["I8 RH", "H10 LH", "K13 RH", "K15 LH", "K17 RH", "H18 LH"] },
         // To Jug or not to Jug
-        { ["F5*", "D9", "H10", "F12", "G13", "D15", "H18!"], ["D9 LH", "H10 RH", "F12 LH", "G13 RH", "D15 LH", "H18 RH"] }
+        { ["F5*", "D9", "H10", "F12", "G13", "D15", "H18!"], ["D9 LH", "H10 RH", "F12 LH", "G13 RH", "D15 LH", "H18 RH"] },
+        // Death Star (6C)
+        { ["I4*", "J6*", "H11", "K9", "G13", "D15", "D18!"], ["K9 RH", "H11 LH", "G13 RH", "D15 LH", "D18 RH"] }
     };
 
     [Theory]
