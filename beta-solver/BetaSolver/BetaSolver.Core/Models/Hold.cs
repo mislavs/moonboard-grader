@@ -35,7 +35,7 @@ public readonly record struct Hold(int X, int Y, bool IsStart, bool IsEnd)
     {
         var dx = other.X - X;
         var dy = other.Y - Y;
-        return Math.Sqrt(dx * dx + dy * dy);
+        return Math.Sqrt((double)dx * dx + (double)dy * dy);
     }
 
     private static (int X, int Y) ParseCoordinates(string description)
