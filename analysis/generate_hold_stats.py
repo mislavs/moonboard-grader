@@ -331,7 +331,6 @@ def generate_heatmaps(hold_stats: dict) -> dict:
         col_idx = COLUMNS.index(col_char)
         row_idx = row_num - 1
         
-        # meanGrade now uses weighted values (already stored as weighted in stats)
         mean_grid[row_idx][col_idx] = GRADE_TO_INDEX[stats['meanGrade']]
         min_grid[row_idx][col_idx] = stats['minGradeIndex']
         freq_grid[row_idx][col_idx] = stats['frequency']
