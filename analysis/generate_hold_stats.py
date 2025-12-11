@@ -301,7 +301,7 @@ def generate_heatmaps(hold_stats: dict) -> dict:
     Each heatmap is normalized to 0-1 range.
     Grid layout: [row][col] where row 0 = row 1, col 0 = column A
     
-    The meanGrade heatmap uses weighted mean values (corrected for dataset imbalance).
+    The meanGrade heatmap uses weighted mean values (already corrected for dataset imbalance when stored in stats; no additional weighting is applied here).
     
     Returns:
         Dictionary with keys: 'meanGrade', 'minGrade', 'frequency'
