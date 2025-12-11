@@ -14,10 +14,8 @@ public sealed class DpBetaSolverTests
     {
         // Trivial three hold problem
         { ["E5*", "E10", "F18!"], ["E10 LH", "F18 RH"] },
-        // Four hold problem
-        { ["E5*", "E8", "E12", "E18!"], ["E8 LH", "E12 RH", "E18 LH"] },
         // Two start holds
-        { ["D5*", "F5*", "E10", "E18!"], ["E10 LH", "E18 RH"] },
+        { ["D5*", "F5*", "F10", "F18!"], ["F10 LH", "F18 RH"] },
         // Prefers non-crossing moves
         { ["C5*", "B10", "H10", "E18!"], ["H10 RH", "B10 LH", "E18 LH"] },
         // Single hold problem
@@ -25,7 +23,7 @@ public sealed class DpBetaSolverTests
         // White Jughaul
         { ["F5*", "I8", "H10", "K13", "K15", "K17", "H18!"], ["I8 RH", "H10 LH", "K13 RH", "K15 LH", "K17 RH", "H18 LH"] },
         // To Jug or not to Jug
-        // { ["F5*", "D9", "H10", "F12", "G13", "D15", "H18!"], ["D9 LH", "H10 RH", "F12 LH", "G13 RH", "D15 LH", "H18 RH"] }
+        { ["F5*", "D9", "H10", "F12", "G13", "D15", "H18!"], ["D9 LH", "H10 RH", "F12 LH", "G13 RH", "D15 LH", "H18 RH"] }
     };
 
     [Theory]

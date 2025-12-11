@@ -9,11 +9,17 @@ namespace BetaSolver.Core.Scorer;
 public sealed class DistanceBasedMoveScorer : IMoveScorer
 {
     /// <summary>
-    /// Decay rate for distance (quadratic).
-    /// Higher values = steeper penalty for longer moves.
+    /// Decay rate for move distance (moving hand origin to target).
+    /// At rate 0.01: 2 units → ~96%, 4 units → ~85%, 6 units → ~70%, 8 units → ~53%
+    /// </summary>
+    private const double MoveDecayRate = 0.01;
+
+    /// <summary>
+    /// Decay rate for reach distance (stationary hand to target).
+    /// More important factor - affects how far the climber must reach/stretch.
     /// At rate 0.02: 2 units → ~92%, 4 units → ~73%, 6 units → ~49%, 8 units → ~28%
     /// </summary>
-    private const double DistanceDecayRate = 0.02;
+    private const double ReachDecayRate = 0.02;
 
     /// <summary>
     /// How many grid units of crossing is tolerable before penalty.
@@ -30,29 +36,43 @@ public sealed class DistanceBasedMoveScorer : IMoveScorer
     /// Calculates the ease factor for completing a move (0-1 range).
     /// Higher values are better (1.0 = no penalty, approaching 0 = very difficult).
     /// </summary>
-    public double ScoreMove(int targetIndex, int otherHandIndex, Hand hand, IReadOnlyList<Hold> holds)
+    public double ScoreMove(int targetIndex, int originIndex, int otherHandIndex, Hand hand, IReadOnlyList<Hold> holds)
     {
         var targetHold = holds[targetIndex];
+        var movingHandHold = holds[originIndex];
         var otherHandHold = holds[otherHandIndex];
 
-        var distanceFactor = CalculateDistanceFactor(targetHold, otherHandHold);
+        var moveFactor = CalculateMoveFactor(targetHold, movingHandHold);
+        var reachFactor = CalculateReachFactor(targetHold, otherHandHold);
         var crossBodyFactor = CalculateCrossBodyFactor(targetHold, otherHandHold, hand);
 
         // Multiply factors for combined ease score
-        return distanceFactor * crossBodyFactor;
+        return moveFactor * reachFactor * crossBodyFactor;
     }
 
     /// <summary>
-    /// Calculates the distance-based ease factor.
+    /// Calculates the move factor based on how far the moving hand must travel
+    /// from its origin hold to the target.
     /// Uses quadratic exponential decay: gentle penalty for close moves,
     /// steep penalty for far moves.
     /// </summary>
-    private static double CalculateDistanceFactor(Hold target, Hold otherHandHold)
+    private static double CalculateMoveFactor(Hold target, Hold movingHandHold)
     {
-        var distance = otherHandHold.DistanceTo(target);
+        var distance = movingHandHold.DistanceTo(target);
 
         // Quadratic decay: gentle near 0, steep as distance grows
-        return Math.Exp(-DistanceDecayRate * distance * distance);
+        return Math.Exp(-MoveDecayRate * distance * distance);
+    }
+
+    /// <summary>
+    /// Calculates the reach factor based on how far the stationary hand is from the target.
+    /// This represents how far the climber must reach/stretch during the move.
+    /// </summary>
+    private static double CalculateReachFactor(Hold target, Hold stationaryHandHold)
+    {
+        var distance = stationaryHandHold.DistanceTo(target);
+
+        return Math.Exp(-ReachDecayRate * distance * distance);
     }
 
     /// <summary>

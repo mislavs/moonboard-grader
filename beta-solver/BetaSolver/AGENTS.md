@@ -25,3 +25,4 @@
 ## Tests
 
 - test should follow the arrange-act-assert pattern
+- don't modify SolveTestCases in DpBetaSolverTests.cs unless explicitly asked - they should still return same results when modification are made

@@ -97,7 +97,7 @@ public sealed class DpBetaSolver(IMoveScorer _scorer)
             var newVisitedMask = visitedMask | (1L << targetIndex);
 
             // Try moving left hand
-            var lhScore = _scorer.ScoreMove(targetIndex, rhPosition, Hand.Left, holds);
+            var lhScore = _scorer.ScoreMove(targetIndex, lhPosition, rhPosition, Hand.Left, holds);
             if (lhScore > 0)
             {
                 var (futureScore, futureMoves) = SolveRecursive(
@@ -112,7 +112,7 @@ public sealed class DpBetaSolver(IMoveScorer _scorer)
             }
 
             // Try moving right hand
-            var rhScore = _scorer.ScoreMove(targetIndex, lhPosition, Hand.Right, holds);
+            var rhScore = _scorer.ScoreMove(targetIndex, rhPosition, lhPosition, Hand.Right, holds);
             if (rhScore > 0)
             {
                 var (futureScore, futureMoves) = SolveRecursive(

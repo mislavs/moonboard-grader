@@ -16,15 +16,16 @@ public class DistanceBasedMoveScorerTests
         // Arrange
         var holds = new List<Hold>
         {
-            new("E5"),  // Index 0 - other hand position
-            new("F6"),  // Index 1 - target (close)
+            new("E5"),  // Index 0 - moving hand origin
+            new("D5"),  // Index 1 - other hand position
+            new("F6"),  // Index 2 - target (close to origin)
         };
 
         // Act
-        var factor = _scorer.ScoreMove(targetIndex: 1, otherHandIndex: 0, Hand.Right, holds);
+        var factor = _scorer.ScoreMove(targetIndex: 2, originIndex: 0, otherHandIndex: 1, Hand.Right, holds);
 
         // Assert - close moves should have high ease factor
-        factor.Should().BeGreaterThan(0.9);
+        factor.Should().BeGreaterThan(0.8);
         factor.Should().BeLessThanOrEqualTo(1.0);
     }
 
@@ -34,14 +35,15 @@ public class DistanceBasedMoveScorerTests
         // Arrange
         var holds = new List<Hold>
         {
-            new("E5"),   // Index 0 - other hand position
-            new("F6"),   // Index 1 - close target
-            new("J12"),  // Index 2 - far target
+            new("E5"),   // Index 0 - moving hand origin
+            new("D5"),   // Index 1 - other hand position
+            new("F6"),   // Index 2 - close target
+            new("J12"),  // Index 3 - far target
         };
 
         // Act
-        var closeFactor = _scorer.ScoreMove(targetIndex: 1, otherHandIndex: 0, Hand.Right, holds);
-        var farFactor = _scorer.ScoreMove(targetIndex: 2, otherHandIndex: 0, Hand.Right, holds);
+        var closeFactor = _scorer.ScoreMove(targetIndex: 2, originIndex: 0, otherHandIndex: 1, Hand.Right, holds);
+        var farFactor = _scorer.ScoreMove(targetIndex: 3, originIndex: 0, otherHandIndex: 1, Hand.Right, holds);
 
         // Assert
         farFactor.Should().BeLessThan(closeFactor);
@@ -53,35 +55,36 @@ public class DistanceBasedMoveScorerTests
         // Arrange - distance across the board
         var holds = new List<Hold>
         {
-            new("A1"),   // Index 0 - other hand at bottom left
-            new("K18"),  // Index 1 - target at top right (diagonal across board)
+            new("A1"),   // Index 0 - moving hand at bottom left
+            new("B1"),   // Index 1 - other hand nearby
+            new("K18"),  // Index 2 - target at top right (diagonal across board)
         };
 
         // Act
-        var factor = _scorer.ScoreMove(targetIndex: 1, otherHandIndex: 0, Hand.Right, holds);
+        var factor = _scorer.ScoreMove(targetIndex: 2, originIndex: 0, otherHandIndex: 1, Hand.Right, holds);
 
         // Assert - very low factor for extreme distance
-        factor.Should().BeLessThan(0.1);
+        factor.Should().BeLessThan(0.01);
         factor.Should().BeGreaterThan(0);
     }
 
     [Fact]
     public void ScoreMove_AllScores_AreBetweenZeroAndOne()
     {
-        // Arrange - various moves
+        // Arrange - various moves (origin, other, target)
         var testCases = new[]
         {
-            (new Hold("E5"), new Hold("F6")),   // Close
-            (new Hold("A1"), new Hold("K18")),  // Far
-            (new Hold("G5"), new Hold("C5")),   // Crossing
+            (new Hold("E5"), new Hold("D5"), new Hold("F6")),   // Close
+            (new Hold("A1"), new Hold("B1"), new Hold("K18")),  // Far
+            (new Hold("G5"), new Hold("H5"), new Hold("C5")),   // Crossing
         };
 
-        foreach (var (other, target) in testCases)
+        foreach (var (origin, other, target) in testCases)
         {
-            var holds = new List<Hold> { other, target };
+            var holds = new List<Hold> { origin, other, target };
 
             // Act
-            var factor = _scorer.ScoreMove(targetIndex: 1, otherHandIndex: 0, Hand.Right, holds);
+            var factor = _scorer.ScoreMove(targetIndex: 2, originIndex: 0, otherHandIndex: 1, Hand.Right, holds);
 
             // Assert
             factor.Should().BeGreaterThan(0);
@@ -99,19 +102,21 @@ public class DistanceBasedMoveScorerTests
         // Arrange - right hand reaching far to the left of left hand
         var crossingHolds = new List<Hold>
         {
-            new("G5"),  // Index 0 - left hand (other) position
-            new("C5"),  // Index 1 - target to the left (crossing)
+            new("H5"),  // Index 0 - right hand (moving) origin
+            new("G5"),  // Index 1 - left hand (other) position
+            new("C5"),  // Index 2 - target to the left (crossing)
         };
 
         var nonCrossingHolds = new List<Hold>
         {
-            new("G5"),  // Index 0 - left hand position
-            new("I5"),  // Index 1 - target to the right (not crossing)
+            new("H5"),  // Index 0 - right hand origin
+            new("G5"),  // Index 1 - left hand position
+            new("I5"),  // Index 2 - target to the right (not crossing)
         };
 
         // Act
-        var crossingFactor = _scorer.ScoreMove(targetIndex: 1, otherHandIndex: 0, Hand.Right, crossingHolds);
-        var nonCrossingFactor = _scorer.ScoreMove(targetIndex: 1, otherHandIndex: 0, Hand.Right, nonCrossingHolds);
+        var crossingFactor = _scorer.ScoreMove(targetIndex: 2, originIndex: 0, otherHandIndex: 1, Hand.Right, crossingHolds);
+        var nonCrossingFactor = _scorer.ScoreMove(targetIndex: 2, originIndex: 0, otherHandIndex: 1, Hand.Right, nonCrossingHolds);
 
         // Assert
         crossingFactor.Should().BeLessThan(nonCrossingFactor);
@@ -123,19 +128,21 @@ public class DistanceBasedMoveScorerTests
         // Arrange - left hand reaching far to the right of right hand
         var crossingHolds = new List<Hold>
         {
-            new("C5"),  // Index 0 - right hand (other) position
-            new("G5"),  // Index 1 - target to the right (crossing)
+            new("B5"),  // Index 0 - left hand (moving) origin
+            new("C5"),  // Index 1 - right hand (other) position
+            new("G5"),  // Index 2 - target to the right (crossing)
         };
 
         var nonCrossingHolds = new List<Hold>
         {
-            new("C5"),  // Index 0 - right hand position
-            new("A5"),  // Index 1 - target to the left (not crossing)
+            new("B5"),  // Index 0 - left hand origin
+            new("C5"),  // Index 1 - right hand position
+            new("A5"),  // Index 2 - target to the left (not crossing)
         };
 
         // Act
-        var crossingFactor = _scorer.ScoreMove(targetIndex: 1, otherHandIndex: 0, Hand.Left, crossingHolds);
-        var nonCrossingFactor = _scorer.ScoreMove(targetIndex: 1, otherHandIndex: 0, Hand.Left, nonCrossingHolds);
+        var crossingFactor = _scorer.ScoreMove(targetIndex: 2, originIndex: 0, otherHandIndex: 1, Hand.Left, crossingHolds);
+        var nonCrossingFactor = _scorer.ScoreMove(targetIndex: 2, originIndex: 0, otherHandIndex: 1, Hand.Left, nonCrossingHolds);
 
         // Assert
         crossingFactor.Should().BeLessThan(nonCrossingFactor);
@@ -145,23 +152,26 @@ public class DistanceBasedMoveScorerTests
     public void ScoreMove_SlightCrossing_WithinThreshold_NoCrossBodyPenalty()
     {
         // Arrange - hands crossing by only 1 grid unit (within threshold)
+        // Both moves have same reach and stability distances
         var crossingHolds = new List<Hold>
         {
-            new("E5"),  // Index 0 - other hand
-            new("D5"),  // Index 1 - target 1 unit to the left (within 1-unit threshold)
+            new("F5"),  // Index 0 - moving hand origin
+            new("E5"),  // Index 1 - other hand
+            new("D5"),  // Index 2 - target 1 unit to the left of other hand (within 1-unit threshold)
         };
 
         var nonCrossingHolds = new List<Hold>
         {
-            new("E5"),
-            new("F5"),  // 1 unit to the right
+            new("D5"),  // Index 0 - moving hand origin
+            new("E5"),  // Index 1 - other hand
+            new("F5"),  // Index 2 - target 1 unit to the right of other hand
         };
 
         // Act
-        var crossingFactor = _scorer.ScoreMove(targetIndex: 1, otherHandIndex: 0, Hand.Right, crossingHolds);
-        var nonCrossingFactor = _scorer.ScoreMove(targetIndex: 1, otherHandIndex: 0, Hand.Right, nonCrossingHolds);
+        var crossingFactor = _scorer.ScoreMove(targetIndex: 2, originIndex: 0, otherHandIndex: 1, Hand.Right, crossingHolds);
+        var nonCrossingFactor = _scorer.ScoreMove(targetIndex: 2, originIndex: 0, otherHandIndex: 1, Hand.Right, nonCrossingHolds);
 
-        // Assert - same distance, within threshold, so should be equal
+        // Assert - same reach distance (2 units), same stability distance (1 unit), within cross-body threshold
         crossingFactor.Should().BeApproximately(nonCrossingFactor, 0.001);
     }
 
