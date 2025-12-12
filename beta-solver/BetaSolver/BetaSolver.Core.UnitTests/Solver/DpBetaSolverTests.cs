@@ -19,18 +19,20 @@ public sealed class DpBetaSolverTests
         // Prefers non-crossing moves
         { ["C5*", "B10", "H10", "E18!"], ["H10 RH", "B10 LH", "E18 LH"] },
         // Single hold problem
-        { ["E10*!"], Array.Empty<string>() },
-        // White Jughaul
+        { ["E10*!"], [] },
+        // White Jughaul (6A+)
         { ["F5*", "I8", "H10", "K13", "K15", "K17", "H18!"], ["I8 RH", "H10 LH", "K13 RH", "K15 LH", "K17 RH", "H18 LH"] },
-        // To Jug or not to Jug
+        // To Jug or not to Jug (6a+)
         { ["F5*", "D9", "H10", "F12", "G13", "D15", "H18!"], ["D9 LH", "H10 RH", "F12 LH", "G13 RH", "D15 LH", "H18 RH"] },
         // Death Star (6C)
-        { ["I4*", "J6*", "H11", "K9", "G13", "D15", "D18!"], ["K9 RH", "H11 LH", "G13 RH", "D15 LH", "D18 RH"] }
+        { ["I4*", "J6*", "H11", "K9", "G13", "D15", "D18!"], ["K9 RH", "H11 LH", "G13 RH", "D15 LH", "D18 RH"] },
+        // Alpine Start (6B)
+        { ["F4*", "F7", "H9", "F12", "J13", "I16", "K17", "F18!"], ["F7 LH", "H9 RH", "F12 LH", "J13 RH", "I16 LH", "K17 RH", "F18 LH"] }
     };
 
     [Theory]
     [MemberData(nameof(SolveTestCases))]
-    public void Solve_ReturnsExpectedSequence(string[] holdDescriptions, string[] expected)
+    public void Solve_ReturnsExpectedSequence(string[] holdDescriptions, string[] expectedBeta)
     {
         // Arrange
         var holds = holdDescriptions.Select(ParseHold).ToArray();
@@ -39,7 +41,7 @@ public sealed class DpBetaSolverTests
         var result = Solve(holds);
 
         // Assert
-        result.Should().BeEquivalentTo(expected);
+        result.Should().BeEquivalentTo(expectedBeta);
     }
 
     private string[] Solve(Hold[] holds)
