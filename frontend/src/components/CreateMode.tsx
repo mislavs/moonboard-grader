@@ -6,7 +6,9 @@ import CreateModeControls from "./CreateModeControls";
 import PredictionDisplay from "./PredictionDisplay";
 import DuplicateCheckResult from "./DuplicateCheckResult";
 import CruxHighlightToggle from "./CruxHighlightToggle";
+import BetaToggle from "./BetaToggle";
 import { usePrediction } from "../hooks/usePrediction";
+import { useBeta } from "../hooks/useBeta";
 import { useDuplicateCheck } from "../hooks/useDuplicateCheck";
 import { useBackendHealth } from "../hooks/useBackendHealth";
 import { useGeneration } from "../hooks/useGeneration";
@@ -20,7 +22,9 @@ export default function CreateMode() {
     AVAILABLE_GRADES[0]
   );
   const [showAttention, setShowAttention] = useState(false);
+  const [showBeta, setShowBeta] = useState(false);
   const { prediction, predicting, error, predict, reset } = usePrediction();
+  const { beta, loading: betaLoading, fetchBeta, reset: resetBeta } = useBeta();
   const {
     duplicate,
     checking,
@@ -36,9 +40,10 @@ export default function CreateMode() {
   } = useGeneration();
   const backendHealthy = useBackendHealth();
 
-  // Clear duplicate result when moves change
+  // Clear duplicate result and beta when moves change
   useEffect(() => {
     resetDuplicate();
+    resetBeta();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createdMoves]);
 
@@ -47,6 +52,14 @@ export default function CreateMode() {
     reset();
     resetDuplicate();
     resetGenerate();
+    resetBeta();
+  };
+
+  const handleToggleBeta = async (checked: boolean) => {
+    setShowBeta(checked);
+    if (checked && createdMoves.length > 0 && !beta) {
+      await fetchBeta(createdMoves);
+    }
   };
 
   const handlePredictGrade = async () => {
@@ -134,6 +147,8 @@ export default function CreateMode() {
             onMovesChange={setCreatedMoves}
             attentionMap={prediction?.attention_map}
             showAttention={showAttention}
+            beta={beta ?? undefined}
+            showBeta={showBeta}
           />
 
           {/* Crux Highlight Toggle */}
@@ -142,6 +157,19 @@ export default function CreateMode() {
               checked={showAttention}
               onChange={setShowAttention}
             />
+          )}
+
+          {/* Beta Toggle */}
+          {createdMoves.length > 0 && (
+            <BetaToggle
+              checked={showBeta}
+              onChange={handleToggleBeta}
+            />
+          )}
+
+          {/* Beta Loading */}
+          {betaLoading && (
+            <LoadingSpinner message="Loading beta..." />
           )}
         </div>
       </div>

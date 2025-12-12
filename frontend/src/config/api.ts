@@ -4,6 +4,8 @@
 
 export const API_BASE_URL = '/api';
 
+export const BETA_API_BASE_URL = '/beta-api';
+
 export const PREDICTION_TOP_K = 4;
 
 export const ERROR_MESSAGES = {

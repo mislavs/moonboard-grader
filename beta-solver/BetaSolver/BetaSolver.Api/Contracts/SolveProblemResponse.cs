@@ -13,7 +13,7 @@ public sealed record SolveProblemResponse(
     public SolveProblemResponse(Beta beta)
         : this(
             beta.StartHands
-                .Select(kvp => new StartHandDto(kvp.Key, kvp.Value.Description))
+                .Select(kvp => new StartHandDto(kvp.Key == Hand.Left ? "LH" : "RH", kvp.Value.Description))
                 .ToList(),
             beta.Moves
                 .Select(m => new BetaMoveDto(m.Hold.Description, m.Hand == Hand.Left ? "LH" : "RH"))

@@ -11,6 +11,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      '/beta-api': {
+        target: process.env.BETA_SOLVER_HTTPS || process.env.BETA_SOLVER_HTTP || 'https://localhost:7068',
+        changeOrigin: true,
+        secure: false, // Allow self-signed certificates in development
+        rewrite: (path) => path.replace(/^\/beta-api/, ''),
+      },
     },
   },
 })

@@ -4,8 +4,10 @@ import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
 import ProblemNavigator from './ProblemNavigator';
 import CruxHighlightToggle from './CruxHighlightToggle';
+import BetaToggle from './BetaToggle';
 import { fetchProblem, ApiError } from '../services/api';
 import { usePrediction } from '../hooks/usePrediction';
+import { useBeta } from '../hooks/useBeta';
 import type { Problem } from '../types/problem';
 import { ERROR_MESSAGES } from '../config/api';
 
@@ -15,8 +17,10 @@ export default function ViewMode() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAttention, setShowAttention] = useState(false);
+  const [showBeta, setShowBeta] = useState(false);
   
   const { prediction, predicting, predict, reset: resetPrediction } = usePrediction();
+  const { beta, loading: betaLoading, fetchBeta, reset: resetBeta } = useBeta();
 
   useEffect(() => {
     async function loadProblem() {
@@ -43,10 +47,11 @@ export default function ViewMode() {
     loadProblem();
   }, [selectedProblemId]);
 
-  // Reset prediction when problem changes
+  // Reset prediction and beta when problem changes
   useEffect(() => {
     resetPrediction();
-  }, [selectedProblemId, resetPrediction]);
+    resetBeta();
+  }, [selectedProblemId, resetPrediction, resetBeta]);
 
   // Auto-fetch heatmap when problem loads and toggle is on
   useEffect(() => {
@@ -55,11 +60,26 @@ export default function ViewMode() {
     }
   }, [problem, showAttention, predicting, prediction?.attention_map, predict]);
 
+  // Auto-fetch beta when problem loads and toggle is on
+  useEffect(() => {
+    if (showBeta && problem && !betaLoading && !beta && !loading) {
+      fetchBeta(problem.moves);
+    }
+  }, [problem, showBeta, betaLoading, beta, fetchBeta, loading]);
+
   // Fetch attention map when toggle is turned on
   const handleToggleAttention = async (checked: boolean) => {
     setShowAttention(checked);
     if (checked && problem && !prediction?.attention_map) {
       await predict(problem.moves);
+    }
+  };
+
+  // Fetch beta when toggle is turned on
+  const handleToggleBeta = async (checked: boolean) => {
+    setShowBeta(checked);
+    if (checked && problem && !beta) {
+      await fetchBeta(problem.moves);
     }
   };
 
@@ -96,13 +116,15 @@ export default function ViewMode() {
                 mode="view"
                 attentionMap={prediction?.attention_map}
                 showAttention={showAttention}
+                beta={beta ?? undefined}
+                showBeta={showBeta}
               />
             )}
             
             {/* Loading Overlay */}
-            {(loading || predicting) && (
+            {(loading || predicting || betaLoading) && (
               <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center z-10">
-                <LoadingSpinner message={predicting ? "Loading heatmap..." : "Loading problem..."} />
+                <LoadingSpinner message={betaLoading ? "Loading beta..." : predicting ? "Loading heatmap..." : "Loading problem..."} />
               </div>
             )}
           </div>
@@ -112,6 +134,14 @@ export default function ViewMode() {
             <CruxHighlightToggle
               checked={showAttention}
               onChange={handleToggleAttention}
+            />
+          )}
+
+          {/* Beta Toggle */}
+          {problem && !error && (
+            <BetaToggle
+              checked={showBeta}
+              onChange={handleToggleBeta}
             />
           )}
         </div>

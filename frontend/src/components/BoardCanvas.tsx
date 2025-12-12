@@ -1,4 +1,5 @@
 import type { Move } from "../types/problem";
+import type { BetaResponse } from "../types/beta";
 import {
   parsePosition,
   gridToPixel,
@@ -17,6 +18,8 @@ interface BoardCanvasViewProps {
   onMovesChange?: never;
   attentionMap?: number[][];
   showAttention?: boolean;
+  beta?: BetaResponse;
+  showBeta?: boolean;
 }
 
 interface BoardCanvasCreateProps {
@@ -25,6 +28,8 @@ interface BoardCanvasCreateProps {
   onMovesChange: (moves: Move[]) => void;
   attentionMap?: number[][];
   showAttention?: boolean;
+  beta?: BetaResponse;
+  showBeta?: boolean;
 }
 
 type BoardCanvasProps = BoardCanvasViewProps | BoardCanvasCreateProps;
@@ -36,8 +41,36 @@ export default function BoardCanvas(props: BoardCanvasProps) {
     onMovesChange,
     attentionMap,
     showAttention = false,
+    beta,
+    showBeta = false,
   } = props;
   const { width, height, holdRadius } = BOARD_CONFIG;
+
+  // Build lookup map from hold description to hand assignments (can have both hands on same hold)
+  const holdToHands = new Map<string, Set<"LH" | "RH">>();
+  if (beta && showBeta) {
+    // Check if there's only one start hold - if so, both hands start there
+    const startHolds = moves.filter(m => m.isStart);
+    const hasSingleStartHold = startHolds.length === 1;
+
+    if (hasSingleStartHold) {
+      // Single start hold gets both hands
+      holdToHands.set(startHolds[0].description, new Set(["LH", "RH"]));
+    } else {
+      // Multiple start holds - use beta response
+      for (const startHand of beta.startHands) {
+        if (!holdToHands.has(startHand.description)) {
+          holdToHands.set(startHand.description, new Set());
+        }
+        holdToHands.get(startHand.description)!.add(startHand.hand);
+      }
+    }
+
+    // Add moves (may override starts for holds used again)
+    for (const betaMove of beta.moves) {
+      holdToHands.set(betaMove.hold, new Set([betaMove.hand]));
+    }
+  }
 
   const handleClick = (event: React.MouseEvent<SVGSVGElement>) => {
     if (mode !== "create" || !onMovesChange) return;
@@ -82,18 +115,67 @@ export default function BoardCanvas(props: BoardCanvasProps) {
           const position = parsePosition(move.description);
           const { x, y } = gridToPixel(position, width, height);
           const color = getHoldColor(move);
+          const hands = holdToHands.get(move.description);
+          const handsArray = hands ? Array.from(hands) : [];
+          const hasBothHands = handsArray.length === 2;
 
           return (
-            <circle
-              key={`${move.description}-${index}`}
-              cx={x}
-              cy={y}
-              r={holdRadius}
-              fill={mode === "create" ? "transparent" : "none"}
-              stroke={color}
-              strokeWidth={5}
-              style={mode === "create" ? { cursor: "pointer" } : undefined}
-            />
+            <g key={`${move.description}-${index}`}>
+              <circle
+                cx={x}
+                cy={y}
+                r={holdRadius}
+                fill={mode === "create" ? "transparent" : "none"}
+                stroke={color}
+                strokeWidth={5}
+                style={mode === "create" ? { cursor: "pointer" } : undefined}
+              />
+              {showBeta && handsArray.length > 0 && (
+                hasBothHands ? (
+                  // Both hands on same hold - show side by side
+                  <>
+                    <text
+                      x={x - 10}
+                      y={y - holdRadius - 8}
+                      textAnchor="middle"
+                      fontSize="14"
+                      fontWeight="bold"
+                      fill="#60a5fa"
+                      stroke="#000"
+                      strokeWidth="0.5"
+                    >
+                      L
+                    </text>
+                    <text
+                      x={x + 10}
+                      y={y - holdRadius - 8}
+                      textAnchor="middle"
+                      fontSize="14"
+                      fontWeight="bold"
+                      fill="#fb923c"
+                      stroke="#000"
+                      strokeWidth="0.5"
+                    >
+                      R
+                    </text>
+                  </>
+                ) : (
+                  // Single hand
+                  <text
+                    x={x}
+                    y={y - holdRadius - 8}
+                    textAnchor="middle"
+                    fontSize="14"
+                    fontWeight="bold"
+                    fill={handsArray[0] === "LH" ? "#60a5fa" : "#fb923c"}
+                    stroke="#000"
+                    strokeWidth="0.5"
+                  >
+                    {handsArray[0] === "LH" ? "L" : "R"}
+                  </text>
+                )
+              )}
+            </g>
           );
         })}
       </svg>

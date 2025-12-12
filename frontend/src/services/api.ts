@@ -5,7 +5,8 @@
 import type { Problem, Move } from '../types/problem';
 import type { PredictionResponse, PredictionRequest } from '../types/prediction';
 import type { BoardAnalyticsResponse } from '../types/analytics';
-import { API_BASE_URL, ERROR_MESSAGES } from '../config/api';
+import type { BetaResponse } from '../types/beta';
+import { API_BASE_URL, BETA_API_BASE_URL, ERROR_MESSAGES } from '../config/api';
 
 export class ApiError extends Error {
   statusCode?: number;
@@ -189,5 +190,26 @@ export async function generateProblem(
  */
 export async function fetchBoardAnalytics(): Promise<BoardAnalyticsResponse> {
   return apiFetch<BoardAnalyticsResponse>(`${API_BASE_URL}/analytics/board`);
+}
+
+/**
+ * Solve beta for a climbing problem
+ */
+export async function solveBeta(moves: Move[]): Promise<BetaResponse> {
+  const requestBody = {
+    moves: moves.map(m => ({
+      description: m.description,
+      isStart: m.isStart,
+      isEnd: m.isEnd,
+    })),
+  };
+
+  return apiFetch<BetaResponse>(`${BETA_API_BASE_URL}/solve`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
 }
 

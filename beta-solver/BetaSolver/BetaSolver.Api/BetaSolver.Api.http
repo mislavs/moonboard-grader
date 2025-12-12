@@ -1,5 +1,5 @@
 ### Alpine Start (6B)
-POST http://localhost:5176/solve
+POST https://localhost:7068/solve
 Content-Type: application/json
 
 {
