@@ -1,0 +1,35 @@
+### Alpine Start (6B)
+POST http://localhost:5176/solve
+Content-Type: application/json
+
+{
+  "moves": [
+    { "description": "F4", "isStart": true, "isEnd": false },
+    { "description": "F7", "isStart": false, "isEnd": false },
+    { "description": "H9", "isStart": false, "isEnd": false },
+    { "description": "F12", "isStart": false, "isEnd": false },
+    { "description": "J13", "isStart": false, "isEnd": false },
+    { "description": "I16", "isStart": false, "isEnd": false },
+    { "description": "K17", "isStart": false, "isEnd": false },
+    { "description": "F18", "isStart": false, "isEnd": true }
+  ]
+}
+
+### Death Star (6C)
+POST http://localhost:5176/solve
+Content-Type: application/json
+
+{
+  "moves": [
+    { "description": "I4", "isStart": true, "isEnd": false },
+    { "description": "J6", "isStart": true, "isEnd": false },
+    { "description": "H11", "isStart": false, "isEnd": false },
+    { "description": "K9", "isStart": false, "isEnd": false },
+    { "description": "G13", "isStart": false, "isEnd": false },
+    { "description": "D15", "isStart": false, "isEnd": false },
+    { "description": "D18", "isStart": false, "isEnd": true }
+  ]
+}
+
+###
+

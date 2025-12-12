@@ -8,12 +8,12 @@ public sealed class Problem
     /// <summary>
     /// The name of the problem.
     /// </summary>
-    public string Name { get; }
+    public string? Name { get; }
     
     /// <summary>
     /// The grade of the problem (e.g., "6B+").
     /// </summary>
-    public string Grade { get; }
+    public string? Grade { get; }
     
     /// <summary>
     /// The list of holds in this problem, sorted by Y-coordinate (bottom to top).
@@ -44,7 +44,7 @@ public sealed class Problem
         .Select(x => x.i)
         .ToList();
 
-    public Problem(string name, string grade, IEnumerable<Hold> holds, int? apiId = null)
+    public Problem(string? name, string? grade, IEnumerable<Hold> holds, int? apiId = null)
     {
         Name = name;
         Grade = grade;
@@ -57,6 +57,11 @@ public sealed class Problem
             .ToList();
         
         ValidateProblem();
+    }
+
+    public Problem(IEnumerable<Hold> holds)
+        : this(null, null, holds)
+    {
     }
     
     private void ValidateProblem()
