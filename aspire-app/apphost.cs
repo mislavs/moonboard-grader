@@ -9,6 +9,8 @@ var backend = builder.AddUvicornApp("backend", "../backend", "app.main:app")
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health");
 
+var solverBackend = builder.AddProject("solver-backend", "../beta-solver/BetaSolver/BetaSolver.Api/BetaSolver.Api.csproj");
+
 var frontend = builder.AddViteApp("frontend", "../frontend")
     .WithReference(backend)
     .WaitFor(backend);
