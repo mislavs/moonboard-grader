@@ -27,7 +27,10 @@ public sealed class DpBetaSolverTests
         // Death Star (6C)
         { ["I4*", "J6*", "H11", "K9", "G13", "D15", "D18!"], ["K9 RH", "H11 LH", "G13 RH", "D15 LH", "D18 RH"] },
         // Alpine Start (6B)
-        { ["F4*", "F7", "H9", "F12", "J13", "I16", "K17", "F18!"], ["F7 LH", "H9 RH", "F12 LH", "J13 RH", "I16 LH", "K17 RH", "F18 LH"] }
+        { ["F4*", "F7", "H9", "F12", "J13", "I16", "K17", "F18!"], ["F7 LH", "H9 RH", "F12 LH", "J13 RH", "I16 LH", "K17 RH", "F18 LH"] },
+        // Speed (6B+)
+        // preferred beta uses matching - not supported yet
+        // { ["A5*", "D5*", "G8", "G10", "F12", "D15", "F18!"], ["D5 LH", "G8 RH", "G10 RH", "F12 LH", "F12 RH", "D15 LH", "F18 RH"] }
     };
 
     [Theory]
