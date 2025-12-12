@@ -6,7 +6,7 @@ namespace BetaSolver.Core.Solver;
 /// <summary>
 /// Solves for the optimal beta sequence using dynamic programming with memoization.
 /// </summary>
-public sealed class DpBetaSolver(IMoveScorer _scorer)
+public sealed class DpBetaSolver(IMoveScorer _scorer) : IBetaSolver
 {
     /// <summary>
     /// Finds the optimal beta sequence for the given problem.
