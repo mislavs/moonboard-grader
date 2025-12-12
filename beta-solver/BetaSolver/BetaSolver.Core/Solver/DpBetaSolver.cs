@@ -13,14 +13,14 @@ public sealed class DpBetaSolver(IMoveScorer _scorer) : IBetaSolver
     /// </summary>
     /// <param name="problem">The climbing problem to solve</param>
     /// <returns>The optimal sequence of moves with scores</returns>
-    public BetaSequenceResult Solve(Problem problem)
+    public Beta Solve(Problem problem)
     {
         var holds = problem.Holds;
         var startIndices = problem.StartHoldIndices;
 
         if (startIndices.Count == 0)
         {
-            return BetaSequenceResult.Empty;
+            return Beta.Empty;
         }
 
         // Try all valid start configurations and return the best result
@@ -32,17 +32,23 @@ public sealed class DpBetaSolver(IMoveScorer _scorer) : IBetaSolver
         };
     }
 
-    private BetaSequenceResult SolveFromSingleStart(IReadOnlyList<Hold> holds, int startIndex)
+    private Beta SolveFromSingleStart(IReadOnlyList<Hold> holds, int startIndex)
     {
         // Both hands start on the same hold
         var initialVisited = 1L << startIndex;
         var memo = new Dictionary<(int, int, long), (double Score, List<Move> Moves)>();
 
         var (_, moves) = SolveRecursive(startIndex, startIndex, initialVisited, holds, memo);
-        return new BetaSequenceResult(moves);
+        var startHold = holds[startIndex];
+        
+        return new Beta(moves, new Dictionary<Hand, Hold>
+        {
+            { Hand.Left, startHold },
+            { Hand.Right, startHold }
+        });
     }
 
-    private BetaSequenceResult SolveFromDoubleStart(IReadOnlyList<Hold> holds, int startIndex1, int startIndex2)
+    private Beta SolveFromDoubleStart(IReadOnlyList<Hold> holds, int startIndex1, int startIndex2)
     {
         var initialVisited = (1L << startIndex1) | (1L << startIndex2);
         var memo = new Dictionary<(int, int, long), (double Score, List<Move> Moves)>();
@@ -54,9 +60,17 @@ public sealed class DpBetaSolver(IMoveScorer _scorer) : IBetaSolver
         memo.Clear();
         var (score2, moves2) = SolveRecursive(startIndex2, startIndex1, initialVisited, holds, memo);
 
-        // Return the better result
-        var bestMoves = score1 >= score2 ? moves1 : moves2;
-        return new BetaSequenceResult(bestMoves);
+        return score1 >= score2
+            ? new Beta(moves1, new Dictionary<Hand, Hold>
+                {
+                    { Hand.Left, holds[startIndex1] },
+                    { Hand.Right, holds[startIndex2] }
+                })
+            : new Beta(moves2, new Dictionary<Hand, Hold>
+                {
+                    { Hand.Left, holds[startIndex2] },
+                    { Hand.Right, holds[startIndex1] }
+                });
     }
 
     private (double Score, List<Move> Moves) SolveRecursive(

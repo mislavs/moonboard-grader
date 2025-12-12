@@ -9,5 +9,5 @@ public interface IBetaSolver
     /// </summary>
     /// <param name="problem">The climbing problem to solve</param>
     /// <returns>The optimal sequence of moves with scores</returns>
-    BetaSequenceResult Solve(Problem problem);
+    Beta Solve(Problem problem);
 }

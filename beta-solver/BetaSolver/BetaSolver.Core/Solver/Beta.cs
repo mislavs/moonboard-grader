@@ -6,10 +6,13 @@ namespace BetaSolver.Core.Solver;
 /// Represents the result of solving for the optimal beta sequence.
 /// </summary>
 /// <param name="Moves">The ordered list of moves in the sequence</param>
-public sealed record BetaSequenceResult(IReadOnlyList<Move> Moves)
+/// <param name="StartHands">Maps each hand to the starting hold it is on</param>
+public sealed record Beta(
+    IReadOnlyList<Move> Moves,
+    IReadOnlyDictionary<Hand, Hold> StartHands)
 {
     /// <summary>
     /// Creates an empty result with no moves.
     /// </summary>
-    public static BetaSequenceResult Empty => new(Array.Empty<Move>());
+    public static Beta Empty => new([], new Dictionary<Hand, Hold>());
 }
