@@ -47,12 +47,47 @@ public sealed class DpBetaSolverTests
         result.Should().BeEquivalentTo(expectedBeta);
     }
 
+    [Fact]
+    public void Solve_PopulatesMoveContext_ForSingleStartProblem()
+    {
+        // Arrange - trivial three hold problem: E5 (start) -> E10 -> F18 (end)
+        var holds = new[]
+        {
+            new Hold("E5", isStart: true, isEnd: false),
+            new Hold("E10", isStart: false, isEnd: false),
+            new Hold("F18", isStart: false, isEnd: true)
+        };
+        var problem = new Problem("Test", "6A", holds);
+
+        // Act
+        var result = _solver.Solve(problem);
+
+        // Assert
+        result.Moves.Should().HaveCount(2);
+
+        // Move 1: LH moves from E5 to E10, RH stays on E5
+        var move1 = result.Moves[0];
+        move1.TargetHold.Description.Should().Be("E10");
+        move1.Hand.Should().Be(Hand.Left);
+        move1.OriginHold.Description.Should().Be("E5");
+        move1.StationaryHold.Description.Should().Be("E5");
+        move1.Score.Should().BeGreaterThan(0);
+
+        // Move 2: RH moves from E5 to F18, LH stays on E10
+        var move2 = result.Moves[1];
+        move2.TargetHold.Description.Should().Be("F18");
+        move2.Hand.Should().Be(Hand.Right);
+        move2.OriginHold.Description.Should().Be("E5");
+        move2.StationaryHold.Description.Should().Be("E10");
+        move2.Score.Should().BeGreaterThan(0);
+    }
+    
     private string[] Solve(Hold[] holds)
     {
         var problem = new Problem("Test", "6A", holds);
         var result = _solver.Solve(problem);
         return result.Moves
-            .Select(m => $"{m.Hold.Description} {(m.Hand == Hand.Left ? "LH" : "RH")}")
+            .Select(m => $"{m.TargetHold.Description} {(m.Hand == Hand.Left ? "LH" : "RH")}")
             .ToArray();
     }
 

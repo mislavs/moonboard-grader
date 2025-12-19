@@ -16,7 +16,7 @@ public sealed record SolveProblemResponse(
                 .Select(kvp => new StartHandDto(kvp.Key == Hand.Left ? "LH" : "RH", kvp.Value.Description))
                 .ToList(),
             beta.Moves
-                .Select(m => new BetaMoveDto(m.Hold.Description, m.Hand == Hand.Left ? "LH" : "RH"))
+                .Select(m => new BetaMoveDto(m.TargetHold.Description, m.Hand == Hand.Left ? "LH" : "RH"))
                 .ToList())
     {
     }

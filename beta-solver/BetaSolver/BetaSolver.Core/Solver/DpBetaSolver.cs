@@ -121,7 +121,13 @@ public sealed class DpBetaSolver(IMoveScorer _scorer) : IBetaSolver
                 if (totalScore > bestScore)
                 {
                     bestScore = totalScore;
-                    bestMoves = [new Move(holds[targetIndex], Hand.Left), .. futureMoves];
+                    var move = new Move(
+                        TargetHold: holds[targetIndex],
+                        Hand: Hand.Left,
+                        Score: lhScore,
+                        StationaryHold: holds[rhPosition],
+                        OriginHold: holds[lhPosition]);
+                    bestMoves = [move, .. futureMoves];
                 }
             }
 
@@ -136,7 +142,13 @@ public sealed class DpBetaSolver(IMoveScorer _scorer) : IBetaSolver
                 if (totalScore > bestScore)
                 {
                     bestScore = totalScore;
-                    bestMoves = [new Move(holds[targetIndex], Hand.Right), .. futureMoves];
+                    var move = new Move(
+                        TargetHold: holds[targetIndex],
+                        Hand: Hand.Right,
+                        Score: rhScore,
+                        StationaryHold: holds[lhPosition],
+                        OriginHold: holds[rhPosition]);
+                    bestMoves = [move, .. futureMoves];
                 }
             }
         }
