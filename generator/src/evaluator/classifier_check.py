@@ -74,6 +74,18 @@ def evaluate_classifier_check(
     generator_offset = generator.grade_offset
     min_grade_idx = generator.min_grade_index
     max_grade_idx = generator.max_grade_index
+    model_num_grades = generator.model.num_grades
+    filtered_count = (
+        (max_grade_idx - min_grade_idx + 1)
+        if min_grade_idx is not None and max_grade_idx is not None
+        else None
+    )
+    # Only remap if the model was trained on a remapped/filtered label space.
+    expects_remapped_labels = (
+        generator_offset > 0
+        and filtered_count is not None
+        and model_num_grades == filtered_count
+    )
     
     # Determine the actual grade range to evaluate
     # Prefer using min/max_grade_index if available (more reliable)
@@ -83,9 +95,8 @@ def evaluate_classifier_check(
         logger.info(f"Using explicit grade range from checkpoint: {min_grade_idx} to {max_grade_idx}")
     else:
         # Fall back to using num_grades (unfiltered model)
-        num_grades = generator.model.num_grades
-        grade_indices_to_eval = list(range(generator_offset, generator_offset + num_grades))
-        logger.info(f"Using num_grades={num_grades} with offset={generator_offset}")
+        grade_indices_to_eval = list(range(generator_offset, generator_offset + model_num_grades))
+        logger.info(f"Using num_grades={model_num_grades} with offset={generator_offset}")
     
     results_per_grade = {}
     
@@ -93,8 +104,12 @@ def evaluate_classifier_check(
     logger.info(f"Evaluating {len(grade_indices_to_eval)} grades: {decode_grade(grade_indices_to_eval[0])} to {decode_grade(grade_indices_to_eval[-1])}")
 
     for global_grade_idx in grade_indices_to_eval:
-        # Convert global index to generator's relative index
-        generator_relative_idx = global_grade_idx - generator_offset
+        # Convert global index to generator's relative index only if needed.
+        generator_relative_idx = (
+            global_grade_idx - generator_offset
+            if expects_remapped_labels
+            else global_grade_idx
+        )
         grade_name = decode_grade(global_grade_idx)
         logger.info(f"Evaluating grade {grade_name} (global_idx={global_grade_idx}, generator_idx={generator_relative_idx})")
         
