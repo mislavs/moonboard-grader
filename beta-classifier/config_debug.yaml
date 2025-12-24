@@ -1,0 +1,32 @@
+# Debug configuration - simpler settings for faster iteration
+model:
+  d_model: 64
+  n_heads: 4
+  n_layers: 2
+  dropout: 0.1
+  max_seq_len: 50
+  num_classes: 19
+
+training:
+  learning_rate: 0.001      # 10x higher than default
+  batch_size: 64
+  num_epochs: 50
+  early_stopping_patience: 10
+  optimizer: "adam"
+  weight_decay: 0.0001
+  use_class_weights: true   # Try false if still unstable
+  label_smoothing: 0.0      # Disabled for debugging
+
+data:
+  path: "../data/solved_problems.json"
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  random_seed: 42
+
+checkpoint:
+  dir: "models"
+  save_best: true
+
+device: "cuda"
+
