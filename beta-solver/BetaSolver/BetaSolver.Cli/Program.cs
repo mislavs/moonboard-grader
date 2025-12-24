@@ -1,4 +1,6 @@
-﻿using System.Text.Encodings.Web;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using BetaSolver.Contracts;
 using BetaSolver.Core.Models;
@@ -36,36 +38,51 @@ public static class Program
             var inputFile = await LoadInputProblemsAsync(inputPath);
             Console.WriteLine($"Loaded {inputFile.Data.Count} problems from {inputPath}");
 
-            // Solve each problem
-            var solver = new DpBetaSolver(new DistanceBasedMoveScorer());
-            var outputProblems = new List<OutputProblem>();
-
+            // Solve problems in parallel with thread-local solvers
+            var outputProblems = new ConcurrentBag<OutputProblem>();
             var solvedCount = 0;
             var errorCount = 0;
+            var totalCount = inputFile.Data.Count;
 
-            foreach (var inputProblem in inputFile.Data)
-            {
-                try
+            // Thread-local solver instances to avoid contention
+            using var threadLocalSolver = new ThreadLocal<DpBetaSolver>(
+                () => new DpBetaSolver(new DistanceBasedMoveScorer()));
+
+            Console.WriteLine($"Processing with {Environment.ProcessorCount} cores...");
+            var stopwatch = Stopwatch.StartNew();
+
+            Parallel.ForEach(
+                inputFile.Data,
+                new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                inputProblem =>
                 {
-                    var outputProblem = SolveProblem(inputProblem, solver, holdStats);
-                    outputProblems.Add(outputProblem);
-                    solvedCount++;
-
-                    if (solvedCount % 1000 == 0)
+                    try
                     {
-                        Console.WriteLine($"  Solved {solvedCount}/{inputFile.Data.Count} problems...");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    errorCount++;
-                    Console.Error.WriteLine($"Error solving '{inputProblem.Name}': {ex.Message}");
-                }
-            }
+                        var solver = threadLocalSolver.Value!;
+                        var outputProblem = SolveProblem(inputProblem, solver, holdStats);
+                        outputProblems.Add(outputProblem);
 
-            // Write output
-            await WriteOutputAsync(outputPath, outputProblems);
-            Console.WriteLine($"Wrote {outputProblems.Count} solved problems to {outputPath}");
+                        var count = Interlocked.Increment(ref solvedCount);
+                        if (count % 10000 == 0)
+                        {
+                            Console.WriteLine($"  Solved {count}/{totalCount} problems...");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Interlocked.Increment(ref errorCount);
+                        Console.Error.WriteLine($"Error solving '{inputProblem.Name}': {ex.Message}");
+                    }
+                });
+
+            stopwatch.Stop();
+            var problemsPerSecond = solvedCount / stopwatch.Elapsed.TotalSeconds;
+            Console.WriteLine($"Solved {solvedCount} problems in {stopwatch.Elapsed.TotalSeconds:F2}s ({problemsPerSecond:F0} problems/sec)");
+
+            // Write output (convert to list to preserve consistent ordering by ApiId)
+            var sortedProblems = outputProblems.OrderBy(p => p.ApiId).ToList();
+            await WriteOutputAsync(outputPath, sortedProblems);
+            Console.WriteLine($"Wrote {sortedProblems.Count} solved problems to {outputPath}");
 
             if (errorCount > 0)
             {
