@@ -47,13 +47,21 @@ Experimental algorithm that finds the best beta for a climbing problem.
 - Move scoring based on multiple factors
 - **Tech**: C#, .NET
 
+### 7. Beta Classifier
+Transformer-based grade classifier using move sequences from the Beta Solver.
+- Predicts grades from rich per-move features (positions, difficulty, body mechanics)
+- Sequence classification with attention mechanisms
+- Alternative to grid-based classification using movement data
+- **Tech**: Python, PyTorch, Transformer
+
 ## Quick Start
 
 See individual README files in each component directory for detailed setup instructions:
-- `classifier/README.md` - Train and evaluate models
+- `classifier/README.md` - Train and evaluate grid-based models
 - `backend/README.md` - Run the API server
 - `frontend/README.md` - Run the web interface
 - `generator/README.md` - Generate synthetic climbing problems
 - `aspire-app/` - Run the full application stack with Aspire
 - `beta-solver/` - Compute optimal beta sequences for problems
+- `beta-classifier/README.md` - Train sequence-based grade classifier
 
