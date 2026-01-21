@@ -450,3 +450,76 @@ class BoardAnalyticsResponse(BaseModel):
     meta: AnalyticsMeta = Field(
         ..., description="Metadata about the analytics"
     )
+
+
+# ============================================================================
+# Board Setup Schemas
+# ============================================================================
+
+
+class AngleConfigResponse(BaseModel):
+    """Configuration for a specific wall angle within a hold setup."""
+
+    angle: int = Field(..., description="Wall angle in degrees")
+    hasModel: bool = Field(
+        ..., description="Whether a trained model exists for this configuration"
+    )
+    isDefault: bool = Field(
+        ..., description="Whether this is the default configuration"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "angle": 40,
+                "hasModel": True,
+                "isDefault": True
+            }
+        }
+    )
+
+
+class HoldSetupResponse(BaseModel):
+    """Configuration for a hold setup (e.g., MoonBoard Masters 2017)."""
+
+    id: str = Field(..., description="Unique identifier for the hold setup")
+    name: str = Field(..., description="Display name for the hold setup")
+    angles: List[AngleConfigResponse] = Field(
+        ..., description="Available wall angles for this hold setup"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "masters-2017",
+                "name": "MoonBoard Masters 2017",
+                "angles": [
+                    {"angle": 40, "hasModel": True, "isDefault": True}
+                ]
+            }
+        }
+    )
+
+
+class BoardSetupsResponse(BaseModel):
+    """Response containing all available board setups."""
+
+    holdSetups: List[HoldSetupResponse] = Field(
+        ..., description="List of available hold setups"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "holdSetups": [
+                    {
+                        "id": "masters-2017",
+                        "name": "MoonBoard Masters 2017",
+                        "angles": [
+                            {"angle": 40, "hasModel": True, "isDefault": True}
+                        ]
+                    }
+                ]
+            }
+        }
+    )

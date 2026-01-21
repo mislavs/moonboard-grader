@@ -55,6 +55,12 @@ class Settings(BaseSettings):
         description="Path to the problems data JSON file"
     )
 
+    # Board Configuration
+    board_config_path: Path = Field(
+        default=Path("../config/board_setups.json"),
+        description="Path to the board setups configuration file"
+    )
+
     # Logging Configuration
     log_level: str = Field(default="INFO", description="Logging level")
 

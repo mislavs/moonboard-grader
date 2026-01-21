@@ -1,0 +1,16 @@
+{
+  "holdSetups": [
+    {
+      "id": "masters-2017",
+      "name": "MoonBoard Masters 2017",
+      "angles": [
+        {
+          "angle": 40,
+          "dataFile": "data/problems.json",
+          "modelFile": "models/model_for_inference.pth",
+          "isDefault": true
+        }
+      ]
+    }
+  ]
+}

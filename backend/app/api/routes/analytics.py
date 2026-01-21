@@ -7,8 +7,9 @@ Provides endpoints for board-level analytics and hold statistics.
 import json
 import logging
 from pathlib import Path
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from ...models.schemas import BoardAnalyticsResponse
 
@@ -26,7 +27,16 @@ ANALYTICS_DATA_PATH = Path(__file__).parent.parent.parent.parent / "data" / "hol
     response_model=BoardAnalyticsResponse,
     tags=["Analytics"]
 )
-async def get_board_analytics():
+async def get_board_analytics(
+    hold_setup: Optional[str] = Query(
+        None,
+        description="Hold setup ID (e.g., 'masters-2017'). Uses default if not specified."
+    ),
+    angle: Optional[int] = Query(
+        None,
+        description="Wall angle in degrees (e.g., 40). Uses default if not specified."
+    )
+):
     """
     Get board-level analytics including hold difficulty statistics.
 
@@ -36,12 +46,20 @@ async def get_board_analytics():
     The data is pre-computed from problems with 5+ repeats to ensure
     statistical reliability.
 
+    Args:
+        hold_setup: Optional hold setup ID for analytics data
+        angle: Optional wall angle for analytics data
+
     Returns:
         BoardAnalyticsResponse with holds stats, heatmaps, and metadata
 
     Raises:
         HTTPException: 500 if analytics data file is not found or invalid
     """
+    # Log the setup being used (for future multi-data-source support)
+    if hold_setup or angle:
+        logger.debug(f"Analytics requested for setup={hold_setup}, angle={angle}")
+
     if not ANALYTICS_DATA_PATH.exists():
         logger.error(f"Analytics data file not found: {ANALYTICS_DATA_PATH}")
         raise HTTPException(

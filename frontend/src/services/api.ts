@@ -6,6 +6,7 @@ import type { Problem, Move } from '../types/problem';
 import type { PredictionResponse, PredictionRequest } from '../types/prediction';
 import type { BoardAnalyticsResponse } from '../types/analytics';
 import type { BetaResponse } from '../types/beta';
+import type { BoardSetupsResponse } from '../types/boardSetup';
 import { API_BASE_URL, BETA_API_BASE_URL, ERROR_MESSAGES } from '../config/api';
 
 export class ApiError extends Error {
@@ -58,6 +59,33 @@ async function apiFetch<T>(
 }
 
 /**
+ * Board setup parameters for API calls
+ */
+export interface BoardSetupParams {
+  holdSetupId?: string;
+  angle?: number;
+}
+
+/**
+ * Append board setup query parameters to a URL
+ */
+function appendSetupParams(url: string, params?: BoardSetupParams): string {
+  if (!params) return url;
+
+  const separator = url.includes('?') ? '&' : '?';
+  const parts: string[] = [];
+
+  if (params.holdSetupId) {
+    parts.push(`hold_setup=${encodeURIComponent(params.holdSetupId)}`);
+  }
+  if (params.angle !== undefined) {
+    parts.push(`angle=${params.angle}`);
+  }
+
+  return parts.length > 0 ? `${url}${separator}${parts.join('&')}` : url;
+}
+
+/**
  * Fetch a problem by its ID from the backend
  */
 export async function fetchProblem(id: number): Promise<Problem> {
@@ -69,14 +97,17 @@ export async function fetchProblem(id: number): Promise<Problem> {
  */
 export async function predictGrade(
   moves: Move[],
-  topK: number = 3
+  topK: number = 3,
+  setupParams?: BoardSetupParams
 ): Promise<PredictionResponse> {
   const requestBody: PredictionRequest = {
     moves,
     top_k: topK,
   };
 
-  return apiFetch<PredictionResponse>(`${API_BASE_URL}/predict`, {
+  const url = appendSetupParams(`${API_BASE_URL}/predict`, setupParams);
+
+  return apiFetch<PredictionResponse>(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -121,22 +152,25 @@ export async function fetchProblems(
   pageSize: number = 20,
   benchmarksOnly?: boolean | null,
   gradeFrom?: string | null,
-  gradeTo?: string | null
+  gradeTo?: string | null,
+  setupParams?: BoardSetupParams
 ): Promise<PaginatedProblemsResponse> {
   let url = `${API_BASE_URL}/problems?page=${page}&page_size=${pageSize}`;
-  
+
   if (benchmarksOnly !== null && benchmarksOnly !== undefined) {
     url += `&benchmarks_only=${benchmarksOnly}`;
   }
-  
+
   if (gradeFrom) {
     url += `&grade_from=${encodeURIComponent(gradeFrom)}`;
   }
-  
+
   if (gradeTo) {
     url += `&grade_to=${encodeURIComponent(gradeTo)}`;
   }
-  
+
+  url = appendSetupParams(url, setupParams);
+
   return apiFetch<PaginatedProblemsResponse>(url);
 }
 
@@ -174,9 +208,12 @@ export interface GenerateResponse {
  */
 export async function generateProblem(
   grade: string = '6A+',
-  temperature: number = 1.0
+  temperature: number = 1.0,
+  setupParams?: BoardSetupParams
 ): Promise<GenerateResponse> {
-  return apiFetch<GenerateResponse>(`${API_BASE_URL}/generate`, {
+  const url = appendSetupParams(`${API_BASE_URL}/generate`, setupParams);
+
+  return apiFetch<GenerateResponse>(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -188,8 +225,11 @@ export async function generateProblem(
 /**
  * Fetch board analytics data including hold statistics and heatmaps
  */
-export async function fetchBoardAnalytics(): Promise<BoardAnalyticsResponse> {
-  return apiFetch<BoardAnalyticsResponse>(`${API_BASE_URL}/analytics/board`);
+export async function fetchBoardAnalytics(
+  setupParams?: BoardSetupParams
+): Promise<BoardAnalyticsResponse> {
+  const url = appendSetupParams(`${API_BASE_URL}/analytics/board`, setupParams);
+  return apiFetch<BoardAnalyticsResponse>(url);
 }
 
 /**
@@ -211,5 +251,12 @@ export async function solveBeta(moves: Move[]): Promise<BetaResponse> {
     },
     body: JSON.stringify(requestBody),
   });
+}
+
+/**
+ * Fetch available board setups
+ */
+export async function fetchBoardSetups(): Promise<BoardSetupsResponse> {
+  return apiFetch<BoardSetupsResponse>(`${API_BASE_URL}/board-setups`);
 }
 

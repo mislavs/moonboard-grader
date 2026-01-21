@@ -4,7 +4,8 @@ Generation route handlers.
 Provides endpoints for generating new climbing problems using VAE models.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import Optional
 import logging
 
 from ...models.schemas import (
@@ -25,6 +26,14 @@ router = APIRouter()
 )
 async def generate_problem(
     request: GenerateRequest,
+    hold_setup: Optional[str] = Query(
+        None,
+        description="Hold setup ID (e.g., 'masters-2017'). Uses default if not specified."
+    ),
+    angle: Optional[int] = Query(
+        None,
+        description="Wall angle in degrees (e.g., 40). Uses default if not specified."
+    ),
     generator_service: GeneratorService = Depends(get_loaded_generator)
 ):
     """
@@ -36,6 +45,8 @@ async def generate_problem(
 
     Args:
         request: Generation parameters including grade and temperature
+        hold_setup: Optional hold setup ID for generation
+        angle: Optional wall angle for generation
         generator_service: Injected generator service (dependency)
 
     Returns:
@@ -44,6 +55,9 @@ async def generate_problem(
     Raises:
         HTTPException: If model is not loaded or generation fails
     """
+    # Log the setup being used (for future multi-model support)
+    if hold_setup or angle:
+        logger.debug(f"Generation requested for setup={hold_setup}, angle={angle}")
     try:
         logger.info(
             f"Generation request received for grade {request.grade}"

@@ -4,7 +4,8 @@ Prediction route handlers.
 Provides endpoints for grade prediction using ML models.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import Optional
 import logging
 
 from ...models.schemas import (
@@ -25,6 +26,14 @@ router = APIRouter()
 )
 async def predict_grade(
     request: ProblemRequest,
+    hold_setup: Optional[str] = Query(
+        None,
+        description="Hold setup ID (e.g., 'masters-2017'). Uses default if not specified."
+    ),
+    angle: Optional[int] = Query(
+        None,
+        description="Wall angle in degrees (e.g., 40). Uses default if not specified."
+    ),
     predictor_service: PredictorService = Depends(get_loaded_predictor)
 ):
     """
@@ -32,6 +41,8 @@ async def predict_grade(
 
     Args:
         request: Problem data with moves and optional top_k parameter
+        hold_setup: Optional hold setup ID to use for prediction
+        angle: Optional wall angle to use for prediction
         predictor_service: Injected predictor service (dependency)
 
     Returns:
@@ -41,6 +52,9 @@ async def predict_grade(
     Raises:
         HTTPException: If model is not loaded or prediction fails
     """
+    # Log the setup being used (for future multi-model support)
+    if hold_setup or angle:
+        logger.debug(f"Prediction requested for setup={hold_setup}, angle={angle}")
     # Convert Pydantic models to dict format expected by Predictor
     problem_dict = {
         "moves": [move.model_dump() for move in request.moves]

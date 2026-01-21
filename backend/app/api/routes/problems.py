@@ -76,6 +76,14 @@ async def get_problems_list(
     grade_to: Optional[str] = Query(
         None, description="Maximum grade (inclusive, e.g., '7A')"
     ),
+    hold_setup: Optional[str] = Query(
+        None,
+        description="Hold setup ID (e.g., 'masters-2017'). Uses default if not specified."
+    ),
+    angle: Optional[int] = Query(
+        None,
+        description="Wall angle in degrees (e.g., 40). Uses default if not specified."
+    ),
     problem_service: ProblemService = Depends(get_problem_service)
 ):
     """
@@ -94,6 +102,8 @@ async def get_problems_list(
             Case-insensitive. (default: None)
         grade_to: Maximum grade filter (inclusive), e.g., '7A'.
             Case-insensitive. (default: None)
+        hold_setup: Optional hold setup ID for filtering problems
+        angle: Optional wall angle for filtering problems
         problem_service: Injected problem service (dependency)
 
     Returns:
@@ -136,6 +146,10 @@ async def get_problems_list(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Grade encoder not available"
             )
+
+    # Log the setup being used (for future multi-data-source support)
+    if hold_setup or angle:
+        logger.debug(f"Problems requested for setup={hold_setup}, angle={angle}")
 
     try:
         items, total = problem_service.get_all_problems(
