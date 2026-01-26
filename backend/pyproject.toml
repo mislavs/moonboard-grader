@@ -4,18 +4,27 @@ version = "0.1.0"
 description = "FastAPI backend service for predicting climbing problem grades using deep learning"
 requires-python = ">=3.10"
 dependencies = [
+    # Web framework
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
     "python-multipart>=0.0.6",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "python-dotenv>=1.0.0",
+    # Testing
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
     "httpx>=0.25.0",
+    # Local packages
     "moonboard-classifier",
     "moonboard-generator",
+    # OpenTelemetry
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+    "opentelemetry-instrumentation-fastapi>=0.41b0",
+    "opentelemetry-instrumentation-logging>=0.41b0",
 ]
 
 [tool.setuptools.packages.find]

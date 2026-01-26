@@ -8,6 +8,7 @@ moonboard-classifier package.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from .core.config import settings
 from .core.logging import setup_logging
@@ -21,7 +22,7 @@ from .api.dependencies import (
 )
 from .api import router
 
-# Setup logging
+# Setup logging (also initializes OpenTelemetry)
 setup_logging()
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,9 @@ def create_application() -> FastAPI:
     # Register event handlers
     app.add_event_handler("startup", startup_handler)
     app.add_event_handler("shutdown", shutdown_handler)
+
+    # Instrument FastAPI for OpenTelemetry tracing
+    FastAPIInstrumentor.instrument_app(app)
 
     return app
 

@@ -36,7 +36,7 @@ Frontend (generates trace) ──traceparent header──▶ Backend ──trace
 
 ## Step 1: Backend (Python/FastAPI)
 
-### 1.1 Add dependencies
+### 1.1 Add dependencies ✅
 
 **File:** `backend/pyproject.toml`
 
@@ -49,7 +49,9 @@ Add to dependencies:
 "opentelemetry-instrumentation-logging>=0.41b0",
 ```
 
-### 1.2 Create telemetry configuration
+**Implementation Summary:** Added the five OpenTelemetry dependencies to `backend/pyproject.toml`. Ran `uv sync` to install packages - resolved 113 packages total, with 22 new packages installed including opentelemetry-api 1.39.1, opentelemetry-sdk 1.39.1, opentelemetry-exporter-otlp 1.39.1, and the instrumentation packages. All 133 existing passing tests continue to pass.
+
+### 1.2 Create telemetry configuration ✅
 
 **New file:** `backend/app/core/telemetry.py`
 
@@ -60,26 +62,34 @@ Add to dependencies:
 - Instrument FastAPI app
 - Bridge Python logging to OpenTelemetry
 
-### 1.3 Update logging configuration
+**Implementation Summary:** Created `backend/app/core/telemetry.py` with `setup_telemetry()` function that configures TracerProvider and LoggerProvider with OTLP gRPC exporters. Reads endpoint from `OTEL_EXPORTER_OTLP_ENDPOINT` env var; gracefully disables export if not set. Also added `get_otel_logging_handler()` to provide a LoggingHandler for Python's logging integration.
+
+### 1.3 Update logging configuration ✅
 
 **File:** `backend/app/core/logging.py`
 
 - Add OpenTelemetry logging handler
 - Use `opentelemetry.sdk._logs` to export logs
 
-### 1.4 Initialize telemetry on startup
+**Implementation Summary:** Updated `setup_logging()` to call `setup_telemetry()` first, then add the OpenTelemetry logging handler alongside the console handler. Refactored to use a single `log_level` variable to avoid repeated `getattr()` calls.
+
+### 1.4 Initialize telemetry on startup ✅
 
 **File:** `backend/app/main.py`
 
 - Import and call telemetry setup before app creation
 - Instrument FastAPI with `FastAPIInstrumentor`
 
-### 1.5 Propagate trace context to beta solver
+**Implementation Summary:** Added `FastAPIInstrumentor` import and call to `FastAPIInstrumentor.instrument_app(app)` in `create_application()`. Telemetry is initialized via `setup_logging()` which is called at module load.
+
+### 1.5 Propagate trace context to beta solver ⏭️ (N/A)
 
 **File:** backend client/service that calls beta solver
 
 - Use `opentelemetry.propagate.inject()` to add trace headers to outbound requests
 - Headers automatically include `traceparent` and `tracestate`
+
+**Implementation Summary:** Not applicable - the backend does not directly call the beta solver. The frontend calls the beta solver directly, so trace propagation will be handled in Step 2.
 
 ---
 
