@@ -8,6 +8,7 @@ import type { BoardAnalyticsResponse } from '../types/analytics';
 import type { BetaResponse } from '../types/beta';
 import type { BoardSetupsResponse } from '../types/boardSetup';
 import { API_BASE_URL, BETA_API_BASE_URL, ERROR_MESSAGES } from '../config/api';
+import { context, propagation, trace, SpanKind, SpanStatusCode } from '@opentelemetry/api';
 
 export class ApiError extends Error {
   statusCode?: number;
@@ -58,6 +59,48 @@ async function apiFetch<T>(
   }
 }
 
+async function tracedApiFetch<T>(
+  url: string,
+  spanName: string,
+  options?: RequestInit
+): Promise<T> {
+  const tracer = trace.getTracer('frontend');
+  const span = tracer.startSpan(spanName, {
+    kind: SpanKind.CLIENT,
+    attributes: {
+      'http.method': options?.method ?? 'GET',
+      'http.url': url,
+    },
+  });
+
+  const spanContext = trace.setSpan(context.active(), span);
+  const headers = new Headers(options?.headers);
+  propagation.inject(spanContext, headers, {
+    set(carrier, key, value) {
+      carrier.set(key, value);
+    },
+  });
+
+  try {
+    const result = await context.with(spanContext, () =>
+      apiFetch<T>(url, {
+        ...options,
+        headers,
+      })
+    );
+    span.setStatus({ code: SpanStatusCode.OK });
+    return result;
+  } catch (error) {
+    span.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  } finally {
+    span.end();
+  }
+}
+
 /**
  * Board setup parameters for API calls
  */
@@ -89,7 +132,8 @@ function appendSetupParams(url: string, params?: BoardSetupParams): string {
  * Fetch a problem by its ID from the backend
  */
 export async function fetchProblem(id: number): Promise<Problem> {
-  return apiFetch<Problem>(`${API_BASE_URL}/problems/${id}`);
+  const url = `${API_BASE_URL}/problems/${id}`;
+  return tracedApiFetch<Problem>(url, 'GET /problems/{id}');
 }
 
 /**
@@ -107,7 +151,7 @@ export async function predictGrade(
 
   const url = appendSetupParams(`${API_BASE_URL}/predict`, setupParams);
 
-  return apiFetch<PredictionResponse>(url, {
+  return tracedApiFetch<PredictionResponse>(url, 'POST /predict', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -120,7 +164,11 @@ export async function predictGrade(
  * Health check to verify backend connection
  */
 export async function healthCheck(): Promise<{ status: string; model_loaded: boolean }> {
-  return apiFetch<{ status: string; model_loaded: boolean }>(`${API_BASE_URL}/health`);
+  const url = `${API_BASE_URL}/health`;
+  return tracedApiFetch<{ status: string; model_loaded: boolean }>(
+    url,
+    'GET /health'
+  );
 }
 
 /**
@@ -171,7 +219,7 @@ export async function fetchProblems(
 
   url = appendSetupParams(url, setupParams);
 
-  return apiFetch<PaginatedProblemsResponse>(url);
+  return tracedApiFetch<PaginatedProblemsResponse>(url, 'GET /problems');
 }
 
 /**
@@ -186,7 +234,8 @@ export interface DuplicateCheckResponse {
  * Check if a problem with the same moves already exists
  */
 export async function checkDuplicate(moves: Move[]): Promise<DuplicateCheckResponse> {
-  return apiFetch<DuplicateCheckResponse>(`${API_BASE_URL}/problems/check-duplicate`, {
+  const url = `${API_BASE_URL}/problems/check-duplicate`;
+  return tracedApiFetch<DuplicateCheckResponse>(url, 'POST /problems/check-duplicate', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -213,7 +262,7 @@ export async function generateProblem(
 ): Promise<GenerateResponse> {
   const url = appendSetupParams(`${API_BASE_URL}/generate`, setupParams);
 
-  return apiFetch<GenerateResponse>(url, {
+  return tracedApiFetch<GenerateResponse>(url, 'POST /generate', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -229,7 +278,7 @@ export async function fetchBoardAnalytics(
   setupParams?: BoardSetupParams
 ): Promise<BoardAnalyticsResponse> {
   const url = appendSetupParams(`${API_BASE_URL}/analytics/board`, setupParams);
-  return apiFetch<BoardAnalyticsResponse>(url);
+  return tracedApiFetch<BoardAnalyticsResponse>(url, 'GET /analytics/board');
 }
 
 /**
@@ -244,7 +293,8 @@ export async function solveBeta(moves: Move[]): Promise<BetaResponse> {
     })),
   };
 
-  return apiFetch<BetaResponse>(`${BETA_API_BASE_URL}/solve`, {
+  const url = `${BETA_API_BASE_URL}/solve`;
+  return tracedApiFetch<BetaResponse>(url, 'POST /solve', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -257,6 +307,7 @@ export async function solveBeta(moves: Move[]): Promise<BetaResponse> {
  * Fetch available board setups
  */
 export async function fetchBoardSetups(): Promise<BoardSetupsResponse> {
-  return apiFetch<BoardSetupsResponse>(`${API_BASE_URL}/board-setups`);
+  const url = `${API_BASE_URL}/board-setups`;
+  return tracedApiFetch<BoardSetupsResponse>(url, 'GET /board-setups');
 }
 
