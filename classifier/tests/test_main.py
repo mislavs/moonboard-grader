@@ -184,6 +184,88 @@ class TestTrainCommand:
         # Should raise FileNotFoundError when data file not found
         with pytest.raises(FileNotFoundError):
             train_command(args)
+
+    def test_train_command_filtered_grade_range_mismatch_fails_fast(self, monkeypatch):
+        """Filtered grade range must match model.num_classes when filtering is enabled."""
+        from src.cli import train as train_module
+
+        config = {
+            'model': {'type': 'fc', 'num_classes': 19},
+            'data': {
+                'filter_grades': True,
+                'min_grade_index': 2,
+                'max_grade_index': 11
+            }
+        }
+
+        load_dataset_called = {'value': False}
+
+        def fake_load_dataset(*args, **kwargs):
+            load_dataset_called['value'] = True
+            return []
+
+        monkeypatch.setattr(train_module, 'load_config', lambda _: config)
+        monkeypatch.setattr(train_module, 'load_dataset', fake_load_dataset)
+        monkeypatch.setattr(train_module, 'print_section_header', lambda *_: None)
+
+        args = MagicMock()
+        args.config = 'ignored.yaml'
+
+        with pytest.raises(ValueError, match=r"model\.num_classes=.*expected_classes=10"):
+            train_module.train_command(args)
+
+        assert load_dataset_called['value'] is False
+
+    def test_train_command_filtered_grade_range_valid_continues(self, monkeypatch):
+        """Valid filtered grade/class config should proceed to dataset splitting."""
+        from src.cli import train as train_module
+
+        config = {
+            'model': {'type': 'fc', 'num_classes': 10},
+            'data': {
+                'path': 'ignored.json',
+                'filter_grades': True,
+                'min_grade_index': 2,
+                'max_grade_index': 11,
+                'train_ratio': 0.7,
+                'val_ratio': 0.15,
+                'test_ratio': 0.15,
+                'random_seed': 42
+            },
+            'device': 'cpu'
+        }
+
+        mock_dataset = [
+            ("a", 2),
+            ("b", 5),
+            ("c", 11),
+            ("d", 12),  # Will be filtered out
+        ]
+        captured = {'labels': None}
+
+        def fake_create_datasets(tensors, labels, *args, **kwargs):
+            captured['labels'] = labels
+            raise RuntimeError("split_called")
+
+        monkeypatch.setattr(train_module, 'load_config', lambda _: config)
+        monkeypatch.setattr(train_module, 'setup_device', lambda _: ('cpu', 'cpu'))
+        monkeypatch.setattr(train_module, 'load_dataset', lambda *args, **kwargs: mock_dataset)
+        monkeypatch.setattr(
+            train_module,
+            'get_dataset_stats',
+            lambda dataset: {'total_problems': len(dataset), 'grade_distribution': {2: 1, 5: 1, 11: 1, 12: 1}},
+        )
+        monkeypatch.setattr(train_module, 'decode_grade', lambda idx: f'G{idx}')
+        monkeypatch.setattr(train_module, 'create_datasets', fake_create_datasets)
+        monkeypatch.setattr(train_module, 'print_section_header', lambda *_: None)
+
+        args = MagicMock()
+        args.config = 'ignored.yaml'
+
+        with pytest.raises(RuntimeError, match="split_called"):
+            train_module.train_command(args)
+
+        assert captured['labels'].tolist() == [0, 3, 9]
     
     def test_train_command_saves_history(self, tmp_path):
         """Test that training saves history to correct location without path duplication."""

@@ -65,6 +65,27 @@ def train_command(args):
     # Load configuration
     config = load_config(args.config)
     print(f"\n✓ Loaded configuration from: {args.config}")
+
+    # Validate filtered grade configuration early to fail fast on class-space mismatch.
+    num_classes = config['model']['num_classes']
+    if config.get('data', {}).get('filter_grades', False):
+        min_grade_idx = config['data']['min_grade_index']
+        max_grade_idx = config['data']['max_grade_index']
+        expected_classes = max_grade_idx - min_grade_idx + 1
+
+        if expected_classes <= 0:
+            raise ValueError(
+                "Invalid filtered-grade config: max_grade_index must be >= min_grade_index "
+                f"(got min_grade_index={min_grade_idx}, max_grade_index={max_grade_idx})."
+            )
+
+        if expected_classes != num_classes:
+            raise ValueError(
+                "Invalid filtered-grade config: when data.filter_grades=true, "
+                "model.num_classes must equal (max_grade_index - min_grade_index + 1). "
+                f"Got model.num_classes={num_classes}, min_grade_index={min_grade_idx}, "
+                f"max_grade_index={max_grade_idx}, expected_classes={expected_classes}."
+            )
     
     # Set device
     device_name = config.get('device', 'cpu')
@@ -150,9 +171,6 @@ def train_command(args):
     
     # Check if balanced sampling is enabled
     use_balanced_sampling = config['training'].get('use_balanced_sampling', False)
-    
-    # Get num_classes early for balanced sampling
-    num_classes = config['model']['num_classes']
     
     if use_balanced_sampling:
         # Calculate sample weights for balanced sampling

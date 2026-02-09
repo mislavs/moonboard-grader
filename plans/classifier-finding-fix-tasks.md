@@ -55,7 +55,7 @@ Acceptance criteria:
 3. Test coverage added for both checks.
 ```
 
-## Task 03 - Validate Filtered Grade Range Against num_classes (High, Accuracy/Correctness)
+## Task 03 - Validate Filtered Grade Range Against num_classes (High, Accuracy/Correctness) [FIXED]
 
 ```text
 Task: Add strict config validation when grade filtering is enabled.
