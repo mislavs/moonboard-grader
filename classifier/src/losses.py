@@ -148,26 +148,17 @@ class OrdinalCrossEntropyLoss(nn.Module):
         Returns:
             Loss value (scalar if reduction='mean'/'sum', tensor if 'none')
         """
-        # Get probabilities
-        log_probs = F.log_softmax(inputs, dim=1)
-        
-        # Create one-hot encoded targets
-        targets_one_hot = F.one_hot(targets, self.num_classes).float()
-        
-        # Calculate distance matrix
-        # Distance from each class to all other classes
+        # Base CE keeps the standard classification objective.
+        ce_loss = F.cross_entropy(inputs, targets, reduction='none')
+
+        # Add an expected ordinal-distance penalty over the full predicted distribution.
+        # This ensures distant mistakes are penalized more than near misses.
+        probs = F.softmax(inputs, dim=1)
         class_indices = torch.arange(self.num_classes, device=inputs.device)
-        distances = torch.abs(class_indices[None, :] - targets[:, None])
-        
-        # Calculate distance-based weights
-        # weight = 1 + alpha * distance
-        # Correct class (distance=0): weight=1
-        # Adjacent class (distance=1): weight=1+alpha
-        # Far class (distance=10): weight=1+10*alpha
-        weights = 1.0 + self.alpha * distances.float()
-        
-        # Weighted negative log-likelihood
-        loss = -torch.sum(targets_one_hot * log_probs * weights, dim=1)
+        distances = torch.abs(class_indices[None, :] - targets[:, None]).float()
+        ordinal_penalty = torch.sum(probs * distances, dim=1)
+
+        loss = ce_loss + self.alpha * ordinal_penalty
         
         # Apply reduction
         if self.reduction == 'mean':

@@ -2,7 +2,7 @@
 
 Each section below is standalone and can be copied into a fresh prompt as-is.
 
-## Task 01 - Fix Ordinal Loss Logic (Critical, Accuracy Impact)
+## Task 01 - Fix Ordinal Loss Logic (Critical, Accuracy Impact) [FIXED]
 
 ```text
 Task: Fix the ordinal loss implementation so distance from the true grade actually affects the loss.
