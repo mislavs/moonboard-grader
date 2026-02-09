@@ -104,7 +104,7 @@ Acceptance criteria:
 3. Backward compatibility preserved for configs without these keys.
 ```
 
-## Task 05 - Align Evaluation Metrics With Saved Model Artifact (High, Accuracy Reporting Integrity)
+## Task 05 - Align Evaluation Metrics With Saved Model Artifact (High, Accuracy Reporting Integrity) [FIXED]
 
 ```text
 Task: Ensure printed/saved metrics correspond to the exact model artifact being saved.
@@ -325,4 +325,3 @@ Acceptance criteria:
 2. Deterministic mode is opt-in if performance tradeoff exists.
 3. Behavior documented in README/USAGE.
 ```
-

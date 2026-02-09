@@ -322,6 +322,123 @@ class TestTrainCommand:
             # PNG files start with specific magic bytes
             assert header[:4] == b'\x89PNG', "File is not a valid PNG"
 
+    def test_train_command_evaluates_and_saves_same_checkpoint_artifact(self, tmp_path, monkeypatch):
+        """Ensure metrics are computed from the same checkpoint artifact that is copied."""
+        from src.cli import train as train_module
+
+        class DummyDataset:
+            def __init__(self, labels):
+                self.labels = labels
+
+            def __len__(self):
+                return len(self.labels)
+
+        class FakeTrainer:
+            def __init__(self, model, train_loader, val_loader, optimizer, criterion, device, checkpoint_dir, **kwargs):
+                self.model = model
+                self.checkpoint_dir = Path(checkpoint_dir)
+
+            def fit(self, num_epochs, early_stopping_patience=None, verbose=True):
+                # Save a best checkpoint (weight=1.0), then a final checkpoint (weight=2.0).
+                with torch.no_grad():
+                    self.model.weight.fill_(1.0)
+                torch.save({"model_state_dict": self.model.state_dict()}, self.checkpoint_dir / "best_model.pth")
+
+                with torch.no_grad():
+                    self.model.weight.fill_(2.0)
+                torch.save({"model_state_dict": self.model.state_dict()}, self.checkpoint_dir / "final_model.pth")
+                return {}, {}
+
+            def log_test_results(self, config, test_metrics, confusion_matrix_path=None):
+                return None
+
+            def save_history(self, filename='training_history.json'):
+                output_path = self.checkpoint_dir / filename
+                output_path.write_text("{}", encoding="utf-8")
+                return output_path
+
+        def fake_evaluate_model(model, test_loader, device):
+            weight_value = float(model.weight.detach().cpu().view(-1)[0].item())
+            if abs(weight_value - 1.0) < 1e-6:
+                return {
+                    "exact_accuracy": 91.0,
+                    "macro_accuracy": 90.0,
+                    "tolerance_1_accuracy": 95.0,
+                    "tolerance_2_accuracy": 98.0,
+                    "avg_loss": 0.1,
+                    "predictions": [0],
+                    "labels": [0],
+                }
+            return {
+                "exact_accuracy": 11.0,
+                "macro_accuracy": 10.0,
+                "tolerance_1_accuracy": 15.0,
+                "tolerance_2_accuracy": 18.0,
+                "avg_loss": 1.0,
+                "predictions": [0],
+                "labels": [0],
+            }
+
+        config = {
+            "model": {"type": "fc", "num_classes": 1},
+            "training": {
+                "learning_rate": 0.001,
+                "batch_size": 4,
+                "num_epochs": 1,
+                "early_stopping_patience": None,
+                "optimizer": "adam",
+                "use_scheduler": False,
+                "use_class_weights": False,
+            },
+            "data": {
+                "path": str(tmp_path / "problems.json"),
+                "train_ratio": 0.7,
+                "val_ratio": 0.15,
+                "test_ratio": 0.15,
+                "random_seed": 42,
+            },
+            "checkpoint": {"dir": str(tmp_path / "models")},
+            "evaluation": {"save_confusion_matrix": False},
+            "device": "cpu",
+        }
+
+        monkeypatch.setattr(train_module, "load_config", lambda _: config)
+        monkeypatch.setattr(train_module, "setup_device", lambda _: ("cpu", "cpu"))
+        monkeypatch.setattr(train_module, "load_dataset", lambda *args, **kwargs: [("x", 0), ("y", 0), ("z", 0)])
+        monkeypatch.setattr(
+            train_module,
+            "get_dataset_stats",
+            lambda dataset: {"total_problems": len(dataset), "grade_distribution": {0: len(dataset)}},
+        )
+        monkeypatch.setattr(
+            train_module,
+            "create_datasets",
+            lambda *args, **kwargs: (DummyDataset([0, 0]), DummyDataset([0]), DummyDataset([0])),
+        )
+        monkeypatch.setattr(train_module, "create_data_loaders", lambda *args, **kwargs: ("train", "val", "test"))
+        monkeypatch.setattr(train_module, "create_model", lambda *args, **kwargs: torch.nn.Linear(1, 1, bias=False))
+        monkeypatch.setattr(train_module, "count_parameters", lambda model: 1)
+        monkeypatch.setattr(train_module, "decode_grade", lambda _: "6A")
+        monkeypatch.setattr(train_module, "Trainer", FakeTrainer)
+        monkeypatch.setattr(train_module, "evaluate_model", fake_evaluate_model)
+        monkeypatch.setattr(train_module, "print_section_header", lambda *_: None)
+        monkeypatch.setattr(train_module, "print_completion_message", lambda *_: None)
+
+        args = MagicMock()
+        args.config = "ignored.yaml"
+        train_module.train_command(args)
+
+        models_dir = tmp_path / "models"
+        matching = list(models_dir.glob("model_*_acc91_tol1-95_tol2-98.pth"))
+        assert matching, "Expected unique artifact filename to use best-checkpoint metrics"
+
+        unique_checkpoint = torch.load(matching[0], map_location="cpu")
+        best_checkpoint = torch.load(models_dir / "best_model.pth", map_location="cpu")
+        assert torch.equal(
+            unique_checkpoint["model_state_dict"]["weight"],
+            best_checkpoint["model_state_dict"]["weight"],
+        )
+
 
 class TestEvaluateCommand:
     """Test evaluation command."""

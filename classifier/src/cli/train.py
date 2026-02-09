@@ -351,6 +351,10 @@ def train_command(args):
         early_stopping_patience=early_stopping_patience,
         verbose=True
     )
+
+    # Persist training history for post-run analysis.
+    history_path = trainer.save_history('training_history.json')
+    print(f"\n✓ Saved training history to: {history_path}")
     
     # Calculate training duration
     training_end_time = datetime.now()
@@ -369,8 +373,24 @@ def train_command(args):
     
     print(f"\n⏱️  Training duration: {duration_str}")
     
-    # Evaluate on test set
-    print(f"\n📈 Evaluating on test set...")
+    # Evaluate the same checkpoint artifact that will be saved with metrics.
+    best_model_path = checkpoint_dir / "best_model.pth"
+    final_model_path = checkpoint_dir / "final_model.pth"
+    eval_checkpoint_path = None
+
+    if best_model_path.exists():
+        eval_checkpoint_path = best_model_path
+    elif final_model_path.exists():
+        eval_checkpoint_path = final_model_path
+
+    if eval_checkpoint_path is not None:
+        checkpoint = torch.load(eval_checkpoint_path, map_location=device)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        model = model.to(device)
+        print(f"\n📈 Evaluating on test set using checkpoint: {eval_checkpoint_path.name}")
+    else:
+        print("\n📈 Evaluating on test set using in-memory final model (no checkpoint found)")
+
     test_metrics = evaluate_model(model, test_loader, device)
     
     print(f"\n🎯 Test Set Results:")
@@ -387,6 +407,7 @@ def train_command(args):
     tol2_acc = int(test_metrics['tolerance_2_accuracy'])
     
     # Save confusion matrix if requested (using the same timestamp)
+    cm_path = None
     if config.get('evaluation', {}).get('save_confusion_matrix', False):
         cm_filename = f"confusion_matrix_{timestamp}.png"
         cm_path = checkpoint_dir / cm_filename
@@ -418,15 +439,14 @@ def train_command(args):
     unique_model_filename = f"model_{timestamp}_acc{exact_acc}_tol1-{tol1_acc}_tol2-{tol2_acc}.pth"
     unique_model_path = checkpoint_dir / unique_model_filename
     
-    # Copy the best model to the unique filename
-    best_model_path = checkpoint_dir / "best_model.pth"
-    if best_model_path.exists():
-        shutil.copy2(best_model_path, unique_model_path)
+    # Copy the evaluated checkpoint artifact to the unique filename.
+    if eval_checkpoint_path is not None and eval_checkpoint_path.exists():
+        shutil.copy2(eval_checkpoint_path, unique_model_path)
         print(f"\n✓ Saved unique model to: {unique_model_path}")
+        print(f"   Source checkpoint: {eval_checkpoint_path.name}")
     
     # Log final test results to TensorBoard
-    trainer.log_test_results(config, test_metrics, str(cm_path) if cm_path.exists() else None)
+    trainer.log_test_results(config, test_metrics, str(cm_path) if cm_path and cm_path.exists() else None)
     
     print(f"\n✓ TensorBoard logs saved. View with: py -m tensorboard.main --logdir=runs")
     print_completion_message("✅ Training completed successfully!")
-

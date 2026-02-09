@@ -13,6 +13,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 from pathlib import Path
 from datetime import datetime
+import json
 
 
 class Trainer:
@@ -376,6 +377,34 @@ class Trainer:
             'val_accuracy': [],
             'val_tolerance_1_accuracy': []
         })
+
+    def get_history(self) -> Dict[str, List[float]]:
+        """
+        Get a copy of training history.
+
+        Returns:
+            Copy of history dictionary to prevent external mutation
+        """
+        return {key: values.copy() for key, values in self.history.items()}
+
+    def save_history(self, filename: str = 'training_history.json') -> Path:
+        """
+        Save training history as JSON in checkpoint directory by default.
+
+        Args:
+            filename: Output file name or absolute path
+
+        Returns:
+            Path to saved history file
+        """
+        history_path = Path(filename)
+        if not history_path.is_absolute():
+            history_path = self.checkpoint_dir / history_path
+
+        with open(history_path, 'w', encoding='utf-8') as f:
+            json.dump(self.history, f, indent=2)
+
+        return history_path
     
     def log_test_results(self, config: Dict, test_metrics: Dict, confusion_matrix_path: Optional[str] = None) -> None:
         """
@@ -425,4 +454,3 @@ class Trainer:
         # Close the writer
         self.writer.close()
     
-
