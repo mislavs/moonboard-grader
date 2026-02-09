@@ -24,15 +24,15 @@ training:
   # Loss function configuration (NEW)
   loss_type: "focal_ordinal"  # Options: "ce", "focal", "ordinal", "focal_ordinal", "label_smoothing"
   focal_gamma: 2.0             # Focusing parameter for focal loss (1.5-3.0)
-  ordinal_weight: 0.5          # Weight for ordinal component (0.0-1.0)
-  ordinal_alpha: 2.0           # Distance penalty for ordinal loss
+  ordinal_weight: 0.2          # Weight for ordinal component (0.0-1.0)
+  ordinal_alpha: 0.5           # Distance penalty for ordinal loss
   
   # Class weighting
   use_class_weights: true
   max_class_weight: 10.0
   
   # Balanced sampling (addresses class imbalance at batch level)
-  use_balanced_sampling: true
+  use_balanced_sampling: false
   balanced_sampling_strategy: "sqrt"  # Options: "sqrt" (recommended), "inverse"
   
   # Learning rate scheduler
