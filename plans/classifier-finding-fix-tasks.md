@@ -32,7 +32,7 @@ Acceptance criteria:
 4. Tests cover at least one case where distant mistakes are penalized more than near mistakes.
 ```
 
-## Task 02 - Validate Focal+Ordinal Combination Actually Uses Ordinal Signal (High, Accuracy Impact)
+## Task 02 - Validate Focal+Ordinal Combination Actually Uses Ordinal Signal (High, Accuracy Impact) [FIXED]
 
 ```text
 Task: Ensure FocalOrdinalLoss gains real ordinal behavior after ordinal loss fix.

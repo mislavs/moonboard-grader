@@ -5,7 +5,7 @@ Unit tests for custom loss functions.
 import torch
 import torch.nn.functional as F
 
-from src.losses import FocalLoss, OrdinalCrossEntropyLoss
+from src.losses import FocalLoss, FocalOrdinalLoss, OrdinalCrossEntropyLoss
 
 
 def test_ordinal_loss_alpha_changes_value():
@@ -73,3 +73,53 @@ def test_focal_loss_matches_cross_entropy_when_gamma_is_zero():
     ce = F.cross_entropy(logits, targets)
 
     assert torch.allclose(focal, ce, atol=1e-6, rtol=1e-6)
+
+
+def test_focal_ordinal_loss_changes_with_ordinal_alpha():
+    """ordinal_alpha should affect combined focal+ordinal loss on same inputs."""
+    logits = torch.tensor([
+        [0.8, 1.1, -0.4, -1.2, -1.8],
+        [-1.4, -0.3, 0.6, 1.3, 0.2],
+    ], dtype=torch.float32)
+    targets = torch.tensor([1, 3], dtype=torch.long)
+
+    loss_alpha_0 = FocalOrdinalLoss(
+        num_classes=5,
+        gamma=2.0,
+        ordinal_weight=0.7,
+        ordinal_alpha=0.0,
+    )(logits, targets)
+    loss_alpha_3 = FocalOrdinalLoss(
+        num_classes=5,
+        gamma=2.0,
+        ordinal_weight=0.7,
+        ordinal_alpha=3.0,
+    )(logits, targets)
+
+    assert loss_alpha_3 > loss_alpha_0
+
+
+def test_focal_ordinal_loss_ordinal_weight_controls_ordinal_component():
+    """ordinal_weight=0 should match focal-only, and non-zero should differ."""
+    logits = torch.tensor([
+        [0.8, 1.1, -0.4, -1.2, -1.8],
+        [-1.4, -0.3, 0.6, 1.3, 0.2],
+    ], dtype=torch.float32)
+    targets = torch.tensor([1, 3], dtype=torch.long)
+
+    focal_only = FocalLoss(gamma=2.0)(logits, targets)
+    combined_weight_0 = FocalOrdinalLoss(
+        num_classes=5,
+        gamma=2.0,
+        ordinal_weight=0.0,
+        ordinal_alpha=2.0,
+    )(logits, targets)
+    combined_weight_1 = FocalOrdinalLoss(
+        num_classes=5,
+        gamma=2.0,
+        ordinal_weight=1.0,
+        ordinal_alpha=2.0,
+    )(logits, targets)
+
+    assert torch.allclose(combined_weight_0, focal_only, atol=1e-6, rtol=1e-6)
+    assert combined_weight_1 > combined_weight_0
