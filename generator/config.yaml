@@ -18,6 +18,7 @@ model:
 training:
   num_epochs: 70
   learning_rate: 0.0005
+  max_grad_norm: 1.0  # Clip global gradient norm before optimizer step
   kl_weight: 0.01  # Reduced from 1.0 to prevent KL from dominating
   kl_annealing: true  # Gradually increase KL weight from 0.01 to kl_weight
   kl_annealing_epochs: 10  # Number of epochs to anneal over

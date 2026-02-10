@@ -80,6 +80,7 @@ def build_training_config(config: Dict) -> Dict:
         'kl_weight': config['training']['kl_weight'],
         'kl_annealing': config['training']['kl_annealing'],
         'kl_annealing_epochs': config['training']['kl_annealing_epochs'],
+        'max_grad_norm': config['training'].get('max_grad_norm', 1.0),
         'checkpoint_dir': config['checkpoint']['checkpoint_dir'],
         'log_dir': config['logging']['log_dir'],
         'log_interval': config['logging'].get('log_interval', 100),

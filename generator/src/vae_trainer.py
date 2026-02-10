@@ -3,6 +3,7 @@ Training loop for the Conditional VAE.
 """
 
 import logging
+import math
 import time
 from pathlib import Path
 from typing import Dict, Optional, Tuple
@@ -62,6 +63,11 @@ class VAETrainer:
         self.kl_weight = config.get('kl_weight', 1.0)
         self.kl_annealing = config.get('kl_annealing', False)
         self.kl_annealing_epochs = config.get('kl_annealing_epochs', 10)
+        self.max_grad_norm = float(config.get('max_grad_norm', 1.0))
+        if not math.isfinite(self.max_grad_norm) or self.max_grad_norm <= 0:
+            raise ValueError(
+                f'max_grad_norm must be a positive finite float, got {self.max_grad_norm}'
+            )
         
         # Logging configuration
         self.log_interval = config.get('log_interval', 100)
@@ -90,6 +96,7 @@ class VAETrainer:
         self.best_val_loss = float('inf')
         self.train_losses = []
         self.val_losses = []
+        self.last_train_pre_clip_grad_norm = 0.0
         
     def get_kl_weight(self, epoch: int) -> float:
         """
@@ -118,7 +125,7 @@ class VAETrainer:
         grades: torch.Tensor,
         kl_weight: float,
         training: bool,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Optional[float]]:
         """
         Run one batch forward pass and optionally apply optimizer step.
 
@@ -132,6 +139,7 @@ class VAETrainer:
             loss: Normalized total loss (per sample)
             recon_loss: Normalized reconstruction loss (per sample)
             kl_loss: Normalized KL divergence loss (per sample)
+            pre_clip_grad_norm: Global gradient norm before clipping (training only)
         """
         if training:
             self.optimizer.zero_grad()
@@ -144,11 +152,23 @@ class VAETrainer:
         recon_loss = recon_loss / batch_size
         kl_loss = kl_loss / batch_size
 
+        pre_clip_grad_norm = None
         if training:
             loss.backward()
+            pre_clip_grad_norm = torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(),
+                max_norm=self.max_grad_norm,
+            )
             self.optimizer.step()
 
-        return loss, recon_loss, kl_loss
+        pre_clip_grad_norm_value = None
+        if pre_clip_grad_norm is not None:
+            if isinstance(pre_clip_grad_norm, torch.Tensor):
+                pre_clip_grad_norm_value = pre_clip_grad_norm.detach().item()
+            else:
+                pre_clip_grad_norm_value = float(pre_clip_grad_norm)
+
+        return loss, recon_loss, kl_loss, pre_clip_grad_norm_value
 
     def _compute_losses(
         self,
@@ -176,7 +196,9 @@ class VAETrainer:
         total_loss = 0
         total_recon_loss = 0
         total_kl_loss = 0
+        total_pre_clip_grad_norm = 0.0
         num_batches = 0
+        num_grad_norm_batches = 0
         
         grad_context = torch.enable_grad if training else torch.no_grad
         with grad_context():
@@ -184,13 +206,21 @@ class VAETrainer:
                 grids = grids.to(self.device)
                 grades = grades.to(self.device)
 
-                loss, recon_loss, kl_loss = self._run_batch(grids, grades, kl_weight, training)
+                loss, recon_loss, kl_loss, pre_clip_grad_norm = self._run_batch(
+                    grids,
+                    grades,
+                    kl_weight,
+                    training,
+                )
 
                 # Accumulate losses
                 total_loss += loss.item()
                 total_recon_loss += recon_loss.item()
                 total_kl_loss += kl_loss.item()
                 num_batches += 1
+                if training and pre_clip_grad_norm is not None:
+                    total_pre_clip_grad_norm += pre_clip_grad_norm
+                    num_grad_norm_batches += 1
 
                 # Log batch progress (less verbose)
                 if log_progress and batch_idx % self.log_interval == 0:
@@ -209,6 +239,12 @@ class VAETrainer:
         avg_loss = total_loss / num_batches
         avg_recon_loss = total_recon_loss / num_batches
         avg_kl_loss = total_kl_loss / num_batches
+        if training:
+            self.last_train_pre_clip_grad_norm = (
+                total_pre_clip_grad_norm / num_grad_norm_batches
+                if num_grad_norm_batches > 0
+                else 0.0
+            )
         
         return avg_loss, avg_recon_loss, avg_kl_loss
     
@@ -358,6 +394,11 @@ class VAETrainer:
             self.writer.add_scalar('Loss/val_recon', val_recon, epoch)
             self.writer.add_scalar('Loss/train_kl', train_kl, epoch)
             self.writer.add_scalar('Loss/val_kl', val_kl, epoch)
+            self.writer.add_scalar(
+                'Gradients/train_pre_clip_norm',
+                self.last_train_pre_clip_grad_norm,
+                epoch,
+            )
             self.writer.add_scalar('Learning_rate', self.optimizer.param_groups[0]['lr'], epoch)
             
             # Store losses

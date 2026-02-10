@@ -67,6 +67,7 @@ L_KL = -0.5 × Σ(1 + log σ² - μ² - σ²)
 | `latent_dim` | 128 |
 | `grade_embedding_dim` | 32 |
 | `learning_rate` | 0.001 |
+| `max_grad_norm` | 1.0 |
 | `batch_size` | 64 |
 | `num_epochs` | 50 |
 | `kl_weight` | 1.0 |
@@ -76,6 +77,7 @@ L_KL = -0.5 × Σ(1 + log σ² - μ² - σ²)
 
 - **Optimizer**: Adam
 - **Scheduler**: ReduceLROnPlateau (factor=0.5, patience=5)
+- **Gradient clipping**: `clip_grad_norm_` applied before `optimizer.step()` with `max_grad_norm`
 
 ### Checkpoints
 

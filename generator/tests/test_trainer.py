@@ -46,6 +46,7 @@ class TestVAETrainer:
             'num_epochs': 2,
             'kl_weight': 1.0,
             'kl_annealing': False,
+            'max_grad_norm': 1.0,
             'checkpoint_dir': temp_dir,
             'log_dir': str(Path(temp_dir) / 'logs')
         }
@@ -83,6 +84,7 @@ class TestVAETrainer:
         assert trainer.scheduler is not None
         assert trainer.current_epoch == 0
         assert trainer.best_val_loss == float('inf')
+        assert trainer.max_grad_norm == pytest.approx(1.0)
         trainer.writer.close()
     
     def test_train_epoch(self, model_and_loaders, small_dataset_config):
@@ -176,6 +178,116 @@ class TestVAETrainer:
             for before, after in zip(params_before, params_after)
         )
         trainer.writer.close()
+
+    def test_train_epoch_applies_gradient_clipping_with_configured_max_norm(
+        self, small_dataset_config, monkeypatch
+    ):
+        """Training should clip gradients once per batch using max_grad_norm."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+        config = dict(small_dataset_config)
+        config['max_grad_norm'] = 0.75
+
+        trainer = VAETrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=config,
+            device='cpu'
+        )
+
+        clip_calls = []
+
+        def fake_clip_grad_norm_(
+            parameters,
+            max_norm,
+            norm_type=2.0,
+            error_if_nonfinite=False,
+            foreach=None,
+        ):
+            params = list(parameters)
+            assert len(params) > 0
+            clip_calls.append(max_norm)
+            return torch.tensor(3.0)
+
+        monkeypatch.setattr(torch.nn.utils, 'clip_grad_norm_', fake_clip_grad_norm_)
+
+        trainer.train_epoch(0)
+
+        assert len(clip_calls) == len(train_loader)
+        assert all(max_norm == config['max_grad_norm'] for max_norm in clip_calls)
+        assert trainer.last_train_pre_clip_grad_norm == pytest.approx(3.0)
+        trainer.writer.close()
+
+    def test_validate_does_not_apply_gradient_clipping(self, small_dataset_config, monkeypatch):
+        """Validation should not invoke gradient clipping."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+
+        trainer = VAETrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=small_dataset_config,
+            device='cpu'
+        )
+
+        def fail_clip_grad_norm_(*args, **kwargs):
+            raise AssertionError('clip_grad_norm_ should not be called during validate()')
+
+        monkeypatch.setattr(torch.nn.utils, 'clip_grad_norm_', fail_clip_grad_norm_)
+
+        trainer.validate(0)
+        trainer.writer.close()
+
+    @pytest.mark.parametrize('max_grad_norm', [0.0, -1.0, float('inf'), float('nan')])
+    def test_invalid_max_grad_norm_rejected(self, small_dataset_config, max_grad_norm):
+        """Trainer should reject non-positive or non-finite max_grad_norm values."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+        config = dict(small_dataset_config)
+        config['max_grad_norm'] = max_grad_norm
+
+        with pytest.raises(ValueError, match='max_grad_norm must be a positive finite float'):
+            VAETrainer(
+                model=model,
+                train_loader=train_loader,
+                val_loader=val_loader,
+                config=config,
+                device='cpu'
+            )
+
+    def test_train_logs_pre_clip_gradient_norm_metric(self, small_dataset_config):
+        """train() should log pre-clip gradient norm to TensorBoard."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+        config = dict(small_dataset_config)
+        config['num_epochs'] = 1
+
+        trainer = VAETrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=config,
+            device='cpu'
+        )
+        trainer.writer.close()
+
+        class SpyWriter:
+            def __init__(self):
+                self.scalars = []
+
+            def add_scalar(self, tag, scalar_value, global_step):
+                self.scalars.append((tag, float(scalar_value), global_step))
+
+            def close(self):
+                pass
+
+        trainer.writer = SpyWriter()
+        trainer.train(start_epoch=0)
+
+        logged_tags = [tag for tag, _, _ in trainer.writer.scalars]
+        assert 'Gradients/train_pre_clip_norm' in logged_tags
 
     def test_train_epoch_routes_through_compute_losses(
         self, small_dataset_config, monkeypatch

@@ -207,6 +207,7 @@ model:
 training:
   num_epochs: 50
   learning_rate: 0.001
+  max_grad_norm: 1.0
   kl_weight: 1.0
   kl_annealing: true
   kl_annealing_epochs: 10

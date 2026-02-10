@@ -37,7 +37,8 @@ Code review of the `generator/` project covering correctness, architecture, and 
 - **File**: `generator/src/vae_trainer.py` — `train_epoch()`
 - **Problem**: With `reduction="sum"` in the loss, gradient magnitudes can spike, especially early in training. No `clip_grad_norm_` is applied before `optimizer.step()`.
 - **Fix**: Add `torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)` before the optimizer step.
-- [ ] Add gradient clipping to training loop
+- **Status**: Done. Added configurable gradient clipping (`training.max_grad_norm`, default `1.0`) in the training batch path before `optimizer.step()`, with pre-clip gradient norm TensorBoard logging.
+- [x] Add gradient clipping to training loop
 
 ### 5. `generate_with_retry` "max_attempts" is misleading
 - **File**: `generator/src/generator.py` — `generate_with_retry()`
