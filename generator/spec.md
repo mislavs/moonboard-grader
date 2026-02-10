@@ -72,12 +72,15 @@ L_KL = -0.5 × Σ(1 + log σ² - μ² - σ²)
 | `num_epochs` | 50 |
 | `kl_weight` | 1.0 |
 | `kl_annealing_epochs` | 10 |
+| `early_stopping_patience` | 15 |
+| `early_stopping_min_delta` | 0.0001 |
 
 ### Optimizer & Scheduler
 
 - **Optimizer**: Adam
 - **Scheduler**: ReduceLROnPlateau (factor=0.5, patience=5)
 - **Gradient clipping**: `clip_grad_norm_` applied before `optimizer.step()` with `max_grad_norm`
+- **Early stopping**: Stop when validation loss fails to improve by `early_stopping_min_delta` for `early_stopping_patience` consecutive epochs
 
 ### Checkpoints
 

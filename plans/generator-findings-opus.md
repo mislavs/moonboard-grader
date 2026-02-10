@@ -54,7 +54,8 @@ Code review of the `generator/` project covering correctness, architecture, and 
 - **File**: `generator/src/vae_trainer.py` — `train()`
 - **Problem**: Training runs for a fixed number of epochs. The LR scheduler reduces learning rate on plateau, but there's no mechanism to stop if validation loss hasn't improved for many epochs. With 70 epochs, the model may overfit.
 - **Fix**: Add a patience-based early stopping check after validation.
-- [ ] Add early stopping to training loop
+- **Status**: Done. Added patience-based early stopping with configurable `early_stopping_patience` and `early_stopping_min_delta`, TensorBoard metrics, and checkpoint persistence for resume continuity.
+- [x] Add early stopping to training loop
 
 ### 7. No weight decay or dropout for regularization
 - **File**: `generator/src/vae.py`, `generator/src/vae_trainer.py`

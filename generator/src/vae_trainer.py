@@ -68,6 +68,30 @@ class VAETrainer:
             raise ValueError(
                 f'max_grad_norm must be a positive finite float, got {self.max_grad_norm}'
             )
+        raw_early_stopping_patience = config.get('early_stopping_patience', 15)
+        if raw_early_stopping_patience is None:
+            self.early_stopping_patience: Optional[int] = None
+        elif (
+            isinstance(raw_early_stopping_patience, bool)
+            or not isinstance(raw_early_stopping_patience, int)
+            or raw_early_stopping_patience <= 0
+        ):
+            raise ValueError(
+                'early_stopping_patience must be a positive integer or None, '
+                f'got {raw_early_stopping_patience!r}'
+            )
+        else:
+            self.early_stopping_patience = raw_early_stopping_patience
+
+        self.early_stopping_min_delta = float(config.get('early_stopping_min_delta', 1e-4))
+        if (
+            not math.isfinite(self.early_stopping_min_delta)
+            or self.early_stopping_min_delta < 0
+        ):
+            raise ValueError(
+                'early_stopping_min_delta must be a finite float >= 0, '
+                f'got {self.early_stopping_min_delta}'
+            )
         
         # Logging configuration
         self.log_interval = config.get('log_interval', 100)
@@ -97,6 +121,22 @@ class VAETrainer:
         self.train_losses = []
         self.val_losses = []
         self.last_train_pre_clip_grad_norm = 0.0
+        self.early_stopping_counter = 0
+        self.best_epoch: Optional[int] = None
+
+    def _is_validation_improved(self, val_loss: float) -> bool:
+        """
+        Check whether current validation loss is meaningfully better.
+
+        Args:
+            val_loss: Current validation loss
+
+        Returns:
+            bool: True when improvement exceeds early_stopping_min_delta
+        """
+        if self.best_val_loss == float('inf'):
+            return True
+        return (self.best_val_loss - val_loss) > self.early_stopping_min_delta
         
     def get_kl_weight(self, epoch: int) -> float:
         """
@@ -307,6 +347,10 @@ class VAETrainer:
             'optimizer_state_dict': self.optimizer.state_dict(),
             'scheduler_state_dict': self.scheduler.state_dict(),
             'best_val_loss': self.best_val_loss,
+            'best_epoch': self.best_epoch,
+            'early_stopping_patience': self.early_stopping_patience,
+            'early_stopping_min_delta': self.early_stopping_min_delta,
+            'early_stopping_counter': self.early_stopping_counter,
             'config': self.config,
             'train_losses': self.train_losses,
             'val_losses': self.val_losses,
@@ -347,6 +391,16 @@ class VAETrainer:
         self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         self.current_epoch = checkpoint['epoch']
         self.best_val_loss = checkpoint['best_val_loss']
+        self.best_epoch = checkpoint.get('best_epoch', None)
+        self.early_stopping_patience = checkpoint.get(
+            'early_stopping_patience',
+            self.early_stopping_patience,
+        )
+        self.early_stopping_min_delta = checkpoint.get(
+            'early_stopping_min_delta',
+            self.early_stopping_min_delta,
+        )
+        self.early_stopping_counter = checkpoint.get('early_stopping_counter', 0)
         self.train_losses = checkpoint.get('train_losses', [])
         self.val_losses = checkpoint.get('val_losses', [])
     
@@ -406,10 +460,42 @@ class VAETrainer:
             self.val_losses.append(val_loss)
             
             # Save best model based on validation loss
-            if val_loss < self.best_val_loss:
+            should_stop = False
+            if self._is_validation_improved(val_loss):
                 self.best_val_loss = val_loss
+                self.best_epoch = epoch
+                self.early_stopping_counter = 0
                 self.save_checkpoint(epoch, f'checkpoint_epoch_{epoch}.pth', is_best=True)
                 print(f"  → New best validation loss: {val_loss:.4f} - Saved checkpoint")
+            else:
+                self.early_stopping_counter += 1
+                if (
+                    self.early_stopping_patience is not None
+                    and self.early_stopping_counter >= self.early_stopping_patience
+                ):
+                    best_epoch_display = (
+                        self.best_epoch + 1 if self.best_epoch is not None else "N/A"
+                    )
+                    print(
+                        "  → Early stopping triggered: "
+                        f"no val loss improvement > {self.early_stopping_min_delta:.6f} "
+                        f"for {self.early_stopping_counter} epochs "
+                        f"(best epoch: {best_epoch_display})"
+                    )
+                    should_stop = True
+
+            self.writer.add_scalar('EarlyStopping/counter', self.early_stopping_counter, epoch)
+            self.writer.add_scalar(
+                'EarlyStopping/patience',
+                (
+                    -1.0
+                    if self.early_stopping_patience is None
+                    else float(self.early_stopping_patience)
+                ),
+                epoch,
+            )
+            if should_stop:
+                break
         
         # Save final model
         self.save_checkpoint(self.current_epoch, 'final_vae.pth')

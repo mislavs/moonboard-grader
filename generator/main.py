@@ -81,6 +81,8 @@ def build_training_config(config: Dict) -> Dict:
         'kl_annealing': config['training']['kl_annealing'],
         'kl_annealing_epochs': config['training']['kl_annealing_epochs'],
         'max_grad_norm': config['training'].get('max_grad_norm', 1.0),
+        'early_stopping_patience': config['training'].get('early_stopping_patience', 15),
+        'early_stopping_min_delta': config['training'].get('early_stopping_min_delta', 1e-4),
         'checkpoint_dir': config['checkpoint']['checkpoint_dir'],
         'log_dir': config['logging']['log_dir'],
         'log_interval': config['logging'].get('log_interval', 100),

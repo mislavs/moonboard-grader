@@ -85,6 +85,10 @@ class TestVAETrainer:
         assert trainer.current_epoch == 0
         assert trainer.best_val_loss == float('inf')
         assert trainer.max_grad_norm == pytest.approx(1.0)
+        assert trainer.early_stopping_patience == 15
+        assert trainer.early_stopping_min_delta == pytest.approx(1e-4)
+        assert trainer.early_stopping_counter == 0
+        assert trainer.best_epoch is None
         trainer.writer.close()
     
     def test_train_epoch(self, model_and_loaders, small_dataset_config):
@@ -257,6 +261,50 @@ class TestVAETrainer:
                 device='cpu'
             )
 
+    @pytest.mark.parametrize('early_stopping_patience', [0, -1, 1.5, '3', True])
+    def test_invalid_early_stopping_patience_rejected(
+        self, small_dataset_config, early_stopping_patience
+    ):
+        """Trainer should reject invalid early stopping patience values."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+        config = dict(small_dataset_config)
+        config['early_stopping_patience'] = early_stopping_patience
+
+        with pytest.raises(
+            ValueError,
+            match='early_stopping_patience must be a positive integer or None',
+        ):
+            VAETrainer(
+                model=model,
+                train_loader=train_loader,
+                val_loader=val_loader,
+                config=config,
+                device='cpu'
+            )
+
+    @pytest.mark.parametrize('early_stopping_min_delta', [-1e-3, float('inf'), float('nan')])
+    def test_invalid_early_stopping_min_delta_rejected(
+        self, small_dataset_config, early_stopping_min_delta
+    ):
+        """Trainer should reject invalid early stopping min-delta values."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+        config = dict(small_dataset_config)
+        config['early_stopping_min_delta'] = early_stopping_min_delta
+
+        with pytest.raises(
+            ValueError,
+            match='early_stopping_min_delta must be a finite float >= 0',
+        ):
+            VAETrainer(
+                model=model,
+                train_loader=train_loader,
+                val_loader=val_loader,
+                config=config,
+                device='cpu'
+            )
+
     def test_train_logs_pre_clip_gradient_norm_metric(self, small_dataset_config):
         """train() should log pre-clip gradient norm to TensorBoard."""
         model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
@@ -288,6 +336,98 @@ class TestVAETrainer:
 
         logged_tags = [tag for tag, _, _ in trainer.writer.scalars]
         assert 'Gradients/train_pre_clip_norm' in logged_tags
+        assert 'EarlyStopping/counter' in logged_tags
+        assert 'EarlyStopping/patience' in logged_tags
+
+    def test_train_stops_early_after_patience_without_meaningful_improvement(
+        self, small_dataset_config, monkeypatch
+    ):
+        """train() should stop once patience is exhausted without min-delta improvement."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+        config = dict(small_dataset_config)
+        config['num_epochs'] = 10
+        config['early_stopping_patience'] = 2
+        config['early_stopping_min_delta'] = 1e-4
+
+        trainer = VAETrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=config,
+            device='cpu'
+        )
+
+        train_epochs = []
+        val_epochs = []
+        val_losses = [1.0, 0.99995, 0.99992, 0.99991]
+
+        def fake_train_epoch(epoch):
+            train_epochs.append(epoch)
+            trainer.last_train_pre_clip_grad_norm = 0.0
+            return 1.0, 0.5, 0.1
+
+        def fake_validate(epoch):
+            val_epochs.append(epoch)
+            idx = min(len(val_epochs) - 1, len(val_losses) - 1)
+            return val_losses[idx], 0.4, 0.1
+
+        monkeypatch.setattr(trainer, 'train_epoch', fake_train_epoch)
+        monkeypatch.setattr(trainer, 'validate', fake_validate)
+
+        trainer.train(start_epoch=0)
+
+        assert train_epochs == [0, 1, 2]
+        assert val_epochs == [0, 1, 2]
+        assert trainer.current_epoch == 2
+        assert len(trainer.train_losses) == 3
+        assert len(trainer.val_losses) == 3
+        assert trainer.best_epoch == 0
+        assert trainer.early_stopping_counter == 2
+
+    def test_train_does_not_stop_early_when_early_stopping_is_disabled(
+        self, small_dataset_config, monkeypatch
+    ):
+        """train() should run full epochs when early_stopping_patience is None."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+        config = dict(small_dataset_config)
+        config['num_epochs'] = 4
+        config['early_stopping_patience'] = None
+        config['early_stopping_min_delta'] = 1e-4
+
+        trainer = VAETrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=config,
+            device='cpu'
+        )
+
+        train_epochs = []
+        val_epochs = []
+
+        def fake_train_epoch(epoch):
+            train_epochs.append(epoch)
+            trainer.last_train_pre_clip_grad_norm = 0.0
+            return 1.0, 0.5, 0.1
+
+        def fake_validate(epoch):
+            val_epochs.append(epoch)
+            return 1.0, 0.4, 0.1
+
+        monkeypatch.setattr(trainer, 'train_epoch', fake_train_epoch)
+        monkeypatch.setattr(trainer, 'validate', fake_validate)
+
+        trainer.train(start_epoch=0)
+
+        assert train_epochs == [0, 1, 2, 3]
+        assert val_epochs == [0, 1, 2, 3]
+        assert trainer.current_epoch == 3
+        assert len(trainer.train_losses) == 4
+        assert len(trainer.val_losses) == 4
+        assert trainer.best_epoch == 0
+        assert trainer.early_stopping_counter == 3
 
     def test_train_epoch_routes_through_compute_losses(
         self, small_dataset_config, monkeypatch
@@ -403,6 +543,75 @@ class TestVAETrainer:
             assert torch.allclose(p1, p2)
         trainer.writer.close()
         new_trainer.writer.close()
+
+    def test_checkpoint_persists_and_restores_early_stopping_state(self, small_dataset_config):
+        """Checkpoint save/load should preserve early-stopping state and support legacy fallback."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+        config = dict(small_dataset_config)
+        config['early_stopping_patience'] = 9
+        config['early_stopping_min_delta'] = 0.002
+
+        trainer = VAETrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=config,
+            device='cpu'
+        )
+        trainer.best_val_loss = 0.5
+        trainer.best_epoch = 4
+        trainer.early_stopping_counter = 3
+        checkpoint_path = Path(config['checkpoint_dir']) / 'early_stopping_checkpoint.pth'
+        trainer.save_checkpoint(epoch=6, filename='early_stopping_checkpoint.pth')
+
+        new_model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        new_config = dict(small_dataset_config)
+        new_config['early_stopping_patience'] = 1
+        new_config['early_stopping_min_delta'] = 0.5
+        new_trainer = VAETrainer(
+            model=new_model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=new_config,
+            device='cpu'
+        )
+        new_trainer.load_checkpoint(str(checkpoint_path))
+
+        assert new_trainer.early_stopping_patience == 9
+        assert new_trainer.early_stopping_min_delta == pytest.approx(0.002)
+        assert new_trainer.early_stopping_counter == 3
+        assert new_trainer.best_epoch == 4
+
+        legacy_checkpoint_path = Path(config['checkpoint_dir']) / 'legacy_early_stopping_checkpoint.pth'
+        legacy_checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
+        legacy_checkpoint.pop('early_stopping_patience', None)
+        legacy_checkpoint.pop('early_stopping_min_delta', None)
+        legacy_checkpoint.pop('early_stopping_counter', None)
+        legacy_checkpoint.pop('best_epoch', None)
+        torch.save(legacy_checkpoint, legacy_checkpoint_path)
+
+        legacy_model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        legacy_config = dict(small_dataset_config)
+        legacy_config['early_stopping_patience'] = 11
+        legacy_config['early_stopping_min_delta'] = 0.003
+        legacy_trainer = VAETrainer(
+            model=legacy_model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=legacy_config,
+            device='cpu'
+        )
+        legacy_trainer.load_checkpoint(str(legacy_checkpoint_path))
+
+        assert legacy_trainer.early_stopping_patience == 11
+        assert legacy_trainer.early_stopping_min_delta == pytest.approx(0.003)
+        assert legacy_trainer.early_stopping_counter == 0
+        assert legacy_trainer.best_epoch is None
+
+        trainer.writer.close()
+        new_trainer.writer.close()
+        legacy_trainer.writer.close()
 
     def test_load_checkpoint_legacy_encoder_shape_mismatch_has_clear_error(
         self, model_and_loaders, small_dataset_config

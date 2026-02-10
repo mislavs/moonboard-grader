@@ -22,6 +22,8 @@ training:
   kl_weight: 0.01  # Reduced from 1.0 to prevent KL from dominating
   kl_annealing: true  # Gradually increase KL weight from 0.01 to kl_weight
   kl_annealing_epochs: 10  # Number of epochs to anneal over
+  early_stopping_patience: 15  # Stop after N epochs without meaningful val-loss improvement
+  early_stopping_min_delta: 0.0001  # Minimum absolute val-loss improvement to reset patience
 
 # Checkpoint and logging
 checkpoint:

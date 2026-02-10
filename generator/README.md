@@ -49,6 +49,8 @@ py main.py evaluate --checkpoint models/best_vae.pth --output results.json
 py main.py train [--config config.yaml] [--resume checkpoint.pth]
 ```
 
+Training monitors validation loss with both LR-on-plateau scheduling and patience-based early stopping.
+
 Monitor training with TensorBoard:
 
 ```bash
@@ -211,6 +213,8 @@ training:
   kl_weight: 1.0
   kl_annealing: true
   kl_annealing_epochs: 10
+  early_stopping_patience: 15
+  early_stopping_min_delta: 0.0001
 
 checkpoint:
   checkpoint_dir: "models"
