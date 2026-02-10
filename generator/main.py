@@ -24,6 +24,7 @@ from src.label_space import (
     build_label_context,
     infer_num_model_grades,
 )
+from src.checkpoint_compat import load_state_dict_with_compatibility
 from moonboard_core import decode_grade, encode_grade
 
 # Setup logging
@@ -457,7 +458,11 @@ def evaluate_command(args):
             num_grades=num_model_grades,
             grade_embedding_dim=model_config.get('grade_embedding_dim', 32)
         )
-        model.load_state_dict(checkpoint['model_state_dict'])
+        load_state_dict_with_compatibility(
+            model,
+            checkpoint['model_state_dict'],
+            checkpoint_path=args.checkpoint,
+        )
         model.to(device)
         model.eval()
 

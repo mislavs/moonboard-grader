@@ -224,6 +224,38 @@ class TestProblemGenerator:
         assert generator.model.latent_dim == 32
         assert generator.label_context.label_space_mode == "global_legacy"
 
+    def test_from_checkpoint_legacy_encoder_shape_mismatch_has_clear_error(
+        self, checkpoint_tmp_dir
+    ):
+        """Legacy unconditioned-encoder checkpoints should fail with guidance."""
+        model = ConditionalVAE(latent_dim=32, num_grades=5, grade_embedding_dim=16)
+        checkpoint_path = checkpoint_tmp_dir / "legacy_encoder_checkpoint.pth"
+
+        legacy_state = model.state_dict()
+        legacy_in_features = model.encoder_output_size
+        legacy_state["fc_mu.weight"] = (
+            legacy_state["fc_mu.weight"][:, :legacy_in_features].clone()
+        )
+        legacy_state["fc_logvar.weight"] = (
+            legacy_state["fc_logvar.weight"][:, :legacy_in_features].clone()
+        )
+
+        checkpoint = {
+            "epoch": 1,
+            "model_state_dict": legacy_state,
+            "model_config": {
+                "latent_dim": 32,
+                "num_grades": 5,
+                "grade_embedding_dim": 16,
+            },
+        }
+        torch.save(checkpoint, checkpoint_path)
+
+        with pytest.raises(
+            RuntimeError, match="legacy CVAE architecture without encoder grade conditioning"
+        ):
+            ProblemGenerator.from_checkpoint(str(checkpoint_path), device="cpu")
+
     def test_from_checkpoint_explicit_remapped_metadata(self, checkpoint_tmp_dir):
         """New checkpoints should preserve explicit remapped label-space metadata."""
         model = ConditionalVAE(latent_dim=32, num_grades=1, grade_embedding_dim=16)

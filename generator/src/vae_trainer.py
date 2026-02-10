@@ -13,6 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from .vae import ConditionalVAE, vae_loss
 from .label_space import LabelSpaceMode
+from .checkpoint_compat import load_state_dict_with_compatibility
 
 logger = logging.getLogger(__name__)
 
@@ -291,8 +292,12 @@ class VAETrainer:
             checkpoint_path: Path to checkpoint file
         """
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
-        
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+
+        load_state_dict_with_compatibility(
+            self.model,
+            checkpoint['model_state_dict'],
+            checkpoint_path=checkpoint_path,
+        )
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         self.current_epoch = checkpoint['epoch']

@@ -11,7 +11,8 @@ Code review of the `generator/` project covering correctness, architecture, and 
 - **Problem**: In a Conditional VAE, both the encoder and decoder should be conditioned on the label. Only the decoder receives the grade embedding. The encoder maps input grids to latent space without any knowledge of grade.
 - **Impact**: The latent space cannot learn grade-specific structure. A 6A+ problem and an 8A problem with identical holds map to the same latent point. The decoder must do all grade differentiation from the embedding alone, limiting generation quality.
 - **Fix**: Pass the grade embedding to the encoder — either concatenate to the flattened features before `fc_mu`/`fc_logvar`, or add the grade as a 4th input channel.
-- [ ] Add grade conditioning to the encoder
+- **Status**: Done. Encoder now conditions on grade via feature+embedding concatenation before `fc_mu`/`fc_logvar`, with updated encode call sites and checkpoint compatibility handling for legacy architecture mismatch.
+- [x] Add grade conditioning to the encoder
 
 ### 2. Decoder uses bilinear interpolation to fix dimension mismatch
 - **File**: `generator/src/vae.py` — `decode()` method

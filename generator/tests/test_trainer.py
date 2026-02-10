@@ -161,6 +161,48 @@ class TestVAETrainer:
             assert torch.allclose(p1, p2)
         trainer.writer.close()
         new_trainer.writer.close()
+
+    def test_load_checkpoint_legacy_encoder_shape_mismatch_has_clear_error(
+        self, model_and_loaders, small_dataset_config
+    ):
+        """Legacy unconditioned-encoder checkpoints should fail with guidance."""
+        model, train_loader, val_loader = model_and_loaders
+
+        trainer = VAETrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=small_dataset_config,
+            device='cpu'
+        )
+
+        checkpoint_path = Path(small_dataset_config['checkpoint_dir']) / 'legacy_checkpoint.pth'
+        trainer.save_checkpoint(epoch=1, filename='legacy_checkpoint.pth')
+
+        checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
+        legacy_state = checkpoint['model_state_dict']
+        legacy_in_features = model.encoder_output_size
+        legacy_state['fc_mu.weight'] = legacy_state['fc_mu.weight'][:, :legacy_in_features].clone()
+        legacy_state['fc_logvar.weight'] = legacy_state['fc_logvar.weight'][:, :legacy_in_features].clone()
+        checkpoint['model_state_dict'] = legacy_state
+        torch.save(checkpoint, checkpoint_path)
+
+        new_model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        new_trainer = VAETrainer(
+            model=new_model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=small_dataset_config,
+            device='cpu'
+        )
+
+        with pytest.raises(
+            RuntimeError, match='legacy CVAE architecture without encoder grade conditioning'
+        ):
+            new_trainer.load_checkpoint(str(checkpoint_path))
+
+        trainer.writer.close()
+        new_trainer.writer.close()
     
     def test_best_checkpoint_saved(self, model_and_loaders, small_dataset_config):
         """Test that best checkpoint is saved correctly."""

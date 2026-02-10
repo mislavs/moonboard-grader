@@ -60,9 +60,10 @@ class ConditionalVAE(nn.Module):
         # Calculate flattened size after conv layers: 256 * 3 * 2 = 1536
         self.encoder_output_size = 256 * 3 * 2
 
-        # Latent space layers
-        self.fc_mu = nn.Linear(self.encoder_output_size, latent_dim)
-        self.fc_logvar = nn.Linear(self.encoder_output_size, latent_dim)
+        # Latent space layers: encoder features + grade embedding
+        encoder_conditioned_size = self.encoder_output_size + grade_embedding_dim
+        self.fc_mu = nn.Linear(encoder_conditioned_size, latent_dim)
+        self.fc_logvar = nn.Linear(encoder_conditioned_size, latent_dim)
 
         # Decoder input: latent + grade embedding
         self.fc_decode = nn.Linear(
@@ -97,12 +98,13 @@ class ConditionalVAE(nn.Module):
         # Final layer to adjust to exact output size
         self.output_adjust = nn.Conv2d(3, 3, kernel_size=1)
 
-    def encode(self, x):
+    def encode(self, x, grade_labels):
         """
         Encode input grid to latent distribution parameters.
 
         Args:
             x: Input tensor of shape (batch_size, 3, 18, 11)
+            grade_labels: Grade labels of shape (batch_size,)
 
         Returns:
             mu: Mean of latent distribution (batch_size, latent_dim)
@@ -110,8 +112,10 @@ class ConditionalVAE(nn.Module):
         """
         h = self.encoder(x)
         h = h.view(h.size(0), -1)  # Flatten
-        mu = self.fc_mu(h)
-        logvar = self.fc_logvar(h)
+        grade_emb = self.grade_embedding(grade_labels)
+        h_cond = torch.cat([h, grade_emb], dim=1)
+        mu = self.fc_mu(h_cond)
+        logvar = self.fc_logvar(h_cond)
         return mu, logvar
 
     def reparameterize(self, mu, logvar):
@@ -173,7 +177,7 @@ class ConditionalVAE(nn.Module):
             mu: Mean of latent distribution
             logvar: Log variance of latent distribution
         """
-        mu, logvar = self.encode(x)
+        mu, logvar = self.encode(x, grade_labels)
         z = self.reparameterize(mu, logvar)
         x_recon = self.decode(z, grade_labels)
         return x_recon, mu, logvar

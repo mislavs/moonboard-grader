@@ -33,11 +33,23 @@ class TestConditionalVAE:
     
     def test_encode_shape(self, model, sample_input):
         """Test that encoding produces correct output shapes."""
-        grids, _ = sample_input
-        mu, logvar = model.encode(grids)
+        grids, grades = sample_input
+        mu, logvar = model.encode(grids, grades)
         
         assert mu.shape == (4, 128)
         assert logvar.shape == (4, 128)
+
+    def test_encode_conditioned_on_grade(self, model):
+        """Same grid with different grades should produce different latent params."""
+        single_grid = torch.randn(1, 3, 18, 11)
+        grids = single_grid.repeat(2, 1, 1, 1)
+        grades = torch.tensor([0, 1], dtype=torch.long)
+
+        mu, logvar = model.encode(grids, grades)
+
+        same_mu = torch.allclose(mu[0], mu[1])
+        same_logvar = torch.allclose(logvar[0], logvar[1])
+        assert not (same_mu and same_logvar)
     
     def test_reparameterize_shape(self, model):
         """Test that reparameterization produces correct output shape."""

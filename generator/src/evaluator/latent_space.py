@@ -65,8 +65,9 @@ def evaluate_latent_space(
     with torch.no_grad():
         for grids, grades in val_loader:
             grids = grids.to(device)
+            grades_device = grades.to(device)
             # Encode to latent space (get mu, not logvar)
-            mu, _ = model.encode(grids)
+            mu, _ = model.encode(grids, grades_device)
             all_latents.append(mu.cpu().numpy())
             all_grades.extend(grades.tolist())
     

@@ -14,6 +14,7 @@ import logging
 from moonboard_core import grid_to_moves, validate_moves, decode_grade
 from .vae import ConditionalVAE
 from .label_space import EvaluationLabelContext, build_label_context, infer_num_model_grades
+from .checkpoint_compat import load_state_dict_with_compatibility
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +183,11 @@ class ProblemGenerator:
             )
             
             # Load weights
-            model.load_state_dict(model_state)
+            load_state_dict_with_compatibility(
+                model,
+                model_state,
+                checkpoint_path=str(checkpoint_path),
+            )
             
             logger.info(f"Loaded model from {checkpoint_path}")
             logger.info(f"  Epoch: {checkpoint.get('epoch', 'unknown')}")
@@ -198,8 +203,10 @@ class ProblemGenerator:
             
             return instance
             
-        except (KeyError, RuntimeError) as e:
-            raise RuntimeError(f"Failed to load checkpoint: {e}")
+        except KeyError as e:
+            raise RuntimeError(
+                f"Failed to load checkpoint: missing required key {e}"
+            ) from e
         except torch.serialization.pickle.UnpicklingError as e:
             raise RuntimeError(f"Corrupted checkpoint file: {e}")
     
@@ -373,7 +380,7 @@ class ProblemGenerator:
         Args:
             problem1_grid: Grid tensor of first problem (3, 18, 11)
             problem2_grid: Grid tensor of second problem (3, 18, 11)
-            grade_label: Grade label for decoding
+            grade_label: Grade label used for both encoding endpoints and decoding
             steps: Number of interpolation steps
             
         Returns:
@@ -383,9 +390,11 @@ class ProblemGenerator:
             # Encode both problems
             x1 = torch.from_numpy(problem1_grid).unsqueeze(0).to(self.device)
             x2 = torch.from_numpy(problem2_grid).unsqueeze(0).to(self.device)
-            
-            mu1, _ = self.model.encode(x1)
-            mu2, _ = self.model.encode(x2)
+
+            # Interpolation is conditioned in a single grade context.
+            grade = torch.tensor([grade_label], dtype=torch.long, device=self.device)
+            mu1, _ = self.model.encode(x1, grade)
+            mu2, _ = self.model.encode(x2, grade)
             
             # Interpolate in latent space
             alphas = np.linspace(0, 1, steps)
@@ -395,7 +404,6 @@ class ProblemGenerator:
                 z = (1 - alpha) * mu1 + alpha * mu2
                 
                 # Decode
-                grade = torch.tensor([grade_label], dtype=torch.long, device=self.device)
                 x_recon = self.model.decode(z, grade)
                 probs = torch.sigmoid(x_recon)
                 grid = probs[0].cpu().numpy()
