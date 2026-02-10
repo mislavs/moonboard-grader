@@ -112,13 +112,60 @@ class VAETrainer:
             return min_weight + (self.kl_weight - min_weight) * progress
         return self.kl_weight
     
-    def _compute_losses(self, data_loader, kl_weight: float, log_progress: bool = False) -> Tuple[float, float, float]:
+    def _run_batch(
+        self,
+        grids: torch.Tensor,
+        grades: torch.Tensor,
+        kl_weight: float,
+        training: bool,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Run one batch forward pass and optionally apply optimizer step.
+
+        Args:
+            grids: Input grid batch on target device
+            grades: Grade label batch on target device
+            kl_weight: Weight for KL divergence
+            training: Whether to run backward pass and optimizer step
+
+        Returns:
+            loss: Normalized total loss (per sample)
+            recon_loss: Normalized reconstruction loss (per sample)
+            kl_loss: Normalized KL divergence loss (per sample)
+        """
+        if training:
+            self.optimizer.zero_grad()
+
+        x_recon, mu, logvar = self.model(grids, grades)
+        loss, recon_loss, kl_loss = vae_loss(x_recon, grids, mu, logvar, kl_weight)
+
+        batch_size = grids.size(0)
+        loss = loss / batch_size
+        recon_loss = recon_loss / batch_size
+        kl_loss = kl_loss / batch_size
+
+        if training:
+            loss.backward()
+            self.optimizer.step()
+
+        return loss, recon_loss, kl_loss
+
+    def _compute_losses(
+        self,
+        data_loader,
+        kl_weight: float,
+        training: bool = False,
+        epoch: Optional[int] = None,
+        log_progress: bool = False,
+    ) -> Tuple[float, float, float]:
         """
         Compute losses for a data loader (shared between train/val).
         
         Args:
             data_loader: DataLoader to iterate over
             kl_weight: Weight for KL divergence
+            training: Whether to compute gradients and update optimizer
+            epoch: Epoch number for training logs
             log_progress: Whether to log batch progress
             
         Returns:
@@ -131,34 +178,32 @@ class VAETrainer:
         total_kl_loss = 0
         num_batches = 0
         
-        for batch_idx, (grids, grades) in enumerate(data_loader):
-            grids = grids.to(self.device)
-            grades = grades.to(self.device)
-            
-            # Forward pass
-            x_recon, mu, logvar = self.model(grids, grades)
-            
-            # Compute loss
-            loss, recon_loss, kl_loss = vae_loss(x_recon, grids, mu, logvar, kl_weight)
-            
-            # Normalize by batch size
-            batch_size = grids.size(0)
-            loss = loss / batch_size
-            recon_loss = recon_loss / batch_size
-            kl_loss = kl_loss / batch_size
-            
-            # Accumulate losses
-            total_loss += loss.item()
-            total_recon_loss += recon_loss.item()
-            total_kl_loss += kl_loss.item()
-            num_batches += 1
-            
-            # Log batch progress (less verbose)
-            if log_progress and batch_idx % self.log_interval == 0:
-                logger.debug(f'Batch [{batch_idx}/{len(data_loader)}] '
-                            f'Loss: {loss.item():.4f} '
-                            f'Recon: {recon_loss.item():.4f} '
-                            f'KL: {kl_loss.item():.4f}')
+        grad_context = torch.enable_grad if training else torch.no_grad
+        with grad_context():
+            for batch_idx, (grids, grades) in enumerate(data_loader):
+                grids = grids.to(self.device)
+                grades = grades.to(self.device)
+
+                loss, recon_loss, kl_loss = self._run_batch(grids, grades, kl_weight, training)
+
+                # Accumulate losses
+                total_loss += loss.item()
+                total_recon_loss += recon_loss.item()
+                total_kl_loss += kl_loss.item()
+                num_batches += 1
+
+                # Log batch progress (less verbose)
+                if log_progress and batch_idx % self.log_interval == 0:
+                    if training:
+                        logger.debug(f'Epoch {epoch} [{batch_idx}/{len(data_loader)}] '
+                                    f'Loss: {loss.item():.4f} '
+                                    f'Recon: {recon_loss.item():.4f} '
+                                    f'KL: {kl_loss.item():.4f}')
+                    else:
+                        logger.debug(f'Batch [{batch_idx}/{len(data_loader)}] '
+                                    f'Loss: {loss.item():.4f} '
+                                    f'Recon: {recon_loss.item():.4f} '
+                                    f'KL: {kl_loss.item():.4f}')
         
         # Average losses
         avg_loss = total_loss / num_batches
@@ -181,53 +226,13 @@ class VAETrainer:
         """
         self.model.train()
         kl_weight = self.get_kl_weight(epoch)
-        
-        # Training with gradient updates
-        total_loss = 0
-        total_recon_loss = 0
-        total_kl_loss = 0
-        num_batches = 0
-        
-        for batch_idx, (grids, grades) in enumerate(self.train_loader):
-            grids = grids.to(self.device)
-            grades = grades.to(self.device)
-            
-            # Forward pass
-            self.optimizer.zero_grad()
-            x_recon, mu, logvar = self.model(grids, grades)
-            
-            # Compute loss
-            loss, recon_loss, kl_loss = vae_loss(x_recon, grids, mu, logvar, kl_weight)
-            
-            # Normalize by batch size
-            batch_size = grids.size(0)
-            loss = loss / batch_size
-            recon_loss = recon_loss / batch_size
-            kl_loss = kl_loss / batch_size
-            
-            # Backward pass
-            loss.backward()
-            self.optimizer.step()
-            
-            # Accumulate losses
-            total_loss += loss.item()
-            total_recon_loss += recon_loss.item()
-            total_kl_loss += kl_loss.item()
-            num_batches += 1
-            
-            # Log batch progress (less verbose)
-            if batch_idx % self.log_interval == 0:
-                logger.debug(f'Epoch {epoch} [{batch_idx}/{len(self.train_loader)}] '
-                            f'Loss: {loss.item():.4f} '
-                            f'Recon: {recon_loss.item():.4f} '
-                            f'KL: {kl_loss.item():.4f}')
-        
-        # Average losses
-        avg_loss = total_loss / num_batches
-        avg_recon_loss = total_recon_loss / num_batches
-        avg_kl_loss = total_kl_loss / num_batches
-        
-        return avg_loss, avg_recon_loss, avg_kl_loss
+        return self._compute_losses(
+            self.train_loader,
+            kl_weight,
+            training=True,
+            epoch=epoch,
+            log_progress=True,
+        )
     
     def validate(self, epoch: int) -> Tuple[float, float, float]:
         """
@@ -243,9 +248,13 @@ class VAETrainer:
         """
         self.model.eval()
         kl_weight = self.get_kl_weight(epoch)
-        
-        with torch.no_grad():
-            return self._compute_losses(self.val_loader, kl_weight, log_progress=False)
+        return self._compute_losses(
+            self.val_loader,
+            kl_weight,
+            training=False,
+            epoch=epoch,
+            log_progress=False,
+        )
     
     def save_checkpoint(self, epoch: int, filename: str, is_best: bool = False):
         """

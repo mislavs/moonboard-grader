@@ -64,7 +64,8 @@ Code review of the `generator/` project covering correctness, architecture, and 
 - **File**: `generator/src/vae_trainer.py`
 - **Problem**: `_compute_losses` was designed to share logic between training and validation, but `train_epoch` has its own nearly identical loop with added gradient computation. Changes to loss computation must be maintained in both places.
 - **Fix**: Have `train_epoch` call `_compute_losses` with a training flag, or factor out the backpropagation step.
-- [ ] Deduplicate training/validation loss computation
+- **Status**: Done. Added shared `_run_batch` and training-aware `_compute_losses(...)`; `train_epoch` and `validate` now route through one loss path with mode-specific grad behavior.
+- [x] Deduplicate training/validation loss computation
 
 ### 9. `load_checkpoint` doesn't set `weights_only`
 - **File**: `generator/src/vae_trainer.py` — `load_checkpoint()`

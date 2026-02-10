@@ -7,6 +7,7 @@ import torch
 from pathlib import Path
 import shutil
 from uuid import uuid4
+from torch.utils.data import DataLoader, TensorDataset
 
 from src.vae import ConditionalVAE
 from src.vae_trainer import VAETrainer
@@ -14,6 +15,15 @@ from src.dataset import create_data_loaders
 
 TMP_ROOT = Path(".tmp_pytest_sandbox")
 TMP_ROOT.mkdir(exist_ok=True)
+
+
+def _create_tiny_loaders(batch_size: int = 4, num_samples: int = 8):
+    """Create deterministic in-memory loaders for trainer unit tests."""
+    grids = torch.rand(num_samples, 3, 18, 11)
+    grades = torch.randint(low=0, high=17, size=(num_samples,))
+    dataset = TensorDataset(grids, grades)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    return loader, loader
 
 
 class TestVAETrainer:
@@ -119,6 +129,126 @@ class TestVAETrainer:
         assert isinstance(avg_kl, float)
         assert avg_loss >= 0
         assert avg_recon >= 0
+        trainer.writer.close()
+
+    def test_train_epoch_updates_model_parameters(self, small_dataset_config):
+        """Training should update model parameters."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+
+        trainer = VAETrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=small_dataset_config,
+            device='cpu'
+        )
+
+        params_before = [param.detach().clone() for param in trainer.model.parameters()]
+        trainer.train_epoch(0)
+        params_after = list(trainer.model.parameters())
+
+        assert any(
+            not torch.equal(before, after)
+            for before, after in zip(params_before, params_after)
+        )
+        trainer.writer.close()
+
+    def test_validate_does_not_update_model_parameters(self, small_dataset_config):
+        """Validation should not update model parameters."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+
+        trainer = VAETrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=small_dataset_config,
+            device='cpu'
+        )
+
+        params_before = [param.detach().clone() for param in trainer.model.parameters()]
+        trainer.validate(0)
+        params_after = list(trainer.model.parameters())
+
+        assert all(
+            torch.equal(before, after)
+            for before, after in zip(params_before, params_after)
+        )
+        trainer.writer.close()
+
+    def test_train_epoch_routes_through_compute_losses(
+        self, small_dataset_config, monkeypatch
+    ):
+        """train_epoch should route through _compute_losses with training mode."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+
+        trainer = VAETrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=small_dataset_config,
+            device='cpu'
+        )
+
+        captured = {}
+
+        def fake_compute_losses(data_loader, kl_weight, training=False, epoch=None, log_progress=False):
+            captured['data_loader'] = data_loader
+            captured['kl_weight'] = kl_weight
+            captured['training'] = training
+            captured['epoch'] = epoch
+            captured['log_progress'] = log_progress
+            return 1.0, 0.5, 0.25
+
+        monkeypatch.setattr(trainer, '_compute_losses', fake_compute_losses)
+
+        result = trainer.train_epoch(0)
+
+        assert result == (1.0, 0.5, 0.25)
+        assert captured['data_loader'] is train_loader
+        assert captured['training'] is True
+        assert captured['epoch'] == 0
+        assert captured['log_progress'] is True
+        assert trainer.model.training is True
+        trainer.writer.close()
+
+    def test_validate_routes_through_compute_losses(
+        self, small_dataset_config, monkeypatch
+    ):
+        """validate should route through _compute_losses in eval mode."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+
+        trainer = VAETrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=small_dataset_config,
+            device='cpu'
+        )
+
+        captured = {}
+
+        def fake_compute_losses(data_loader, kl_weight, training=False, epoch=None, log_progress=False):
+            captured['data_loader'] = data_loader
+            captured['kl_weight'] = kl_weight
+            captured['training'] = training
+            captured['epoch'] = epoch
+            captured['log_progress'] = log_progress
+            return 1.1, 0.6, 0.3
+
+        monkeypatch.setattr(trainer, '_compute_losses', fake_compute_losses)
+
+        result = trainer.validate(0)
+
+        assert result == (1.1, 0.6, 0.3)
+        assert captured['data_loader'] is val_loader
+        assert captured['training'] is False
+        assert captured['epoch'] == 0
+        assert captured['log_progress'] is False
+        assert trainer.model.training is False
         trainer.writer.close()
     
     def test_save_and_load_checkpoint(self, model_and_loaders, small_dataset_config):
