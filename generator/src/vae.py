@@ -74,29 +74,24 @@ class ConditionalVAE(nn.Module):
         self.decoder = nn.Sequential(
             # 256x3x2
             nn.ConvTranspose2d(
-                256, 128, kernel_size=3, stride=2, padding=1, output_padding=1
+                256, 128, kernel_size=4, stride=3, padding=1, output_padding=1
             ),
             nn.BatchNorm2d(128),
             nn.ReLU(),
-            # 128x6x4
+            # 128x9x6
             nn.ConvTranspose2d(
-                128, 64, kernel_size=3, stride=2, padding=1, output_padding=0
+                128, 64, kernel_size=3, stride=2, padding=1, output_padding=(1, 0)
             ),
             nn.BatchNorm2d(64),
             nn.ReLU(),
-            # 64x11x7
-            nn.ConvTranspose2d(
-                64, 32, kernel_size=3, stride=2, padding=1, output_padding=1
-            ),
+            # 64x18x11
+            nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(),
-            # 32x22x14
-            nn.Conv2d(32, 3, kernel_size=3, stride=1, padding=1),
-            # 3x22x14
+            # 32x18x11
+            nn.Conv2d(32, 3, kernel_size=1, stride=1, padding=0),
+            # 3x18x11
         )
-
-        # Final layer to adjust to exact output size
-        self.output_adjust = nn.Conv2d(3, 3, kernel_size=1)
 
     def encode(self, x, grade_labels):
         """
@@ -156,11 +151,11 @@ class ConditionalVAE(nn.Module):
         h = h.view(h.size(0), 256, 3, 2)  # Reshape to 256x3x2
         x_recon = self.decoder(h)
 
-        # Adjust to exact output size (3x18x11)
-        x_recon = F.interpolate(
-            x_recon, size=(18, 11), mode="bilinear", align_corners=False
-        )
-        x_recon = self.output_adjust(x_recon)
+        if x_recon.shape[2:] != (18, 11):
+            raise RuntimeError(
+                "Decoder produced invalid spatial shape "
+                f"{tuple(x_recon.shape[2:])}, expected (18, 11)."
+            )
 
         return x_recon
 

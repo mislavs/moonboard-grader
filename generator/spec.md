@@ -32,11 +32,10 @@ Conditional Variational Autoencoder (CVAE) for generating climbing problems at s
 ```
 Latent (128) + Grade embedding (32) → 160
 → Linear(160→1536) → Reshape to 256×3×2
-→ ConvTranspose2d(256→128) + BN + ReLU → 128×6×4
-→ ConvTranspose2d(128→64) + BN + ReLU → 64×11×7
-→ ConvTranspose2d(64→32) + BN + ReLU → 32×22×14
-→ Conv2d(32→3) → 3×22×14
-→ Interpolate → 3×18×11
+→ ConvTranspose2d(256→128, k=4, s=3, p=1, op=1) + BN + ReLU → 128×9×6
+→ ConvTranspose2d(128→64, k=3, s=2, p=1, op=(1,0)) + BN + ReLU → 64×18×11
+→ Conv2d(64→32, k=3, p=1) + BN + ReLU → 32×18×11
+→ Conv2d(32→3, k=1) → 3×18×11
 ```
 
 ## Loss Function

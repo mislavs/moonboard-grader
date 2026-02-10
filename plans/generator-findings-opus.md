@@ -19,7 +19,8 @@ Code review of the `generator/` project covering correctness, architecture, and 
 - **Problem**: The decoder's transpose convolutions produce 32×22×14, which is resized to 3×18×11 via `F.interpolate(mode="bilinear")`. Bilinear interpolation creates smooth continuous values — exactly wrong for a sparse binary grid where ~590 of 594 cells should be 0. It smears activation across neighboring cells, making hold boundaries fuzzy.
 - **Impact**: Reconstructed and generated grids have blurred hold positions. The 1×1 `output_adjust` conv cannot fully undo this damage.
 - **Fix**: Redesign the decoder to output exactly 18×11 without interpolation. Options: asymmetric kernel/stride/padding, or a fully-connected layer producing exact spatial dimensions followed by refinement convs.
-- [ ] Redesign decoder to produce exact 18×11 output
+- **Status**: Done. Decoder now produces native `3×18×11` logits (`3×2 → 9×6 → 18×11`) with no interpolation or `output_adjust`, and legacy interpolation-decoder checkpoints fail fast with a dedicated compatibility error.
+- [x] Redesign decoder to produce exact 18×11 output
 
 ### 3. `ConditionalVAE.sample()` returns raw logits, not probabilities
 - **File**: `generator/src/vae.py` — `sample()` method

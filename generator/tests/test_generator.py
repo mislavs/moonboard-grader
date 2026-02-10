@@ -256,6 +256,36 @@ class TestProblemGenerator:
         ):
             ProblemGenerator.from_checkpoint(str(checkpoint_path), device="cpu")
 
+    def test_from_checkpoint_legacy_decoder_shape_mismatch_has_clear_error(
+        self, checkpoint_tmp_dir
+    ):
+        """Legacy interpolating-decoder checkpoints should fail with guidance."""
+        model = ConditionalVAE(latent_dim=32, num_grades=5, grade_embedding_dim=16)
+        checkpoint_path = checkpoint_tmp_dir / "legacy_decoder_checkpoint.pth"
+
+        legacy_state = model.state_dict()
+        legacy_state["decoder.0.weight"] = (
+            legacy_state["decoder.0.weight"][:, :, :3, :3].clone()
+        )
+        legacy_state["output_adjust.weight"] = torch.randn(3, 3, 1, 1)
+        legacy_state["output_adjust.bias"] = torch.randn(3)
+
+        checkpoint = {
+            "epoch": 1,
+            "model_state_dict": legacy_state,
+            "model_config": {
+                "latent_dim": 32,
+                "num_grades": 5,
+                "grade_embedding_dim": 16,
+            },
+        }
+        torch.save(checkpoint, checkpoint_path)
+
+        with pytest.raises(
+            RuntimeError, match="legacy CVAE decoder architecture"
+        ):
+            ProblemGenerator.from_checkpoint(str(checkpoint_path), device="cpu")
+
     def test_from_checkpoint_explicit_remapped_metadata(self, checkpoint_tmp_dir):
         """New checkpoints should preserve explicit remapped label-space metadata."""
         model = ConditionalVAE(latent_dim=32, num_grades=1, grade_embedding_dim=16)

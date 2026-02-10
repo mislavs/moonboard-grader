@@ -66,6 +66,20 @@ class TestConditionalVAE:
         x_recon = model.decode(z, grades)
         
         assert x_recon.shape == (4, 3, 18, 11)
+
+    def test_decode_does_not_call_interpolate(self, model, sample_input, monkeypatch):
+        """Decoder should output native 18x11 without interpolation."""
+        _, grades = sample_input
+        z = torch.randn(4, 128)
+
+        def fail_interpolate(*args, **kwargs):
+            raise AssertionError("F.interpolate should not be called in decode()")
+
+        monkeypatch.setattr("src.vae.F.interpolate", fail_interpolate)
+
+        x_recon = model.decode(z, grades)
+
+        assert x_recon.shape == (4, 3, 18, 11)
     
     def test_forward_pass(self, model, sample_input):
         """Test full forward pass through the model."""
