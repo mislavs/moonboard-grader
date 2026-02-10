@@ -5,13 +5,14 @@ Training loop for the Conditional VAE.
 import logging
 import time
 from pathlib import Path
-from typing import Dict, Tuple, Optional
+from typing import Dict, Optional, Tuple
 
 import torch
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
 from .vae import ConditionalVAE, vae_loss
+from .label_space import LabelSpaceMode
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class VAETrainer:
         val_loader, 
         config: Dict, 
         device: str = 'cpu',
+        label_space_mode: LabelSpaceMode = "global_legacy",
         grade_offset: int = 0,
         min_grade_index: Optional[int] = None,
         max_grade_index: Optional[int] = None
@@ -48,6 +50,7 @@ class VAETrainer:
         self.device = device
         
         # Grade filtering metadata (for checkpoint saving)
+        self.label_space_mode = label_space_mode
         self.grade_offset = grade_offset
         self.min_grade_index = min_grade_index
         self.max_grade_index = max_grade_index
@@ -266,6 +269,7 @@ class VAETrainer:
                 'num_grades': self.model.num_grades,
                 'grade_embedding_dim': self.model.grade_embedding_dim,
             },
+            'label_space_mode': self.label_space_mode,
             'grade_offset': self.grade_offset,
             'min_grade_index': self.min_grade_index,
             'max_grade_index': self.max_grade_index
@@ -360,4 +364,3 @@ class VAETrainer:
         
         # Close tensorboard writer
         self.writer.close()
-

@@ -5,12 +5,15 @@ Tests for the VAE Trainer.
 import pytest
 import torch
 from pathlib import Path
-import tempfile
 import shutil
+from uuid import uuid4
 
 from src.vae import ConditionalVAE
 from src.vae_trainer import VAETrainer
 from src.dataset import create_data_loaders
+
+TMP_ROOT = Path(".tmp_pytest_sandbox")
+TMP_ROOT.mkdir(exist_ok=True)
 
 
 class TestVAETrainer:
@@ -19,10 +22,11 @@ class TestVAETrainer:
     @pytest.fixture
     def temp_dir(self):
         """Create a temporary directory for checkpoints."""
-        temp_path = tempfile.mkdtemp()
-        yield temp_path
+        temp_path = TMP_ROOT / f"tmp_{uuid4().hex}"
+        temp_path.mkdir(parents=True, exist_ok=True)
+        yield str(temp_path)
         # Cleanup
-        shutil.rmtree(temp_path)
+        shutil.rmtree(temp_path, ignore_errors=True)
     
     @pytest.fixture
     def small_dataset_config(self, temp_dir):
@@ -69,6 +73,7 @@ class TestVAETrainer:
         assert trainer.scheduler is not None
         assert trainer.current_epoch == 0
         assert trainer.best_val_loss == float('inf')
+        trainer.writer.close()
     
     def test_train_epoch(self, model_and_loaders, small_dataset_config):
         """Test training for one epoch."""
@@ -91,6 +96,7 @@ class TestVAETrainer:
         assert isinstance(avg_kl, float)
         assert avg_loss >= 0
         assert avg_recon >= 0
+        trainer.writer.close()
     
     def test_validate(self, model_and_loaders, small_dataset_config):
         """Test validation."""
@@ -113,6 +119,7 @@ class TestVAETrainer:
         assert isinstance(avg_kl, float)
         assert avg_loss >= 0
         assert avg_recon >= 0
+        trainer.writer.close()
     
     def test_save_and_load_checkpoint(self, model_and_loaders, small_dataset_config):
         """Test saving and loading checkpoints."""
@@ -131,6 +138,8 @@ class TestVAETrainer:
         trainer.save_checkpoint(epoch=5, filename='test_checkpoint.pth')
         
         assert checkpoint_path.exists()
+        checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
+        assert checkpoint['label_space_mode'] == 'global_legacy'
         
         # Create new trainer and load checkpoint
         new_model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
@@ -150,6 +159,8 @@ class TestVAETrainer:
         # Check that model weights are the same
         for p1, p2 in zip(trainer.model.parameters(), new_trainer.model.parameters()):
             assert torch.allclose(p1, p2)
+        trainer.writer.close()
+        new_trainer.writer.close()
     
     def test_best_checkpoint_saved(self, model_and_loaders, small_dataset_config):
         """Test that best checkpoint is saved correctly."""
@@ -168,6 +179,7 @@ class TestVAETrainer:
         
         best_path = Path(small_dataset_config['checkpoint_dir']) / 'best_vae.pth'
         assert best_path.exists()
+        trainer.writer.close()
 
 
 class TestTrainingIntegration:
@@ -176,10 +188,11 @@ class TestTrainingIntegration:
     @pytest.fixture
     def temp_dir(self):
         """Create a temporary directory for checkpoints."""
-        temp_path = tempfile.mkdtemp()
-        yield temp_path
+        temp_path = TMP_ROOT / f"tmp_{uuid4().hex}"
+        temp_path.mkdir(parents=True, exist_ok=True)
+        yield str(temp_path)
         # Cleanup
-        shutil.rmtree(temp_path)
+        shutil.rmtree(temp_path, ignore_errors=True)
     
     def test_short_training_run(self, temp_dir):
         """Test a short training run to ensure everything works together."""

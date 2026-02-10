@@ -10,11 +10,14 @@ import torch
 import numpy as np
 
 from .utils import load_data_loader
+from src.label_space import EvaluationLabelContext
+from moonboard_core import decode_grade
 
 
 def evaluate_reconstruction(
     model, 
     data_path: Optional[str], 
+    label_context: EvaluationLabelContext,
     device: str,
     threshold: float = 0.5,
     batch_size: int = 32
@@ -41,7 +44,11 @@ def evaluate_reconstruction(
         - num_samples: Total number of samples evaluated
     """
     # Load validation data and dataset (for grade mappings)
-    val_loader, dataset = load_data_loader(data_path, batch_size=batch_size, device=device)
+    val_loader, _ = load_data_loader(
+        data_path,
+        label_context=label_context,
+        batch_size=batch_size,
+    )
     
     model.eval()
     model = model.to(device)
@@ -89,11 +96,8 @@ def evaluate_reconstruction(
     # Compute per-grade statistics
     per_grade_stats = {}
     for grade_label, ious in grade_ious.items():
-        # Use dataset's label_to_grade mapping to get the correct grade string
-        grade_str = dataset.get_grade_from_label(int(grade_label))
-        if grade_str is None:
-            # Fallback - shouldn't happen, but be defensive
-            grade_str = f"Grade_{int(grade_label)}"
+        global_grade_label = label_context.model_to_global_label(int(grade_label))
+        grade_str = decode_grade(global_grade_label)
         per_grade_stats[grade_str] = {
             'mean_iou': float(np.mean(ious)),
             'std_iou': float(np.std(ious)),

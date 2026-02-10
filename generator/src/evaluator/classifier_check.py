@@ -8,16 +8,19 @@ to predict their grades, reporting accuracy statistics.
 import sys
 import logging
 from pathlib import Path
-from typing import Dict, Optional, Any, List
+from typing import Any, Dict, Optional
 import numpy as np
 import torch
+
+from src.label_space import EvaluationLabelContext
 
 logger = logging.getLogger(__name__)
 
 def evaluate_classifier_check(
     model,
-    checkpoint_path: str,
+    _checkpoint_path: str,
     classifier_checkpoint: Optional[str],
+    label_context: EvaluationLabelContext,
     num_samples: int,
     device: str
 ) -> Dict[str, Any]:
@@ -26,7 +29,7 @@ def evaluate_classifier_check(
     
     Args:
         model: The generator VAE model.
-        checkpoint_path: Path to the generator checkpoint (for loading metadata).
+        _checkpoint_path: Unused (kept for orchestrator signature compatibility).
         classifier_checkpoint: Path to the classifier model checkpoint.
         num_samples: Number of problems to generate per grade.
         device: 'cpu' or 'cuda'.
@@ -66,50 +69,27 @@ def evaluate_classifier_check(
             'skipped': True
         }
 
-    # Setup generator using from_checkpoint to get grade offset metadata
     from ..generator import ProblemGenerator
-    generator = ProblemGenerator.from_checkpoint(checkpoint_path, device=device)
-    
-    # Get metadata from the generator instance
-    generator_offset = generator.grade_offset
-    min_grade_idx = generator.min_grade_index
-    max_grade_idx = generator.max_grade_index
-    model_num_grades = generator.model.num_grades
-    filtered_count = (
-        (max_grade_idx - min_grade_idx + 1)
-        if min_grade_idx is not None and max_grade_idx is not None
-        else None
+    generator = ProblemGenerator(model, device=device)
+    grade_indices_to_eval = label_context.get_global_grade_indices()
+    min_grade_idx, max_grade_idx = label_context.get_global_grade_bounds()
+    logger.info(
+        f"Using checkpoint label context: mode={label_context.label_space_mode}, "
+        f"range={min_grade_idx}-{max_grade_idx}"
     )
-    # Only remap if the model was trained on a remapped/filtered label space.
-    expects_remapped_labels = (
-        generator_offset > 0
-        and filtered_count is not None
-        and model_num_grades == filtered_count
-    )
-    
-    # Determine the actual grade range to evaluate
-    # Prefer using min/max_grade_index if available (more reliable)
-    if min_grade_idx is not None and max_grade_idx is not None:
-        # Use the explicit range from checkpoint
-        grade_indices_to_eval = list(range(min_grade_idx, max_grade_idx + 1))
-        logger.info(f"Using explicit grade range from checkpoint: {min_grade_idx} to {max_grade_idx}")
-    else:
-        # Fall back to using num_grades (unfiltered model)
-        grade_indices_to_eval = list(range(generator_offset, generator_offset + model_num_grades))
-        logger.info(f"Using num_grades={model_num_grades} with offset={generator_offset}")
     
     results_per_grade = {}
     
     logger.info(f"Running classifier check with {num_samples} samples per grade")
-    logger.info(f"Evaluating {len(grade_indices_to_eval)} grades: {decode_grade(grade_indices_to_eval[0])} to {decode_grade(grade_indices_to_eval[-1])}")
+    if not grade_indices_to_eval:
+        return {'error': 'No grades available in label context', 'skipped': True}
+    logger.info(
+        f"Evaluating {len(grade_indices_to_eval)} grades: "
+        f"{decode_grade(grade_indices_to_eval[0])} to {decode_grade(grade_indices_to_eval[-1])}"
+    )
 
     for global_grade_idx in grade_indices_to_eval:
-        # Convert global index to generator's relative index only if needed.
-        generator_relative_idx = (
-            global_grade_idx - generator_offset
-            if expects_remapped_labels
-            else global_grade_idx
-        )
+        generator_relative_idx = label_context.global_to_model_label(global_grade_idx)
         grade_name = decode_grade(global_grade_idx)
         logger.info(f"Evaluating grade {grade_name} (global_idx={global_grade_idx}, generator_idx={generator_relative_idx})")
         
@@ -138,7 +118,7 @@ def evaluate_classifier_check(
                 grid_tensors.append(grid)
             
             # Stack into batch tensor: (batch_size, 3, 18, 11)
-            batch_tensor = torch.FloatTensor(np.array(grid_tensors))
+            batch_tensor = torch.tensor(np.array(grid_tensors), dtype=torch.float32)
             
             # Run batch prediction
             # Note: predict_from_tensor handles both single and batch inputs
@@ -200,6 +180,13 @@ def evaluate_classifier_check(
             'exact_match_percent': float(total_exact),
             'off_by_one_percent': float(total_off_1),
             'off_by_two_percent': float(total_off_2)
+        },
+        'label_space_mode': label_context.label_space_mode,
+        'global_grade_range': {
+            'min': min_grade_idx,
+            'max': max_grade_idx,
+            'min_grade': decode_grade(min_grade_idx),
+            'max_grade': decode_grade(max_grade_idx),
         },
         'per_grade': results_per_grade
     }

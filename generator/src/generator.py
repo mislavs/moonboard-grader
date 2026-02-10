@@ -7,12 +7,13 @@ by sampling from the learned latent space of a trained Conditional VAE.
 
 import torch
 import numpy as np
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 from pathlib import Path
 import logging
 
 from moonboard_core import grid_to_moves, validate_moves, decode_grade
 from .vae import ConditionalVAE
+from .label_space import EvaluationLabelContext, build_label_context, infer_num_model_grades
 
 logger = logging.getLogger(__name__)
 
@@ -106,10 +107,30 @@ class ProblemGenerator:
         self.device = device
         self.threshold = threshold
         
-        # Grade filtering metadata (set when loading from checkpoint)
-        self.grade_offset = 0
-        self.min_grade_index = None
-        self.max_grade_index = None
+        self.label_context = EvaluationLabelContext(
+            label_space_mode="global_legacy",
+            grade_offset=0,
+            min_grade_index=None,
+            max_grade_index=None,
+            num_model_grades=self.model.num_grades,
+        )
+        self._sync_legacy_label_fields()
+
+    def _sync_legacy_label_fields(self) -> None:
+        """
+        Backward-compatible public attributes expected by older callers.
+        """
+        self.grade_offset = self.label_context.grade_offset
+        self.min_grade_index = self.label_context.min_grade_index
+        self.max_grade_index = self.label_context.max_grade_index
+
+    def global_to_model_label(self, global_label: int) -> int:
+        """Map global moonboard_core grade label to model label space."""
+        return self.label_context.global_to_model_label(global_label)
+
+    def model_to_global_label(self, model_label: int) -> int:
+        """Map model label back to global moonboard_core grade label."""
+        return self.label_context.model_to_global_label(model_label)
     
     @classmethod
     def from_checkpoint(
@@ -149,13 +170,9 @@ class ProblemGenerator:
             model_config = checkpoint.get('model_config', {})
             model_state = checkpoint['model_state_dict']
             
-            # Infer num_grades from the actual model state if not in config
-            # The grade_embedding.weight has shape (num_grades, grade_embedding_dim)
-            if 'num_grades' not in model_config and 'grade_embedding.weight' in model_state:
-                num_grades = model_state['grade_embedding.weight'].shape[0]
-                logger.info(f"Inferred num_grades={num_grades} from checkpoint")
-            else:
-                num_grades = model_config.get('num_grades', 17)
+            num_grades = infer_num_model_grades(checkpoint)
+            label_context = build_label_context(checkpoint, num_model_grades=num_grades)
+            logger.info(f"Inferred num_grades={num_grades} from checkpoint")
             
             # Create model with same architecture
             model = ConditionalVAE(
@@ -167,23 +184,17 @@ class ProblemGenerator:
             # Load weights
             model.load_state_dict(model_state)
             
-            # Extract filtering metadata from checkpoint (backward compatible)
-            grade_offset = checkpoint.get('grade_offset', 0)
-            min_grade_index = checkpoint.get('min_grade_index', None)
-            max_grade_index = checkpoint.get('max_grade_index', None)
-            
             logger.info(f"Loaded model from {checkpoint_path}")
             logger.info(f"  Epoch: {checkpoint.get('epoch', 'unknown')}")
             logger.info(f"  Latent dim: {model_config.get('latent_dim', 128)}")
-            if min_grade_index is not None and max_grade_index is not None:
-                from moonboard_core.grade_encoder import decode_grade
-                logger.info(f"  Filtered model: grades {decode_grade(min_grade_index)}-{decode_grade(max_grade_index)}")
+            min_grade_index, max_grade_index = label_context.get_global_grade_bounds()
+            logger.info(f"  Label space mode: {label_context.label_space_mode}")
+            logger.info(f"  Global grade range: {decode_grade(min_grade_index)}-{decode_grade(max_grade_index)}")
             
             # Create instance and store metadata
             instance = cls(model, device=device, threshold=threshold)
-            instance.grade_offset = grade_offset
-            instance.min_grade_index = min_grade_index
-            instance.max_grade_index = max_grade_index
+            instance.label_context = label_context
+            instance._sync_legacy_label_fields()
             
             return instance
             
@@ -251,6 +262,11 @@ class ProblemGenerator:
         
         num_samples = len(grade_labels)
         _validate_generation_params(temperature, self.threshold, num_samples)
+        for label in grade_labels:
+            if not 0 <= label < self.model.num_grades:
+                raise ValueError(
+                    f"Model grade label {label} out of range [0, {self.model.num_grades - 1}]"
+                )
         
         with torch.no_grad():
             # Sample from latent space
@@ -401,7 +417,8 @@ class ProblemGenerator:
 def format_problem_output(
     problem: Dict,
     include_grade: bool = False,
-    grade_names: Optional[List[str]] = None
+    grade_names: Optional[List[str]] = None,
+    label_context: Optional[EvaluationLabelContext] = None,
 ) -> Dict:
     """
     Format a generated problem for output.
@@ -410,6 +427,7 @@ def format_problem_output(
         problem: Problem dictionary from generator
         include_grade: Whether to include grade information
         grade_names: List of grade names for decoding labels
+        label_context: Optional checkpoint label context for global-grade mapping
         
     Returns:
         Formatted problem dictionary
@@ -419,12 +437,17 @@ def format_problem_output(
     }
     
     if include_grade:
-        grade_label = problem['grade_label']
-        if grade_names and 0 <= grade_label < len(grade_names):
-            output['grade'] = grade_names[grade_label]
-            output['grade_label'] = grade_label
+        model_grade_label = int(problem['grade_label'])
+        if label_context is not None:
+            global_grade_label = label_context.model_to_global_label(model_grade_label)
+            output['grade'] = decode_grade(global_grade_label)
+            output['grade_label'] = global_grade_label
+            output['model_grade_label'] = model_grade_label
+        elif grade_names and 0 <= model_grade_label < len(grade_names):
+            output['grade'] = grade_names[model_grade_label]
+            output['grade_label'] = model_grade_label
         else:
-            output['grade_label'] = grade_label
+            output['grade_label'] = model_grade_label
     
     # Include validation info if available
     if 'validation' in problem:

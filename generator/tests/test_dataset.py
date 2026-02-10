@@ -43,7 +43,7 @@ class TestMoonBoardDataset:
         # Check grade label is valid
         if isinstance(grade_label, torch.Tensor):
             grade_label = grade_label.item()
-        assert 0 <= grade_label < len(dataset.grade_to_label)
+        assert 0 <= grade_label < dataset.get_num_model_grades()
     
     def test_dataset_length(self, dataset):
         """Test that dataset length is correct."""
@@ -79,28 +79,25 @@ class TestMoonBoardDataset:
     def test_get_num_grades(self, dataset):
         """Test getting number of unique grades."""
         num_grades = dataset.get_num_grades()
-        assert num_grades == len(dataset.grade_to_label)
+        assert num_grades == dataset.get_num_model_grades()
         assert num_grades > 0
     
     def test_custom_grade_filter(self, data_path):
         """Test dataset with grade filtering (6A to 6B+)."""
-        from moonboard_core.grade_encoder import get_all_grades
-        
         # Filter to grades 1-4 (6A, 6A+, 6B, 6B+)
         dataset = MoonBoardDataset(data_path, min_grade_index=1, max_grade_index=4)
         
-        assert dataset.get_num_grades() == len(get_all_grades())
-        # Check grade names include all grades (not just filtered ones)
-        assert dataset.grade_names == get_all_grades()
-        # But the actual dataset only contains filtered grades
+        assert dataset.get_num_model_grades() == 4
+        assert dataset.label_space_mode == "remapped"
+        # Actual labels in the dataset should be remapped to 0..3.
         # Verify by checking labels in the dataset
         labels_in_dataset = set()
         for i in range(min(100, len(dataset))):  # Check first 100 items
             _, label = dataset[i]
             labels_in_dataset.add(label)
-        # All labels should be within the filtered range
+        # All labels should be model labels in filtered range [0, 3]
         for label in labels_in_dataset:
-            assert 1 <= label <= 4, f"Label {label} outside filtered range [1, 4]"
+            assert 0 <= label <= 3, f"Label {label} outside remapped range [0, 3]"
     
     def test_multiple_items(self, dataset):
         """Test getting multiple items from the dataset."""
@@ -130,6 +127,8 @@ class TestMoonBoardDataset:
             dataset_idx = dataset.grade_to_label[grade]
             assert global_idx == dataset_idx, \
                 f"Grade {grade} has inconsistent indices: global={global_idx}, dataset={dataset_idx}"
+            assert dataset.get_label_from_grade(grade) == global_idx
+            assert dataset.get_grade_from_label(global_idx) == grade
         
         # Verify the mapping is bijective (no collisions)
         assert len(dataset.grade_to_label) == len(dataset.label_to_grade), \
@@ -140,6 +139,37 @@ class TestMoonBoardDataset:
             grade_name = dataset.label_to_grade[label]
             assert grade_name in dataset.grade_to_label, \
                 f"Label {label} maps to {grade_name} which is not in grade_to_label"
+
+    def test_filtered_round_trip_mapping(self, data_path):
+        """Filtered dataset should remap model labels and round-trip correctly."""
+        dataset = MoonBoardDataset(data_path, min_grade_index=2, max_grade_index=12)
+
+        assert dataset.get_num_model_grades() == 11
+        assert dataset.global_to_model_label(2) == 0
+        assert dataset.global_to_model_label(12) == 10
+        assert dataset.model_to_global_label(0) == 2
+        assert dataset.model_to_global_label(10) == 12
+        assert dataset.get_label_from_grade("6A+") == 0
+        assert dataset.get_grade_from_label(0) == "6A+"
+
+    def test_single_grade_mapping(self, data_path):
+        """Single-grade filtered datasets should map that grade to model label 0."""
+        dataset = MoonBoardDataset(data_path, min_grade_index=2, max_grade_index=2)
+        assert dataset.get_num_model_grades() == 1
+        assert dataset.global_to_model_label(2) == 0
+        assert dataset.model_to_global_label(0) == 2
+
+    def test_filtered_global_legacy_override(self, data_path):
+        """Evaluation can request filtered data without remapping labels."""
+        dataset = MoonBoardDataset(
+            data_path,
+            min_grade_index=2,
+            max_grade_index=4,
+            label_space_mode="global_legacy",
+        )
+        assert dataset.get_num_model_grades() == len(dataset.grade_names)
+        _, label = dataset[0]
+        assert 2 <= label <= 4
 
 
 class TestDataLoaders:

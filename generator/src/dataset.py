@@ -3,14 +3,26 @@ PyTorch Dataset for MoonBoard climbing problems.
 """
 
 import logging
-from typing import Optional, Tuple, Callable, List, Dict
+from typing import Callable, Dict, List, Optional, Tuple
 
 import torch
 from torch.utils.data import Dataset
 from moonboard_core.data_processor import load_dataset, filter_dataset_by_grades
-from moonboard_core.grade_encoder import get_filtered_grade_names, decode_grade, get_all_grades
+from moonboard_core.grade_encoder import (
+    decode_grade,
+    get_all_grades,
+    get_filtered_grade_names,
+)
+from .label_space import LabelSpaceMode
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_decode_grade(label: int) -> str:
+    try:
+        return decode_grade(label)
+    except Exception:
+        return str(label)
 
 
 class MoonBoardDataset(Dataset):
@@ -31,6 +43,7 @@ class MoonBoardDataset(Dataset):
         data_path: str, 
         min_grade_index: Optional[int] = None, 
         max_grade_index: Optional[int] = None, 
+        label_space_mode: Optional[LabelSpaceMode] = None,
         transform: Optional[Callable] = None
     ):
         """
@@ -46,16 +59,44 @@ class MoonBoardDataset(Dataset):
         self.transform = transform
         self.min_grade_index = min_grade_index
         self.max_grade_index = max_grade_index
-        # Store grade_offset for checkpoint metadata
-        self.grade_offset = min_grade_index if min_grade_index is not None else 0
-        
+        self._validate_grade_filter_args()
+
+        self.is_filtered = self.min_grade_index is not None and self.max_grade_index is not None
+        inferred_mode = "remapped" if self.is_filtered else "global_legacy"
+        self.label_space_mode = label_space_mode or inferred_mode
+        if self.label_space_mode not in ("remapped", "global_legacy"):
+            raise ValueError(
+                f"label_space_mode must be 'remapped' or 'global_legacy', got {self.label_space_mode}"
+            )
+        self.grade_offset = self.min_grade_index if self.label_space_mode == "remapped" else 0
+
         # Load and filter dataset
         logger.info(f"Loading dataset from {data_path}")
         full_dataset = load_dataset(data_path)
         logger.info(f"Loaded {len(full_dataset)} problems")
-        
+
         self.dataset = self._apply_grade_filter(full_dataset)
+        if len(self.dataset) == 0:
+            if self.is_filtered:
+                raise ValueError(
+                    f"No problems found in grade range [{self.min_grade_index}, {self.max_grade_index}]"
+                )
+            raise ValueError("Dataset is empty")
         self.grade_names, self.grade_to_label, self.label_to_grade = self._build_grade_mappings()
+        self.model_grade_names = [
+            decode_grade(self.model_to_global_label(model_label))
+            for model_label in range(self.get_num_model_grades())
+        ]
+
+    def _validate_grade_filter_args(self) -> None:
+        """Validate grade filter configuration."""
+        min_idx = self.min_grade_index
+        max_idx = self.max_grade_index
+        if (min_idx is None) != (max_idx is None):
+            raise ValueError("min_grade_index and max_grade_index must be provided together")
+        if min_idx is not None and max_idx is not None:
+            # Reuse moonboard_core validation semantics.
+            get_filtered_grade_names(min_idx, max_idx)
     
     def _apply_grade_filter(self, full_dataset: List[Tuple]) -> List[Tuple]:
         """Apply grade filtering if specified."""
@@ -74,7 +115,7 @@ class MoonBoardDataset(Dataset):
         Always uses the full global grade list to ensure consistent label indices
         across training and inference, regardless of which grades are in the dataset.
         """
-        # Always use full global grade list (19 grades: 5+ through 8C+)
+        # Keep global grade list as source of truth for external semantics.
         grade_names = get_all_grades()
         
         # Create bidirectional mappings using global indices
@@ -96,33 +137,72 @@ class MoonBoardDataset(Dataset):
             
         Returns:
             grid_tensor: Tensor of shape (3, 18, 11) with hold positions
-            grade_label: Integer label for the grade (global moonboard_core index, not remapped)
+            grade_label: Integer label for the grade in model label space
         """
         # Get grid and label from processed dataset
-        grid_array, grade_label = self.dataset[idx]
-        
+        grid_array, global_label = self.dataset[idx]
+
         # Convert to PyTorch tensor
         grid_tensor = torch.from_numpy(grid_array).float()
-        
+
         # Validate label is within global range
-        num_grades = len(self.grade_to_label)
-        if grade_label < 0 or grade_label >= num_grades:
-            grade_str = decode_grade(grade_label)
+        num_global_grades = len(self.grade_to_label)
+        if global_label < 0 or global_label >= num_global_grades:
+            grade_str = decode_grade(global_label)
             raise ValueError(
-                f"Invalid grade label {grade_label} ({grade_str}). "
-                f"Must be in global range [0, {num_grades-1}]"
+                f"Invalid global grade label {global_label} ({grade_str}). "
+                f"Must be in global range [0, {num_global_grades-1}]"
             )
-        
+        grade_label = self.global_to_model_label(int(global_label))
+
         # Apply transform if provided
         if self.transform is not None:
             grid_tensor = self.transform(grid_tensor)
-        
+
         return grid_tensor, grade_label
-    
+
     def get_num_grades(self) -> int:
-        """Return the number of unique grades in the dataset."""
+        """Backward-compatible alias for get_num_model_grades."""
+        return self.get_num_model_grades()
+
+    def get_num_model_grades(self) -> int:
+        """Return the number of grades in model label space."""
+        if self.label_space_mode == "remapped" and self.is_filtered:
+            return (self.max_grade_index - self.min_grade_index) + 1
         return len(self.grade_to_label)
-    
+
+    def global_to_model_label(self, global_label: int) -> int:
+        """Map global moonboard_core label to model label space."""
+        if self.label_space_mode == "remapped":
+            if self.is_filtered:
+                if not self.min_grade_index <= global_label <= self.max_grade_index:
+                    raise ValueError(
+                        f"Global label {global_label} ({_safe_decode_grade(global_label)}) outside "
+                        f"filtered range [{self.min_grade_index}, {self.max_grade_index}]"
+                    )
+            return global_label - self.grade_offset
+
+        if self.label_space_mode == "global_legacy":
+            if global_label < 0 or global_label >= len(self.grade_names):
+                raise ValueError(
+                    f"Global label {global_label} out of range [0, {len(self.grade_names) - 1}]"
+                )
+            return global_label
+
+        raise ValueError(f"Unsupported label_space_mode: {self.label_space_mode}")
+
+    def model_to_global_label(self, model_label: int) -> int:
+        """Map model label space to global moonboard_core label."""
+        if model_label < 0 or model_label >= self.get_num_model_grades():
+            raise ValueError(
+                f"Model label {model_label} out of range [0, {self.get_num_model_grades() - 1}]"
+            )
+        if self.label_space_mode == "remapped":
+            return model_label + self.grade_offset
+        if self.label_space_mode == "global_legacy":
+            return model_label
+        raise ValueError(f"Unsupported label_space_mode: {self.label_space_mode}")
+
     def get_grade_from_label(self, label: int) -> Optional[str]:
         """
         Convert a grade label back to grade string.
@@ -133,7 +213,11 @@ class MoonBoardDataset(Dataset):
         Returns:
             grade: Grade string (e.g., "6B+")
         """
-        return self.label_to_grade.get(label, None)
+        try:
+            global_label = self.model_to_global_label(int(label))
+        except (TypeError, ValueError):
+            return None
+        return self.label_to_grade.get(global_label, None)
     
     def get_label_from_grade(self, grade: str) -> Optional[int]:
         """
@@ -145,7 +229,13 @@ class MoonBoardDataset(Dataset):
         Returns:
             label: Integer grade label
         """
-        return self.grade_to_label.get(grade, None)
+        global_label = self.grade_to_label.get(grade, None)
+        if global_label is None:
+            return None
+        try:
+            return self.global_to_model_label(global_label)
+        except ValueError:
+            return None
 
 
 def create_data_loaders(
@@ -155,7 +245,8 @@ def create_data_loaders(
     shuffle: bool = True, 
     num_workers: int = 0, 
     min_grade_index: Optional[int] = None, 
-    max_grade_index: Optional[int] = None
+    max_grade_index: Optional[int] = None,
+    label_space_mode: Optional[LabelSpaceMode] = None,
 ) -> Tuple:
     """
     Create train and validation data loaders.
@@ -168,6 +259,7 @@ def create_data_loaders(
         num_workers: Number of worker processes for data loading
         min_grade_index: Minimum grade index for filtering (e.g., 2 for 6A+)
         max_grade_index: Maximum grade index for filtering (e.g., 2 for 6A+ only)
+        label_space_mode: Optional override for dataset label mapping mode
         
     Returns:
         train_loader: DataLoader for training set
@@ -177,8 +269,12 @@ def create_data_loaders(
     from torch.utils.data import DataLoader, random_split
     
     # Create full dataset
-    dataset = MoonBoardDataset(data_path, min_grade_index=min_grade_index, 
-                               max_grade_index=max_grade_index)
+    dataset = MoonBoardDataset(
+        data_path,
+        min_grade_index=min_grade_index,
+        max_grade_index=max_grade_index,
+        label_space_mode=label_space_mode,
+    )
     
     # Split into train and validation
     train_size = int(train_split * len(dataset))
@@ -208,4 +304,3 @@ def create_data_loaders(
     )
     
     return train_loader, val_loader, dataset
-

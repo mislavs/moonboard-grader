@@ -4,11 +4,23 @@ import pytest
 import torch
 import numpy as np
 from pathlib import Path
-import tempfile
+import shutil
+from uuid import uuid4
 
 from src.vae import ConditionalVAE
 from src.generator import ProblemGenerator, format_problem_output
-from moonboard_core import create_grid_tensor
+from src.label_space import EvaluationLabelContext
+
+TMP_ROOT = Path(".tmp_pytest_sandbox")
+TMP_ROOT.mkdir(exist_ok=True)
+
+
+@pytest.fixture
+def checkpoint_tmp_dir():
+    tmp_dir = TMP_ROOT / f"tmp_{uuid4().hex}"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    yield tmp_dir
+    shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 class TestProblemGenerator:
@@ -185,33 +197,101 @@ class TestProblemGenerator:
             assert 'validation' in problem
             assert 0.0 <= problem['alpha'] <= 1.0
     
-    def test_from_checkpoint(self, model):
+    def test_from_checkpoint(self, model, checkpoint_tmp_dir):
         """Test loading generator from checkpoint."""
-        # Create a temporary checkpoint
-        with tempfile.TemporaryDirectory() as tmpdir:
-            checkpoint_path = Path(tmpdir) / "test_checkpoint.pth"
-            
-            # Save a checkpoint
-            checkpoint = {
-                'epoch': 10,
-                'model_state_dict': model.state_dict(),
-                'model_config': {
-                    'latent_dim': 32,
-                    'num_grades': 5,
-                    'grade_embedding_dim': 16
-                }
+        checkpoint_path = checkpoint_tmp_dir / "test_checkpoint.pth"
+
+        # Save a checkpoint
+        checkpoint = {
+            'epoch': 10,
+            'model_state_dict': model.state_dict(),
+            'model_config': {
+                'latent_dim': 32,
+                'num_grades': 5,
+                'grade_embedding_dim': 16
             }
-            
-            torch.save(checkpoint, checkpoint_path)
-            
-            # Load generator from checkpoint
-            generator = ProblemGenerator.from_checkpoint(
-                checkpoint_path=str(checkpoint_path),
-                device='cpu'
-            )
-            
-            assert generator is not None
-            assert generator.model.latent_dim == 32
+        }
+
+        torch.save(checkpoint, checkpoint_path)
+
+        # Load generator from checkpoint
+        generator = ProblemGenerator.from_checkpoint(
+            checkpoint_path=str(checkpoint_path),
+            device='cpu'
+        )
+
+        assert generator is not None
+        assert generator.model.latent_dim == 32
+        assert generator.label_context.label_space_mode == "global_legacy"
+
+    def test_from_checkpoint_explicit_remapped_metadata(self, checkpoint_tmp_dir):
+        """New checkpoints should preserve explicit remapped label-space metadata."""
+        model = ConditionalVAE(latent_dim=32, num_grades=1, grade_embedding_dim=16)
+        checkpoint_path = checkpoint_tmp_dir / "test_remapped_checkpoint.pth"
+        checkpoint = {
+            "epoch": 1,
+            "model_state_dict": model.state_dict(),
+            "model_config": {
+                "latent_dim": 32,
+                "num_grades": 1,
+                "grade_embedding_dim": 16,
+            },
+            "label_space_mode": "remapped",
+            "grade_offset": 2,
+            "min_grade_index": 2,
+            "max_grade_index": 2,
+        }
+        torch.save(checkpoint, checkpoint_path)
+
+        generator = ProblemGenerator.from_checkpoint(str(checkpoint_path), device="cpu")
+        assert generator.label_context.label_space_mode == "remapped"
+        assert generator.label_context.global_to_model_label(2) == 0
+        assert generator.label_context.model_to_global_label(0) == 2
+
+    def test_from_checkpoint_infers_remapped_legacy_metadata(self, checkpoint_tmp_dir):
+        """Legacy compact checkpoints should be inferred as remapped."""
+        model = ConditionalVAE(latent_dim=32, num_grades=3, grade_embedding_dim=16)
+        checkpoint_path = checkpoint_tmp_dir / "test_legacy_remapped_checkpoint.pth"
+        checkpoint = {
+            "epoch": 1,
+            "model_state_dict": model.state_dict(),
+            "model_config": {
+                "latent_dim": 32,
+                "num_grades": 3,
+                "grade_embedding_dim": 16,
+            },
+            "grade_offset": 2,
+            "min_grade_index": 2,
+            "max_grade_index": 4,
+        }
+        torch.save(checkpoint, checkpoint_path)
+
+        generator = ProblemGenerator.from_checkpoint(str(checkpoint_path), device="cpu")
+        assert generator.label_context.label_space_mode == "remapped"
+        assert generator.label_context.global_to_model_label(2) == 0
+        assert generator.label_context.global_to_model_label(4) == 2
+
+    def test_from_checkpoint_infers_global_legacy_metadata(self, checkpoint_tmp_dir):
+        """Legacy non-compact checkpoints should stay global_legacy."""
+        model = ConditionalVAE(latent_dim=32, num_grades=5, grade_embedding_dim=16)
+        checkpoint_path = checkpoint_tmp_dir / "test_legacy_global_checkpoint.pth"
+        checkpoint = {
+            "epoch": 1,
+            "model_state_dict": model.state_dict(),
+            "model_config": {
+                "latent_dim": 32,
+                "num_grades": 5,
+                "grade_embedding_dim": 16,
+            },
+            "grade_offset": 2,
+            "min_grade_index": 2,
+            "max_grade_index": 4,
+        }
+        torch.save(checkpoint, checkpoint_path)
+
+        generator = ProblemGenerator.from_checkpoint(str(checkpoint_path), device="cpu")
+        assert generator.label_context.label_space_mode == "global_legacy"
+        assert generator.label_context.global_to_model_label(2) == 2
     
     def test_from_checkpoint_missing_file(self):
         """Test that missing checkpoint raises error."""
@@ -310,4 +390,23 @@ class TestFormatProblemOutput:
         
         assert 'validation_warnings' in output
         assert len(output['validation_warnings']) == 1
+
+    def test_include_grade_with_label_context_maps_to_global(self):
+        """When label_context is provided, include-grade should emit global label/name."""
+        problem = {
+            "moves": [{"description": "A1", "isStart": True, "isEnd": False}],
+            "grade_label": 0,
+        }
+        context = EvaluationLabelContext(
+            label_space_mode="remapped",
+            grade_offset=2,
+            min_grade_index=2,
+            max_grade_index=2,
+            num_model_grades=1,
+        )
+
+        output = format_problem_output(problem, include_grade=True, label_context=context)
+        assert output["grade"] == "6A+"
+        assert output["grade_label"] == 2
+        assert output["model_grade_label"] == 0
 

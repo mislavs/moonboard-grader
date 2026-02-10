@@ -2,32 +2,40 @@
 Shared utility functions for evaluation metrics.
 """
 
-from typing import Dict, Optional
+from typing import Dict
 
 from src.dataset import create_data_loaders
+from src.label_space import EvaluationLabelContext
 
 
-def load_data_loader(data_path: str, batch_size: int = 32, device: str = 'cpu'):
+def load_data_loader(
+    data_path: str,
+    label_context: EvaluationLabelContext,
+    batch_size: int = 32,
+):
     """
     Helper to load validation data loader and dataset.
     
     Args:
         data_path: Path to dataset JSON file
         batch_size: Batch size for data loader
-        device: Device to load data on
-        
     Returns:
         Tuple of (val_loader, dataset) where dataset contains grade mappings
     """
     if data_path is None:
         raise ValueError("data_path is required for this metric")
+
+    min_grade_index, max_grade_index = label_context.get_global_grade_bounds()
     
     _, val_loader, dataset = create_data_loaders(
         data_path=data_path,
         batch_size=batch_size,
         train_split=0.8,
         shuffle=False,
-        num_workers=0
+        num_workers=0,
+        min_grade_index=min_grade_index,
+        max_grade_index=max_grade_index,
+        label_space_mode=label_context.label_space_mode,
     )
     
     return val_loader, dataset

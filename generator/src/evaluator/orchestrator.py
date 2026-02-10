@@ -3,6 +3,7 @@ Orchestrator for running evaluation metrics.
 """
 
 from typing import Dict, List, Optional, Any
+from src.label_space import EvaluationLabelContext
 
 from .reconstruction import evaluate_reconstruction
 from .diversity import evaluate_diversity
@@ -25,38 +26,12 @@ METRIC_FUNCTIONS = {
 
 def get_metrics() -> List[str]:
     """
-    Get the list of available metrics by checking which ones are ready to use.
+    Get the list of available metrics.
     
     Returns:
         List of metric names
     """
-    available = []
-    
-    # Test each metric to see if it's ready
-    for metric_name, metric_func in METRIC_FUNCTIONS.items():
-        try:
-            # Call with None parameters - placeholder metrics return not_implemented status
-            # Different metrics have different signatures, so we need to handle each
-            if metric_name == 'diversity':
-                result = metric_func(None, None, None, 'cpu')
-            elif metric_name in ['reconstruction', 'latent_space']:
-                result = metric_func(None, None, 'cpu')
-            elif metric_name == 'latent_visualization':
-                result = metric_func(None, None, 'cpu', None)
-            elif metric_name in ['statistical']:
-                result = metric_func(None, None, None, 'cpu')
-            elif metric_name in ['classifier_check']:
-                result = metric_func(None, None, None, None, 'cpu')
-            else:
-                result = metric_func(None, None, 'cpu')
-            
-            # If it doesn't have 'status': 'not_implemented', it's ready
-            if not (isinstance(result, dict) and result.get('status') == 'not_implemented'):
-                available.append(metric_name)
-        except Exception:
-            available.append(metric_name)
-    
-    return available
+    return list(METRIC_FUNCTIONS.keys())
 
 
 def run_evaluation(
@@ -66,6 +41,7 @@ def run_evaluation(
     classifier_checkpoint: Optional[str] = None,
     metrics: Optional[List[str]] = None,
     num_samples: int = 100,
+    label_context: Optional[EvaluationLabelContext] = None,
     device: str = 'cpu'
 ) -> Dict[str, Any]:
     """
@@ -78,12 +54,16 @@ def run_evaluation(
         classifier_checkpoint: Optional path to classifier checkpoint
         metrics: List of metrics to run (None = all available)
         num_samples: Number of samples per grade for generation-based metrics
+        label_context: Checkpoint label-space context
         device: Device to run on
         
     Returns:
         Dictionary containing results for each metric
     """
     # Determine which metrics to run
+    if label_context is None:
+        raise ValueError("label_context is required for evaluation")
+
     if metrics is None:
         metrics_to_run = get_metrics()
     else:
@@ -97,17 +77,24 @@ def run_evaluation(
     results = {'checkpoint': checkpoint_path, 'metrics': {}}
     for metric in metrics_to_run:
         if metric == 'reconstruction':
-            results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, device)
+            results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, label_context, device)
         elif metric == 'diversity':
-            results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, num_samples, device)
+            results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, label_context, num_samples, device)
         elif metric == 'statistical':
-            results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, num_samples, device)
+            results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, label_context, num_samples, device)
         elif metric == 'latent_space':
-            results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, device)
+            results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, label_context, device)
         elif metric == 'latent_visualization':
-            results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, device, checkpoint_path)
+            results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, data_path, label_context, device, checkpoint_path)
         elif metric == 'classifier_check':
-            results['metrics'][metric] = METRIC_FUNCTIONS[metric](model, checkpoint_path, classifier_checkpoint, num_samples, device)
+            results['metrics'][metric] = METRIC_FUNCTIONS[metric](
+                model,
+                checkpoint_path,
+                classifier_checkpoint,
+                label_context,
+                num_samples,
+                device,
+            )
     
     return results
 

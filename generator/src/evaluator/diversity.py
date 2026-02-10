@@ -11,9 +11,9 @@ import logging
 import numpy as np
 from scipy.spatial.distance import pdist
 
-from moonboard_core import create_grid_tensor
+from moonboard_core import create_grid_tensor, decode_grade
 from src.generator import ProblemGenerator
-from src.dataset import MoonBoardDataset
+from src.label_space import EvaluationLabelContext
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 def evaluate_diversity(
     model, 
     data_path: Optional[str],
+    label_context: EvaluationLabelContext,
     num_samples: int, 
     device: str
 ) -> Dict[str, Any]:
@@ -47,28 +48,27 @@ def evaluate_diversity(
         - interpretation: How to interpret the results
     """
     logger.info(f"Evaluating diversity with {num_samples} samples per grade")
-    
-    # Load dataset to get grade name mappings
-    if data_path is None:
-        data_path = "../data/problems.json"
-    
-    dataset = MoonBoardDataset(data_path=data_path)
+    _ = data_path  # Unused; kept for consistent metric function signature.
     
     # Create generator from model
     generator = ProblemGenerator(model, device=device, threshold=0.5)
     
-    # Get number of grades from model
-    num_grades = model.num_grades
-    logger.info(f"Generating problems for {num_grades} grades")
+    global_grade_indices = label_context.get_global_grade_indices()
+    logger.info(f"Generating problems for {len(global_grade_indices)} grades")
     
     results_per_grade = {}
     
-    for grade_label in range(num_grades):
-        logger.info(f"Generating samples for grade {grade_label}...")
+    for global_grade_label in global_grade_indices:
+        model_grade_label = label_context.global_to_model_label(global_grade_label)
+        grade_name = decode_grade(global_grade_label)
+        logger.info(
+            f"Generating samples for grade {grade_name} "
+            f"(global={global_grade_label}, model={model_grade_label})..."
+        )
         
         # Generate valid problems using retry logic (keeps trying until we get num_samples valid problems)
         valid_problems = generator.generate_with_retry(
-            grade_label=grade_label,
+            grade_label=model_grade_label,
             num_samples=num_samples,
             max_attempts=50,  # Increased from default 10 to handle difficult grades
             temperature=1.0
@@ -76,10 +76,10 @@ def evaluate_diversity(
         
         if len(valid_problems) < 2:
             logger.warning(
-                f"Grade {grade_label}: Insufficient valid problems "
+                f"Grade {grade_name}: Insufficient valid problems "
                 f"({len(valid_problems)}/{num_samples}), skipping (likely too few training examples)"
             )
-            results_per_grade[grade_label] = {
+            results_per_grade[grade_name] = {
                 'skipped': True,
                 'reason': 'insufficient_valid_problems',
                 'num_valid': len(valid_problems),
@@ -99,8 +99,8 @@ def evaluate_diversity(
                 continue
         
         if len(grids) < 2:
-            logger.warning(f"Grade {grade_label}: Failed to build grids")
-            results_per_grade[grade_label] = {
+            logger.warning(f"Grade {grade_name}: Failed to build grids")
+            results_per_grade[grade_name] = {
                 'skipped': True,
                 'reason': 'grid_conversion_failed',
                 'num_valid': len(valid_problems),
@@ -121,7 +121,7 @@ def evaluate_diversity(
         num_unique = len(unique_grids)
         uniqueness_ratio = num_unique / len(grids)
         
-        results_per_grade[grade_label] = {
+        results_per_grade[grade_name] = {
             'mean_diversity': mean_diversity,
             'std_diversity': std_diversity,
             'unique_problems': num_unique,
@@ -131,26 +131,17 @@ def evaluate_diversity(
         }
         
         logger.info(
-            f"Grade {grade_label}: diversity={mean_diversity:.3f}, "
+            f"Grade {grade_name}: diversity={mean_diversity:.3f}, "
             f"uniqueness={uniqueness_ratio:.1%} ({num_unique}/{len(grids)})"
         )
     
-    # Convert numeric grade labels to human-readable grade names
-    per_grade_with_names = {}
-    for grade_label, stats in results_per_grade.items():
-        grade_str = dataset.get_grade_from_label(int(grade_label))
-        if grade_str is None:
-            # Fallback - shouldn't happen, but be defensive
-            grade_str = f"Grade_{int(grade_label)}"
-        per_grade_with_names[grade_str] = stats
-    
     # Aggregate across grades (only non-skipped grades)
-    valid_grades = {k: v for k, v in per_grade_with_names.items() if not v.get('skipped', False)}
+    valid_grades = {k: v for k, v in results_per_grade.items() if not v.get('skipped', False)}
     
     if not valid_grades:
         return {
             'error': 'No valid problems generated across any grade',
-            'per_grade': per_grade_with_names,
+            'per_grade': results_per_grade,
             'num_samples_per_grade': num_samples
         }
     
@@ -170,10 +161,10 @@ def evaluate_diversity(
         'overall_mean_diversity': overall_mean_diversity,
         'overall_std_diversity': overall_std_diversity,
         'overall_uniqueness_ratio': overall_uniqueness_ratio,
-        'per_grade': per_grade_with_names,
+        'per_grade': results_per_grade,
         'num_samples_per_grade': num_samples,
         'num_grades_evaluated': len(valid_grades),
-        'num_grades_total': num_grades,
+        'num_grades_total': len(global_grade_indices),
         'interpretation': (
             'Diversity measured by Hamming distance (0=identical, 1=completely different). '
             'Higher diversity and uniqueness indicate better generation quality. '

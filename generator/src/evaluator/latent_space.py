@@ -12,11 +12,18 @@ import numpy as np
 import torch
 
 from .utils import load_data_loader
+from src.label_space import EvaluationLabelContext
+from moonboard_core import decode_grade
 
 logger = logging.getLogger(__name__)
 
 
-def evaluate_latent_space(model, data_path: Optional[str], device: str) -> Dict[str, Any]:
+def evaluate_latent_space(
+    model,
+    data_path: Optional[str],
+    label_context: EvaluationLabelContext,
+    device: str,
+) -> Dict[str, Any]:
     """
     Evaluate latent space quality and grade clustering.
     
@@ -44,7 +51,11 @@ def evaluate_latent_space(model, data_path: Optional[str], device: str) -> Dict[
         }
     
     logger.info("Loading validation data...")
-    val_loader, dataset = load_data_loader(data_path, batch_size=32, device=device)
+    val_loader, _ = load_data_loader(
+        data_path,
+        label_context=label_context,
+        batch_size=32,
+    )
     
     logger.info("Encoding problems to latent space...")
     model.eval()
@@ -77,13 +88,12 @@ def evaluate_latent_space(model, data_path: Optional[str], device: str) -> Dict[
     # Calculate per-grade centroids and variance
     logger.info("Calculating per-grade centroids...")
     centroids = {}
+    grade_name_to_global_label = {}
     for grade in unique_grades:
         grade_latents = latents[grades == grade]
-        # Use dataset's label_to_grade mapping to get the correct grade string
-        grade_str = dataset.get_grade_from_label(int(grade))
-        if grade_str is None:
-            # Fallback - shouldn't happen, but be defensive
-            grade_str = f"Grade_{int(grade)}"
+        global_label = label_context.model_to_global_label(int(grade))
+        grade_str = decode_grade(global_label)
+        grade_name_to_global_label[grade_str] = global_label
         centroids[grade_str] = {
             'mean': grade_latents.mean(axis=0).tolist(),
             'std': float(grade_latents.std(axis=0).mean()),
@@ -93,10 +103,10 @@ def evaluate_latent_space(model, data_path: Optional[str], device: str) -> Dict[
     # Measure grade separation (distance between adjacent grade centroids)
     logger.info("Calculating grade separation distances...")
     centroid_distances = []
-    # Sort grades by their original numeric labels (stored as sorted by unique_grades)
-    # Create mapping of grade_str back to numeric label for sorting
-    grade_to_label = {dataset.get_grade_from_label(int(g)): int(g) for g in unique_grades}
-    sorted_grade_strs = sorted(centroids.keys(), key=lambda g: grade_to_label.get(g, 0))
+    sorted_grade_strs = sorted(
+        centroids.keys(),
+        key=lambda grade_name: grade_name_to_global_label[grade_name],
+    )
     
     for i in range(len(sorted_grade_strs) - 1):
         g1, g2 = sorted_grade_strs[i], sorted_grade_strs[i+1]

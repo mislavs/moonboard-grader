@@ -12,9 +12,9 @@ import logging
 import numpy as np
 from scipy.stats import wasserstein_distance
 
-from moonboard_core import encode_grade
+from moonboard_core import decode_grade, encode_grade
 from src.generator import ProblemGenerator
-from src.dataset import MoonBoardDataset
+from src.label_space import EvaluationLabelContext
 from .utils import extract_problem_stats
 
 logger = logging.getLogger(__name__)
@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 def evaluate_statistical_similarity(
     model,
     data_path: Optional[str],
+    label_context: EvaluationLabelContext,
     num_samples: int,
     device: str
 ) -> Dict[str, Any]:
@@ -60,9 +61,6 @@ def evaluate_statistical_similarity(
     if data_path is None:
         data_path = "../data/problems.json"
     
-    # Load dataset to get grade name mappings
-    dataset = MoonBoardDataset(data_path=data_path)
-    
     # Load raw JSON to get real problem statistics
     logger.info(f"Loading real problems from {data_path}")
     try:
@@ -83,7 +81,9 @@ def evaluate_statistical_similarity(
     problems_list = raw_data['data']
     logger.info(f"Loaded {len(problems_list)} real problems")
     
-    # Group real problems by grade
+    global_grade_indices = set(label_context.get_global_grade_indices())
+
+    # Group real problems by global grade index
     real_by_grade = {}
     for problem in problems_list:
         grade_str = problem.get('grade')
@@ -91,13 +91,10 @@ def evaluate_statistical_similarity(
             continue
         
         try:
-            # Convert grade string to label using dataset's mapping
-            if grade_str not in dataset.grade_to_label:
-                # Skip grades not in the dataset (e.g., filtered out)
+            grade_label = encode_grade(grade_str)
+            if grade_label not in global_grade_indices:
                 continue
-            
-            grade_label = dataset.grade_to_label[grade_str]
-            
+
             if grade_label not in real_by_grade:
                 real_by_grade[grade_label] = []
             
@@ -113,28 +110,29 @@ def evaluate_statistical_similarity(
     # Create generator from model
     generator = ProblemGenerator(model, device=device, threshold=0.5)
     
-    # Get number of grades from model
-    num_grades = model.num_grades
-    logger.info(f"Generating problems for {num_grades} grades")
+    sorted_global_indices = label_context.get_global_grade_indices()
+    logger.info(f"Generating problems for {len(sorted_global_indices)} grades")
     
     results_per_grade = {}
     
-    for grade_label in range(num_grades):
+    for grade_label in sorted_global_indices:
+        grade_name = decode_grade(grade_label)
+        model_grade_label = label_context.global_to_model_label(grade_label)
         # Skip if we don't have real data for this grade
         if grade_label not in real_by_grade:
-            logger.warning(f"Grade {grade_label}: No real problems available, skipping")
-            results_per_grade[grade_label] = {
+            logger.warning(f"Grade {grade_name}: No real problems available, skipping")
+            results_per_grade[grade_name] = {
                 'skipped': True,
                 'reason': 'no_real_problems',
                 'num_real': 0
             }
             continue
         
-        logger.info(f"Generating samples for grade {grade_label}...")
+        logger.info(f"Generating samples for grade {grade_name}...")
         
         # Generate valid problems using retry logic (keeps trying until we get num_samples valid problems)
         valid_problems = generator.generate_with_retry(
-            grade_label=grade_label,
+            grade_label=model_grade_label,
             num_samples=num_samples,
             max_attempts=50,  # Increased from default 10 to handle difficult grades
             temperature=1.0
@@ -142,10 +140,10 @@ def evaluate_statistical_similarity(
         
         if len(valid_problems) < 10:  # Need enough samples for meaningful statistics
             logger.warning(
-                f"Grade {grade_label}: Insufficient valid problems "
+                f"Grade {grade_name}: Insufficient valid problems "
                 f"({len(valid_problems)}/{num_samples}), skipping (likely too few training examples)"
             )
-            results_per_grade[grade_label] = {
+            results_per_grade[grade_name] = {
                 'skipped': True,
                 'reason': 'insufficient_valid_problems',
                 'num_valid': len(valid_problems),
@@ -165,8 +163,8 @@ def evaluate_statistical_similarity(
                 continue
         
         if len(gen_stats) < 10:
-            logger.warning(f"Grade {grade_label}: Failed to extract enough stats")
-            results_per_grade[grade_label] = {
+            logger.warning(f"Grade {grade_name}: Failed to extract enough stats")
+            results_per_grade[grade_name] = {
                 'skipped': True,
                 'reason': 'stat_extraction_failed',
                 'num_valid': len(valid_problems),
@@ -198,34 +196,26 @@ def evaluate_statistical_similarity(
         valid_distances = [d for d in distances.values() if d is not None]
         mean_distance = float(np.mean(valid_distances)) if valid_distances else None
         
-        results_per_grade[grade_label] = {
+        results_per_grade[grade_name] = {
             'wasserstein_distances': distances,
             'mean_distance': mean_distance,
             'num_generated': len(gen_stats),
             'num_real': len(real_stats)
         }
         
+        mean_distance_str = f"{mean_distance:.3f}" if mean_distance is not None else "N/A"
         logger.info(
-            f"Grade {grade_label}: mean_distance={mean_distance:.3f}, "
+            f"Grade {grade_name}: mean_distance={mean_distance_str}, "
             f"gen={len(gen_stats)}, real={len(real_stats)}"
         )
     
-    # Convert numeric grade labels to human-readable grade names
-    per_grade_with_names = {}
-    for grade_label, stats in results_per_grade.items():
-        grade_str = dataset.get_grade_from_label(int(grade_label))
-        if grade_str is None:
-            # Fallback - shouldn't happen, but be defensive
-            grade_str = f"Grade_{int(grade_label)}"
-        per_grade_with_names[grade_str] = stats
-    
     # Aggregate across grades (only non-skipped grades)
-    valid_grades = {k: v for k, v in per_grade_with_names.items() if not v.get('skipped', False)}
+    valid_grades = {k: v for k, v in results_per_grade.items() if not v.get('skipped', False)}
     
     if not valid_grades:
         return {
             'error': 'No valid comparisons possible (no grades with both real and generated problems)',
-            'per_grade': per_grade_with_names,
+            'per_grade': results_per_grade,
             'num_samples_per_grade': num_samples
         }
     
@@ -256,19 +246,22 @@ def evaluate_statistical_similarity(
         else:
             per_statistic_distances[stat_name] = None
     
+    overall_mean_distance_str = (
+        f"{overall_mean_distance:.3f}" if overall_mean_distance is not None else "N/A"
+    )
     logger.info(
-        f"Overall: mean_distance={overall_mean_distance:.3f}, "
-        f"evaluated {len(valid_grades)}/{len(per_grade_with_names)} grades"
+        f"Overall: mean_distance={overall_mean_distance_str}, "
+        f"evaluated {len(valid_grades)}/{len(results_per_grade)} grades"
     )
     
     return {
         'overall_mean_distance': overall_mean_distance,
         'overall_std_distance': overall_std_distance,
-        'per_grade': per_grade_with_names,
+        'per_grade': results_per_grade,
         'per_statistic': per_statistic_distances,
         'num_samples_per_grade': num_samples,
         'num_grades_evaluated': len(valid_grades),
-        'num_grades_total': num_grades,
+        'num_grades_total': len(sorted_global_indices),
         'interpretation': (
             'Wasserstein distance measures similarity between generated and real problem distributions. '
             'Lower is better (0 = identical distributions). '

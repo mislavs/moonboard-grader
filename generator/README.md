@@ -64,6 +64,7 @@ py main.py generate --checkpoint PATH --grade GRADE [OPTIONS]
 **Key options:**
 
 - `--grade`: Grade to generate (e.g., "6B+", "7A")
+- `--grade-labels`: Comma-separated **global** grade labels (moonboard_core indices)
 - `--num-samples`: Number of problems (default: 1)
 - `--temperature`: Sampling randomness, 0.5-2.0 (default: 1.0)
 - `--threshold`: Hold detection threshold, 0.0-1.0 (default: 0.5)
@@ -85,6 +86,9 @@ py main.py generate --checkpoint models/best_vae.pth --grade 6C --threshold 0.3
 py main.py generate --checkpoint models/best_vae.pth --grade-labels "0,2,4,6,8"
 ```
 
+`--grade` and `--grade-labels` are always interpreted in global grade space.
+Filtered checkpoints remap labels internally and map back at the CLI boundary.
+
 ### Evaluate
 
 Assess generator quality with comprehensive metrics:
@@ -96,8 +100,8 @@ py main.py evaluate --checkpoint models/best_vae.pth --output results.json
 # Run specific metrics
 py main.py evaluate --checkpoint models/best_vae.pth --metrics reconstruction,diversity
 
-# Include optional grade conditioning (requires classifier)
-py main.py evaluate --checkpoint models/best_vae.pth --classifier-checkpoint ../classifier/test_models/best_model.pth --metrics grade_conditioning
+# Include optional classifier check (requires classifier)
+py main.py evaluate --checkpoint models/best_vae.pth --classifier-checkpoint ../classifier/test_models/best_model.pth --metrics classifier_check
 
 # Customize number of samples
 py main.py evaluate --checkpoint models/best_vae.pth --num-samples 50 --metrics diversity
@@ -132,7 +136,7 @@ py main.py evaluate --checkpoint models/best_vae.pth --num-samples 50 --metrics 
 
 **Low Priority (Requires Classifier, Limited Reliability):**
 
-- **`grade_conditioning`**: Grade accuracy via classifier
+- **`classifier_check`**: Grade accuracy via classifier
   - ⚠️ **WARNING**: Limited by classifier's 35% exact accuracy, 70% ±1 grade
   - Use for RELATIVE comparison between models only
   - Not a reliable absolute quality measure
@@ -143,9 +147,10 @@ py main.py evaluate --checkpoint models/best_vae.pth --num-samples 50 --metrics 
 - `--checkpoint PATH`: VAE model checkpoint (required)
 - `--data PATH`: Path to validation data (default: `../data/problems.json`)
 - `--metrics METRICS`: Comma-separated list (default: all available)
+- Unknown metric names fail fast with a non-zero exit.
 - `--num-samples N`: Samples per grade for generation metrics (default: 100)
 - `--output FILE`: Save results to JSON file
-- `--classifier-checkpoint PATH`: Classifier for grade conditioning metric
+- `--classifier-checkpoint PATH`: Classifier for `classifier_check` metric
 - `--cpu`: Force CPU usage
 
 #### Examples
@@ -183,7 +188,7 @@ py main.py evaluate --checkpoint models/best_vae.pth --output best.json
 - Diversity uniqueness: 95-100% (no duplicate generation)
 - Statistical distance: 0.5-1.5 (closely matches real problems)
 - Latent silhouette: -0.1 to 0.2 (expected for reconstruction VAEs)
-- Grade conditioning: Interpret with caution due to classifier limits
+- Classifier check: Interpret with caution due to classifier limits
 
 ## Configuration
 

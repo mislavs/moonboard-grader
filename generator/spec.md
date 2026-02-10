@@ -276,7 +276,7 @@ def evaluate_latent_space(model, val_loader):
 ⚠️ **WARNING**: Limited reliability metric due to classifier baseline (~35% exact, ~70% ±1)
 
 ```python
-def evaluate_grade_conditioning(generator, classifier_checkpoint, num_samples_per_grade=100):
+def evaluate_classifier_check(generator, classifier_checkpoint, num_samples_per_grade=100):
     # Load classifier predictor
     # Generate problems at each grade
     # Classify each generated problem
@@ -374,7 +374,7 @@ py main.py evaluate \
   [--cpu]
 ```
 
-**Available metrics**: `reconstruction`, `diversity`, `statistical`, `latent_space`, `grade_conditioning`
+**Available metrics**: `reconstruction`, `diversity`, `statistical`, `latent_space`, `classifier_check`
 
 **Default behavior**: Runs all implemented metrics (auto-detected)
 

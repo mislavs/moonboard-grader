@@ -20,6 +20,8 @@ from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 
 from .utils import load_data_loader
+from src.label_space import EvaluationLabelContext
+from moonboard_core import decode_grade
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,7 @@ logger = logging.getLogger(__name__)
 def evaluate_latent_visualization(
     model,
     data_path: Optional[str],
+    label_context: EvaluationLabelContext,
     device: str,
     checkpoint_path: str
 ) -> Dict[str, Any]:
@@ -59,7 +62,11 @@ def evaluate_latent_visualization(
     
     # Load validation data
     logger.info("Loading validation data...")
-    val_loader, dataset = load_data_loader(data_path, batch_size=32, device=device)
+    val_loader, _ = load_data_loader(
+        data_path,
+        label_context=label_context,
+        batch_size=32,
+    )
     
     # Encode all problems to latent space
     logger.info("Encoding problems to latent space...")
@@ -80,16 +87,17 @@ def evaluate_latent_visualization(
     
     logger.info(f"Encoded {len(latents)} problems to latent space of dimension {latents.shape[1]}")
     
-    # Get unique grades and create discrete colormap
+    # Get unique grades and build contiguous color labels for plotting.
     unique_grades = np.unique(grades)
     n_grades = len(unique_grades)
+    grade_to_plot_idx = {int(grade): idx for idx, grade in enumerate(unique_grades)}
+    plot_labels = np.array([grade_to_plot_idx[int(label)] for label in grades])
     
     # Map grade labels to grade names
     grade_names = []
     for grade_label in unique_grades:
-        grade_name = dataset.get_grade_from_label(int(grade_label))
-        if grade_name is None:
-            grade_name = f"Grade_{int(grade_label)}"
+        global_label = label_context.model_to_global_label(int(grade_label))
+        grade_name = decode_grade(global_label)
         grade_names.append(grade_name)
     
     # Get discrete colors from tab20/tab20b/tab20c for better distinction
@@ -119,14 +127,14 @@ def evaluate_latent_visualization(
     scatter = plt.scatter(
         latents_tsne[:, 0],
         latents_tsne[:, 1],
-        c=grades,
+        c=plot_labels,
         cmap=discrete_cmap,
         alpha=0.6,
         s=20,
-        vmin=unique_grades.min() - 0.5,
-        vmax=unique_grades.max() + 0.5
+        vmin=-0.5,
+        vmax=n_grades - 0.5,
     )
-    cbar = plt.colorbar(scatter, ticks=unique_grades)
+    cbar = plt.colorbar(scatter, ticks=range(n_grades))
     cbar.set_ticklabels(grade_names)
     cbar.set_label('Grade', rotation=270, labelpad=20)
     plt.title('VAE Latent Space Visualization (t-SNE)')
@@ -147,14 +155,14 @@ def evaluate_latent_visualization(
     scatter = plt.scatter(
         latents_pca[:, 0],
         latents_pca[:, 1],
-        c=grades,
+        c=plot_labels,
         cmap=discrete_cmap,
         alpha=0.6,
         s=20,
-        vmin=unique_grades.min() - 0.5,
-        vmax=unique_grades.max() + 0.5
+        vmin=-0.5,
+        vmax=n_grades - 0.5,
     )
-    cbar = plt.colorbar(scatter, ticks=unique_grades)
+    cbar = plt.colorbar(scatter, ticks=range(n_grades))
     cbar.set_ticklabels(grade_names)
     cbar.set_label('Grade', rotation=270, labelpad=20)
     plt.title('VAE Latent Space Visualization (PCA)')

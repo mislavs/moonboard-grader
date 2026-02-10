@@ -19,7 +19,12 @@ from src.dataset import create_data_loaders
 from src.vae_trainer import VAETrainer
 from src.generator import ProblemGenerator, format_problem_output
 from src.evaluator import run_evaluation, get_metrics
-from moonboard_core import get_filtered_grade_names, encode_grade
+from src.label_space import (
+    EvaluationLabelContext,
+    build_label_context,
+    infer_num_model_grades,
+)
+from moonboard_core import decode_grade, encode_grade
 
 # Setup logging
 logging.basicConfig(
@@ -87,6 +92,7 @@ def train_command(args):
     Args:
         args: Command-line arguments
     """
+    trainer = None
     try:
         # Load configuration
         config = load_config(args.config)
@@ -109,12 +115,13 @@ def train_command(args):
             max_grade_index=data_config.get('max_grade_index', None)
         )
         
-        num_grades = dataset.get_num_grades()
+        num_grades = dataset.get_num_model_grades()
         print(f"   Total problems: {len(dataset)}")
-        print(f"   Unique grades: {num_grades}")
-        print(f"   Grade range: {', '.join(dataset.grade_names)}")
-        
+        print(f"   Model grades: {num_grades}")
+        print(f"   Grade range: {', '.join(dataset.model_grade_names)}")
+
         # Extract filtering metadata from dataset
+        label_space_mode = dataset.label_space_mode
         grade_offset = dataset.grade_offset
         min_grade_index = dataset.min_grade_index
         max_grade_index = dataset.max_grade_index
@@ -141,6 +148,7 @@ def train_command(args):
             val_loader=val_loader,
             config=training_config,
             device=device,
+            label_space_mode=label_space_mode,
             grade_offset=grade_offset,
             min_grade_index=min_grade_index,
             max_grade_index=max_grade_index
@@ -163,8 +171,9 @@ def train_command(args):
         
     except KeyboardInterrupt:
         print("\n\n⚠️  Training interrupted by user")
-        trainer.save_checkpoint(trainer.current_epoch, 'interrupted_checkpoint.pth')
-        print("   Saved interrupted checkpoint")
+        if trainer is not None:
+            trainer.save_checkpoint(trainer.current_epoch, 'interrupted_checkpoint.pth')
+            print("   Saved interrupted checkpoint")
         sys.exit(0)
     except Exception as e:
         print(f"\n❌ Training failed with error: {e}")
@@ -174,14 +183,14 @@ def train_command(args):
 
 def _determine_grade_labels(
     args,
-    model_num_grades: int
+    label_context: EvaluationLabelContext
 ) -> Tuple[List[int], Optional[str]]:
     """
     Determine grade labels from command-line arguments.
     
     Args:
         args: Parsed command-line arguments
-        model_num_grades: Number of grades the model supports
+        label_context: Checkpoint label-space context
         
     Returns:
         Tuple of (grade_labels list, grade_name for display or None)
@@ -190,40 +199,44 @@ def _determine_grade_labels(
         SystemExit: If arguments are invalid
     """
     if args.grade_labels:
-        # Use provided grade labels
-        grade_labels = [int(x) for x in args.grade_labels.split(',')]
-        
-        # Validate grade labels
-        for label in grade_labels:
-            if label >= model_num_grades or label < 0:
-                print(
-                    f"\n[!] Grade label {label} is out of range for model "
-                    f"(valid: 0-{model_num_grades-1})"
-                )
-                sys.exit(1)
-        
+        # grade-labels are treated as global labels for stable CLI semantics.
+        try:
+            requested_global_labels = [int(x.strip()) for x in args.grade_labels.split(',') if x.strip()]
+        except ValueError:
+            print("\n[!] --grade-labels must be a comma-separated list of integers")
+            sys.exit(1)
+        if not requested_global_labels:
+            print("\n[!] --grade-labels must contain at least one integer value")
+            sys.exit(1)
+        try:
+            grade_labels = [
+                label_context.global_to_model_label(global_label)
+                for global_label in requested_global_labels
+            ]
+        except ValueError as e:
+            min_idx, max_idx = label_context.get_global_grade_bounds()
+            print(
+                f"\n[!] {e}\n"
+                f"    Checkpoint supports global labels "
+                f"{min_idx} ({decode_grade(min_idx)}) through {max_idx} ({decode_grade(max_idx)})."
+            )
+            sys.exit(1)
         return grade_labels, None
-        
+
     elif args.grade:
-        # For models trained on single grade, always use label 0
-        if model_num_grades == 1:
-            grade_labels = [0] * args.num_samples
+        # Convert global grade string to model label using checkpoint context.
+        try:
+            global_grade_label = encode_grade(args.grade)
+            model_grade_label = label_context.global_to_model_label(global_grade_label)
+            grade_labels = [model_grade_label] * args.num_samples
             return grade_labels, args.grade
-        else:
-            # Convert grade string to label
-            try:
-                grade_label = encode_grade(args.grade)
-                if grade_label >= model_num_grades or grade_label < 0:
-                    print(
-                        f"\n[!] Grade '{args.grade}' (label {grade_label}) "
-                        f"is out of range for model (valid: 0-{model_num_grades-1})"
-                    )
-                    sys.exit(1)
-                grade_labels = [grade_label] * args.num_samples
-                return grade_labels, args.grade
-            except ValueError as e:
-                print(f"\n[!] Invalid grade '{args.grade}': {e}")
-                sys.exit(1)
+        except ValueError as e:
+            min_idx, max_idx = label_context.get_global_grade_bounds()
+            print(
+                f"\n[!] Invalid grade '{args.grade}': {e}\n"
+                f"    Checkpoint supports grades {decode_grade(min_idx)} to {decode_grade(max_idx)}."
+            )
+            sys.exit(1)
     else:
         print(f"\n[!] Must specify either --grade or --grade-labels")
         sys.exit(1)
@@ -231,7 +244,8 @@ def _determine_grade_labels(
 
 def _format_output_problems(
     problems: List[Dict],
-    include_grade: bool
+    include_grade: bool,
+    label_context: EvaluationLabelContext
 ) -> Tuple[List[Dict], int]:
     """
     Format generated problems for output.
@@ -239,18 +253,11 @@ def _format_output_problems(
     Args:
         problems: List of generated problem dictionaries
         include_grade: Whether to include grade information
+        label_context: Checkpoint label-space context
         
     Returns:
         Tuple of (formatted problems list, count of valid problems)
     """
-    # Get grade names for output
-    grade_names = None
-    if include_grade:
-        try:
-            grade_names = get_filtered_grade_names(None, None)
-        except Exception:
-            pass
-    
     # Format output
     output_problems = []
     valid_count = 0
@@ -258,7 +265,7 @@ def _format_output_problems(
         formatted = format_problem_output(
             problem,
             include_grade=include_grade,
-            grade_names=grade_names
+            label_context=label_context
         )
         output_problems.append(formatted)
         
@@ -290,16 +297,21 @@ def generate_command(args):
         )
         
         # Determine grade labels to generate
-        model_num_grades = generator.model.num_grades
+        label_context = generator.label_context
+        model_num_grades = label_context.num_model_grades
+        min_idx, max_idx = label_context.get_global_grade_bounds()
         print(f"    Model num_grades: {model_num_grades}")
-        
-        grade_labels, grade_name = _determine_grade_labels(args, model_num_grades)
-        
+        print(f"    Label space mode: {label_context.label_space_mode}")
+        print(f"    Global grade range: {decode_grade(min_idx)} to {decode_grade(max_idx)}")
+
+        grade_labels, grade_name = _determine_grade_labels(args, label_context)
+
         if grade_name:
-            if model_num_grades == 1:
-                print(f"   Grade: {grade_name} (model trained on single grade, using label 0)")
-            else:
-                print(f"   Grade: {grade_name} (label {grade_labels[0]})")
+            resolved_global = label_context.model_to_global_label(grade_labels[0])
+            print(
+                f"   Grade: {grade_name} "
+                f"(global {resolved_global}, model label {grade_labels[0]})"
+            )
         else:
             print(f"   Generating for grade labels: {grade_labels}")
         
@@ -335,7 +347,8 @@ def generate_command(args):
         # Format output
         output_problems, valid_count = _format_output_problems(
             problems,
-            args.include_grade
+            args.include_grade,
+            label_context
         )
         
         # Print summary
@@ -412,8 +425,13 @@ def evaluate_command(args):
         
         # Determine which metrics to run
         if args.metrics:
-            requested_metrics = [m.strip() for m in args.metrics.split(',')]
-            metrics_to_run = [m for m in requested_metrics if m in available_metrics]
+            requested_metrics = [m.strip() for m in args.metrics.split(',') if m.strip()]
+            unknown_metrics = [m for m in requested_metrics if m not in available_metrics]
+            if unknown_metrics:
+                print(f"Unknown metric name(s): {', '.join(unknown_metrics)}")
+                print(f"Available metrics: {', '.join(available_metrics)}")
+                sys.exit(1)
+            metrics_to_run = requested_metrics
         else:
             metrics_to_run = available_metrics
         
@@ -428,20 +446,25 @@ def evaluate_command(args):
         
         # Load model
         print(f"Loading model from {args.checkpoint}...")
-        checkpoint = torch.load(args.checkpoint, map_location=device)
-        
+        checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
+        num_model_grades = infer_num_model_grades(checkpoint)
+        label_context = build_label_context(checkpoint, num_model_grades=num_model_grades)
+
         # Create model with checkpoint parameters
-        model_config = checkpoint['model_config']
+        model_config = checkpoint.get('model_config', {})
         model = ConditionalVAE(
-            latent_dim=model_config['latent_dim'],
-            num_grades=model_config['num_grades'],
-            grade_embedding_dim=model_config['grade_embedding_dim']
+            latent_dim=model_config.get('latent_dim', 128),
+            num_grades=num_model_grades,
+            grade_embedding_dim=model_config.get('grade_embedding_dim', 32)
         )
         model.load_state_dict(checkpoint['model_state_dict'])
         model.to(device)
         model.eval()
-        
+
         print(f"Model loaded successfully")
+        min_idx, max_idx = label_context.get_global_grade_bounds()
+        print(f"Label space mode: {label_context.label_space_mode}")
+        print(f"Global grade range: {decode_grade(min_idx)} to {decode_grade(max_idx)}")
         print(f"Running metrics: {', '.join(metrics_to_run)}")
         print()
         
@@ -453,6 +476,7 @@ def evaluate_command(args):
             classifier_checkpoint=args.classifier_checkpoint,
             metrics=metrics_to_run,
             num_samples=args.num_samples,
+            label_context=label_context,
             device=device
         )
         
@@ -853,7 +877,7 @@ def main():
     generate_parser.add_argument(
         '--grade-labels',
         type=str,
-        help='Comma-separated grade labels (e.g., "0,1,2")'
+        help='Comma-separated global grade labels (e.g., "2,3,4")'
     )
     generate_parser.add_argument(
         '--num-samples',
