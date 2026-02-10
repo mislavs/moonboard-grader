@@ -26,7 +26,8 @@ Code review of the `generator/` project covering correctness, architecture, and 
 - **File**: `generator/src/vae.py` — `sample()` method
 - **Problem**: The method returns the raw output of `decode()` (logits), but the docstring says it returns "grids." Anyone calling `model.sample()` directly would get logits, and thresholding would produce wrong results. The `ProblemGenerator` works around this by applying sigmoid in `_grids_from_latent`, so `sample()` is never used.
 - **Fix**: Apply sigmoid in `sample()`, or clearly document the return as logits and rename accordingly.
-- [ ] Fix `sample()` to return probabilities or document it as returning logits
+- **Status**: Done. `sample()` now returns sigmoid probabilities, explicit raw-logit sampling is available via `sample_logits()`, and sampling inputs validate grade-label shape/length.
+- [x] Fix `sample()` to return probabilities or document it as returning logits
 
 ---
 

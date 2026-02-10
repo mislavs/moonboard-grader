@@ -99,6 +99,39 @@ class TestConditionalVAE:
         samples = model.sample(num_samples, grades, device='cpu')
         
         assert samples.shape == (5, 3, 18, 11)
+        assert torch.all(samples >= 0.0)
+        assert torch.all(samples <= 1.0)
+
+    def test_sample_logits_generation(self, model):
+        """Test generating raw logits from the model."""
+        num_samples = 5
+        grades = torch.randint(0, 17, (num_samples,))
+
+        logits = model.sample_logits(num_samples, grades, device='cpu')
+
+        assert logits.shape == (5, 3, 18, 11)
+
+    def test_sample_matches_sigmoid_of_sample_logits(self, model):
+        """sample() should equal sigmoid(sample_logits()) for identical RNG state."""
+        num_samples = 5
+        grades = torch.randint(0, 17, (num_samples,))
+        model.eval()
+
+        torch.manual_seed(1234)
+        probs = model.sample(num_samples, grades, device='cpu')
+
+        torch.manual_seed(1234)
+        logits = model.sample_logits(num_samples, grades, device='cpu')
+
+        assert torch.allclose(probs, torch.sigmoid(logits))
+
+    def test_sample_raises_on_grade_length_mismatch(self, model):
+        """Sampling should fail if grade count does not match num_samples."""
+        num_samples = 5
+        grades = torch.randint(0, 17, (num_samples - 1,))
+
+        with pytest.raises(ValueError, match="grade_labels length must match num_samples"):
+            model.sample(num_samples, grades, device='cpu')
     
     def test_grade_embedding(self, model):
         """Test that grade embedding works correctly."""

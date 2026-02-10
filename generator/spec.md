@@ -10,7 +10,8 @@ Conditional Variational Autoencoder (CVAE) for generating climbing problems at s
 
 - **Input**: 3×18×11 tensor (start holds, middle holds, end holds)
 - **Conditioning**: Integer grade label (0-indexed, embedded to 32-dim vector)
-- **Output**: 3×18×11 tensor with logits
+- **Model output (`decode`/`forward`)**: 3×18×11 tensor with logits
+- **Sampling output (`sample`)**: 3×18×11 tensor with probabilities in `[0, 1]`
 
 ### Encoder
 
@@ -103,6 +104,13 @@ generator = ProblemGenerator.from_checkpoint(
 3. Apply sigmoid: `p = sigmoid(x)`
 4. Threshold to binary: `holds = (p > threshold)`
 5. Convert to moves: `moonboard_core.grid_to_moves()`
+
+### VAE Sampling API Semantics
+
+- `ConditionalVAE.decode(...)` returns logits.
+- `ConditionalVAE.forward(...)` returns logits.
+- `ConditionalVAE.sample_logits(...)` returns logits sampled from the prior.
+- `ConditionalVAE.sample(...)` returns probabilities (`sigmoid(sample_logits(...))`).
 
 ### Generation Methods
 

@@ -18,7 +18,7 @@ class ConditionalVAE(nn.Module):
     - Input: 3x18x11 grid (start/middle/end holds)
     - Conditioning: Grade label (embedded to vector)
     - Latent space: Gaussian distribution with learned mu and logvar
-    - Output: 3x18x11 grid with probabilities for each hold
+    - Decoder output: 3x18x11 logits (convert with sigmoid for probabilities)
 
     Args:
         latent_dim: Dimension of the latent space (default: 128)
@@ -138,7 +138,7 @@ class ConditionalVAE(nn.Module):
             grade_labels: Grade labels of shape (batch_size,)
 
         Returns:
-            x_recon: Reconstructed grid of shape (batch_size, 3, 18, 11)
+            x_recon: Reconstructed logits of shape (batch_size, 3, 18, 11)
         """
         # Embed grade
         grade_emb = self.grade_embedding(grade_labels)
@@ -168,7 +168,7 @@ class ConditionalVAE(nn.Module):
             grade_labels: Grade labels of shape (batch_size,)
 
         Returns:
-            x_recon: Reconstructed grid
+            x_recon: Reconstructed logits
             mu: Mean of latent distribution
             logvar: Log variance of latent distribution
         """
@@ -177,23 +177,65 @@ class ConditionalVAE(nn.Module):
         x_recon = self.decode(z, grade_labels)
         return x_recon, mu, logvar
 
-    def sample(self, num_samples, grade_labels, device="cpu"):
+    def _normalize_sample_grades(self, grade_labels, num_samples, device):
         """
-        Generate new samples from the learned distribution.
+        Validate and normalize grade labels for latent sampling methods.
+
+        Args:
+            grade_labels: Tensor-like grade labels
+            num_samples: Expected number of labels
+            device: Target device for sampling
+
+        Returns:
+            grades: Grade labels tensor with dtype=torch.long on target device
+
+        Raises:
+            ValueError: If grade labels are not 1D or have incorrect length
+        """
+        grades = torch.as_tensor(grade_labels, dtype=torch.long, device=device)
+        if grades.ndim != 1:
+            raise ValueError(
+                f"grade_labels must be 1D, got shape {tuple(grades.shape)}"
+            )
+        if grades.shape[0] != num_samples:
+            raise ValueError(
+                "grade_labels length must match num_samples: "
+                f"{grades.shape[0]} != {num_samples}"
+            )
+        return grades
+
+    def sample_logits(self, num_samples, grade_labels, device="cpu"):
+        """
+        Generate raw logits from the learned prior, conditioned on grade labels.
 
         Args:
             num_samples: Number of samples to generate
-            grade_labels: Grade labels for conditioning (shape: num_samples,)
+            grade_labels: Tensor-like grade labels (shape: num_samples,)
             device: Device to generate samples on
 
         Returns:
-            samples: Generated grids of shape (num_samples, 3, 18, 11)
+            logits: Generated logits of shape (num_samples, 3, 18, 11)
         """
         with torch.no_grad():
-            # Sample from standard normal distribution
-            z = torch.randn(num_samples, self.latent_dim).to(device)
-            samples = self.decode(z, grade_labels)
-        return samples
+            grades = self._normalize_sample_grades(grade_labels, num_samples, device)
+            z = torch.randn(num_samples, self.latent_dim, device=device)
+            logits = self.decode(z, grades)
+        return logits
+
+    def sample(self, num_samples, grade_labels, device="cpu"):
+        """
+        Generate probability grids from the learned distribution.
+
+        Args:
+            num_samples: Number of samples to generate
+            grade_labels: Tensor-like grade labels (shape: num_samples,)
+            device: Device to generate samples on
+
+        Returns:
+            samples: Generated probabilities of shape (num_samples, 3, 18, 11)
+        """
+        logits = self.sample_logits(num_samples, grade_labels, device=device)
+        return torch.sigmoid(logits)
 
 
 def vae_loss(x_recon, x, mu, logvar, kl_weight=1.0):

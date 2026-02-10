@@ -284,6 +284,12 @@ for problem in problems:
     print(f"Generated {len(problem['moves'])} holds")
 ```
 
+`ConditionalVAE` sampling semantics:
+
+- `decode()` and `forward()` return logits.
+- `sample_logits()` returns logits sampled from the prior.
+- `sample()` returns probabilities in `[0, 1]` (`sigmoid(sample_logits())`).
+
 ## Troubleshooting
 
 **Training Issues:**
