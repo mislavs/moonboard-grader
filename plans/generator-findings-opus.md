@@ -61,7 +61,8 @@ Code review of the `generator/` project covering correctness, architecture, and 
 - **File**: `generator/src/vae.py`, `generator/src/vae_trainer.py`
 - **Problem**: No dropout layers in the model, and Adam optimizer has no weight decay. While KL divergence provides some regularization, additional regularization is standard for preventing overfitting.
 - **Fix**: Add dropout after encoder/decoder layers and/or set `weight_decay` in Adam.
-- [ ] Add dropout and/or weight decay
+- **Status**: Done. Added configurable feature-map dropout (`model.dropout_rate`) in encoder/decoder paths with checkpoint-safe layer placement, plus Adam `weight_decay` (`training.weight_decay`) with validation, config wiring, and checkpoint model-config persistence for load-time compatibility.
+- [x] Add dropout and/or weight decay
 
 ### 8. Code duplication between `train_epoch` and `_compute_losses`
 - **File**: `generator/src/vae_trainer.py`

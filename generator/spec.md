@@ -21,6 +21,7 @@ Conditional Variational Autoencoder (CVAE) for generating climbing problems at s
 → Conv2d(32→64, s=2) + BN + ReLU → 64×9×6
 → Conv2d(64→128, s=2) + BN + ReLU → 128×5×3
 → Conv2d(128→256, s=2) + BN + ReLU → 256×3×2
+→ Dropout2d(p=dropout_rate) (train mode only)
 → Flatten → 1536
 → Linear(1536→128) → μ
 → Linear(1536→128) → log σ²
@@ -33,6 +34,7 @@ Conditional Variational Autoencoder (CVAE) for generating climbing problems at s
 ```
 Latent (128) + Grade embedding (32) → 160
 → Linear(160→1536) → Reshape to 256×3×2
+→ Dropout2d(p=dropout_rate) (train mode only)
 → ConvTranspose2d(256→128, k=4, s=3, p=1, op=1) + BN + ReLU → 128×9×6
 → ConvTranspose2d(128→64, k=3, s=2, p=1, op=(1,0)) + BN + ReLU → 64×18×11
 → Conv2d(64→32, k=3, p=1) + BN + ReLU → 32×18×11
@@ -66,7 +68,9 @@ L_KL = -0.5 × Σ(1 + log σ² - μ² - σ²)
 |-----------|---------|
 | `latent_dim` | 128 |
 | `grade_embedding_dim` | 32 |
+| `dropout_rate` | 0.1 |
 | `learning_rate` | 0.001 |
+| `weight_decay` | 1e-5 |
 | `max_grad_norm` | 1.0 |
 | `batch_size` | 64 |
 | `num_epochs` | 50 |
@@ -77,7 +81,7 @@ L_KL = -0.5 × Σ(1 + log σ² - μ² - σ²)
 
 ### Optimizer & Scheduler
 
-- **Optimizer**: Adam
+- **Optimizer**: Adam (`weight_decay` configurable)
 - **Scheduler**: ReduceLROnPlateau (factor=0.5, patience=5)
 - **Gradient clipping**: `clip_grad_norm_` applied before `optimizer.step()` with `max_grad_norm`
 - **Early stopping**: Stop when validation loss fails to improve by `early_stopping_min_delta` for `early_stopping_patience` consecutive epochs

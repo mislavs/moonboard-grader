@@ -208,7 +208,8 @@ class TestProblemGenerator:
             'model_config': {
                 'latent_dim': 32,
                 'num_grades': 5,
-                'grade_embedding_dim': 16
+                'grade_embedding_dim': 16,
+                'dropout_rate': 0.25,
             }
         }
 
@@ -222,7 +223,31 @@ class TestProblemGenerator:
 
         assert generator is not None
         assert generator.model.latent_dim == 32
+        assert generator.model.dropout_rate == pytest.approx(0.25)
         assert generator.label_context.label_space_mode == "global_legacy"
+
+    def test_from_checkpoint_missing_dropout_rate_defaults_to_zero(
+        self, model, checkpoint_tmp_dir
+    ):
+        """Legacy checkpoints without model_config.dropout_rate should still load."""
+        checkpoint_path = checkpoint_tmp_dir / "legacy_no_dropout_checkpoint.pth"
+        checkpoint = {
+            "epoch": 10,
+            "model_state_dict": model.state_dict(),
+            "model_config": {
+                "latent_dim": 32,
+                "num_grades": 5,
+                "grade_embedding_dim": 16,
+            },
+        }
+        torch.save(checkpoint, checkpoint_path)
+
+        generator = ProblemGenerator.from_checkpoint(
+            checkpoint_path=str(checkpoint_path),
+            device="cpu",
+        )
+
+        assert generator.model.dropout_rate == pytest.approx(0.0)
 
     def test_from_checkpoint_legacy_encoder_shape_mismatch_has_clear_error(
         self, checkpoint_tmp_dir

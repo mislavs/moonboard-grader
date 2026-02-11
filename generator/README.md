@@ -205,10 +205,12 @@ data:
 model:
   latent_dim: 128
   grade_embedding_dim: 32
+  dropout_rate: 0.1
 
 training:
   num_epochs: 50
   learning_rate: 0.001
+  weight_decay: 1.0e-5
   max_grad_norm: 1.0
   kl_weight: 1.0
   kl_annealing: true

@@ -5,6 +5,8 @@ The VAE learns to encode climbing problems into a latent space and can generate
 new problems conditioned on difficulty grade.
 """
 
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -24,14 +26,31 @@ class ConditionalVAE(nn.Module):
         latent_dim: Dimension of the latent space (default: 128)
         num_grades: Number of unique grade labels (default: 17)
         grade_embedding_dim: Dimension of grade embedding vector (default: 32)
+        dropout_rate: Dropout rate for encoder/decoder feature regularization (default: 0.0)
     """
 
-    def __init__(self, latent_dim=128, num_grades=17, grade_embedding_dim=32):
+    def __init__(
+        self,
+        latent_dim=128,
+        num_grades=17,
+        grade_embedding_dim=32,
+        dropout_rate=0.0,
+    ):
         super(ConditionalVAE, self).__init__()
 
         self.latent_dim = latent_dim
         self.num_grades = num_grades
         self.grade_embedding_dim = grade_embedding_dim
+        self.dropout_rate = float(dropout_rate)
+        if (
+            not math.isfinite(self.dropout_rate)
+            or self.dropout_rate < 0.0
+            or self.dropout_rate >= 1.0
+        ):
+            raise ValueError(
+                "dropout_rate must be a finite float in [0.0, 1.0), "
+                f"got {self.dropout_rate}"
+            )
 
         # Grade embedding layer
         self.grade_embedding = nn.Embedding(num_grades, grade_embedding_dim)
@@ -59,6 +78,11 @@ class ConditionalVAE(nn.Module):
 
         # Calculate flattened size after conv layers: 256 * 3 * 2 = 1536
         self.encoder_output_size = 256 * 3 * 2
+
+        # Feature-map dropout modules are kept outside Sequential blocks to preserve
+        # stable state_dict key numbering for checkpoint compatibility.
+        self.encoder_dropout = nn.Dropout2d(p=self.dropout_rate)
+        self.decoder_dropout = nn.Dropout2d(p=self.dropout_rate)
 
         # Latent space layers: encoder features + grade embedding
         encoder_conditioned_size = self.encoder_output_size + grade_embedding_dim
@@ -106,6 +130,7 @@ class ConditionalVAE(nn.Module):
             logvar: Log variance of latent distribution (batch_size, latent_dim)
         """
         h = self.encoder(x)
+        h = self.encoder_dropout(h)
         h = h.view(h.size(0), -1)  # Flatten
         grade_emb = self.grade_embedding(grade_labels)
         h_cond = torch.cat([h, grade_emb], dim=1)
@@ -149,6 +174,7 @@ class ConditionalVAE(nn.Module):
         # Decode
         h = self.fc_decode(z_cond)
         h = h.view(h.size(0), 256, 3, 2)  # Reshape to 256x3x2
+        h = self.decoder_dropout(h)
         x_recon = self.decoder(h)
 
         if x_recon.shape[2:] != (18, 11):

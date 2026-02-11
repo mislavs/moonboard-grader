@@ -43,6 +43,7 @@ class TestVAETrainer:
         """Create a small dataset configuration for testing."""
         return {
             'learning_rate': 0.001,
+            'weight_decay': 1e-5,
             'num_epochs': 2,
             'kl_weight': 1.0,
             'kl_annealing': False,
@@ -84,6 +85,8 @@ class TestVAETrainer:
         assert trainer.scheduler is not None
         assert trainer.current_epoch == 0
         assert trainer.best_val_loss == float('inf')
+        assert trainer.weight_decay == pytest.approx(1e-5)
+        assert trainer.optimizer.param_groups[0]['weight_decay'] == pytest.approx(1e-5)
         assert trainer.max_grad_norm == pytest.approx(1.0)
         assert trainer.early_stopping_patience == 15
         assert trainer.early_stopping_min_delta == pytest.approx(1e-4)
@@ -253,6 +256,23 @@ class TestVAETrainer:
         config['max_grad_norm'] = max_grad_norm
 
         with pytest.raises(ValueError, match='max_grad_norm must be a positive finite float'):
+            VAETrainer(
+                model=model,
+                train_loader=train_loader,
+                val_loader=val_loader,
+                config=config,
+                device='cpu'
+            )
+
+    @pytest.mark.parametrize('weight_decay', [-1e-5, float('inf'), float('nan')])
+    def test_invalid_weight_decay_rejected(self, small_dataset_config, weight_decay):
+        """Trainer should reject negative or non-finite weight_decay values."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+        config = dict(small_dataset_config)
+        config['weight_decay'] = weight_decay
+
+        with pytest.raises(ValueError, match='weight_decay must be a finite float >= 0'):
             VAETrainer(
                 model=model,
                 train_loader=train_loader,

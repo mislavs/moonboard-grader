@@ -179,7 +179,8 @@ class ProblemGenerator:
             model = ConditionalVAE(
                 latent_dim=model_config.get('latent_dim', 128),
                 num_grades=num_grades,
-                grade_embedding_dim=model_config.get('grade_embedding_dim', 32)
+                grade_embedding_dim=model_config.get('grade_embedding_dim', 32),
+                dropout_rate=model_config.get('dropout_rate', 0.0),
             )
             
             # Load weights

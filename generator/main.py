@@ -76,6 +76,7 @@ def build_training_config(config: Dict) -> Dict:
     """
     return {
         'learning_rate': config['training']['learning_rate'],
+        'weight_decay': config['training'].get('weight_decay', 1e-5),
         'num_epochs': config['training']['num_epochs'],
         'kl_weight': config['training']['kl_weight'],
         'kl_annealing': config['training']['kl_annealing'],
@@ -136,7 +137,8 @@ def train_command(args):
         model = ConditionalVAE(
             latent_dim=model_config['latent_dim'],
             num_grades=num_grades,  # Use actual number from dataset
-            grade_embedding_dim=model_config['grade_embedding_dim']
+            grade_embedding_dim=model_config['grade_embedding_dim'],
+            dropout_rate=model_config.get('dropout_rate', 0.1),
         )
         
         print(f"   Latent dim: {model_config['latent_dim']}")
@@ -459,7 +461,8 @@ def evaluate_command(args):
         model = ConditionalVAE(
             latent_dim=model_config.get('latent_dim', 128),
             num_grades=num_model_grades,
-            grade_embedding_dim=model_config.get('grade_embedding_dim', 32)
+            grade_embedding_dim=model_config.get('grade_embedding_dim', 32),
+            dropout_rate=model_config.get('dropout_rate', 0.0),
         )
         load_state_dict_with_compatibility(
             model,

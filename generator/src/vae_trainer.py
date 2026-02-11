@@ -59,6 +59,11 @@ class VAETrainer:
         
         # Training hyperparameters
         self.learning_rate = config.get('learning_rate', 1e-3)
+        self.weight_decay = float(config.get('weight_decay', 1e-5))
+        if not math.isfinite(self.weight_decay) or self.weight_decay < 0:
+            raise ValueError(
+                f'weight_decay must be a finite float >= 0, got {self.weight_decay}'
+            )
         self.num_epochs = config.get('num_epochs', 50)
         self.kl_weight = config.get('kl_weight', 1.0)
         self.kl_annealing = config.get('kl_annealing', False)
@@ -97,7 +102,11 @@ class VAETrainer:
         self.log_interval = config.get('log_interval', 100)
         
         # Optimizer
-        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        self.optimizer = optim.Adam(
+            self.model.parameters(),
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay,
+        )
         
         # Learning rate scheduler
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
@@ -358,6 +367,7 @@ class VAETrainer:
                 'latent_dim': self.model.latent_dim,
                 'num_grades': self.model.num_grades,
                 'grade_embedding_dim': self.model.grade_embedding_dim,
+                'dropout_rate': self.model.dropout_rate,
             },
             'label_space_mode': self.label_space_mode,
             'grade_offset': self.grade_offset,

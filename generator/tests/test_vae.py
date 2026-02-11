@@ -29,6 +29,7 @@ class TestConditionalVAE:
         assert model.latent_dim == 128
         assert model.num_grades == 17
         assert model.grade_embedding_dim == 32
+        assert model.dropout_rate == pytest.approx(0.0)
         assert isinstance(model, torch.nn.Module)
     
     def test_encode_shape(self, model, sample_input):
@@ -50,6 +51,27 @@ class TestConditionalVAE:
         same_mu = torch.allclose(mu[0], mu[1])
         same_logvar = torch.allclose(logvar[0], logvar[1])
         assert not (same_mu and same_logvar)
+
+    def test_encode_dropout_train_stochastic_eval_deterministic(self):
+        """Dropout should be stochastic during training and deterministic in eval."""
+        model = ConditionalVAE(
+            latent_dim=64,
+            num_grades=17,
+            grade_embedding_dim=32,
+            dropout_rate=0.5,
+        )
+        grids = torch.randn(8, 3, 18, 11)
+        grades = torch.randint(0, 17, (8,))
+
+        model.train()
+        mu_train_1, _ = model.encode(grids, grades)
+        mu_train_2, _ = model.encode(grids, grades)
+        assert not torch.allclose(mu_train_1, mu_train_2)
+
+        model.eval()
+        mu_eval_1, _ = model.encode(grids, grades)
+        mu_eval_2, _ = model.encode(grids, grades)
+        assert torch.allclose(mu_eval_1, mu_eval_2)
     
     def test_reparameterize_shape(self, model):
         """Test that reparameterization produces correct output shape."""
@@ -247,7 +269,18 @@ class TestModelTrainingStep:
 
 class TestModelDifferentConfigurations:
     """Test the model with different configurations."""
-    
+
+    @pytest.mark.parametrize("dropout_rate", [-0.1, 1.0, float("inf"), float("nan")])
+    def test_invalid_dropout_rate_rejected(self, dropout_rate):
+        """Model should reject invalid dropout rates."""
+        with pytest.raises(ValueError, match="dropout_rate must be a finite float in \\[0.0, 1.0\\)"):
+            ConditionalVAE(
+                latent_dim=128,
+                num_grades=17,
+                grade_embedding_dim=32,
+                dropout_rate=dropout_rate,
+            )
+
     @pytest.mark.parametrize("latent_dim", [64, 128, 256])
     def test_different_latent_dims(self, latent_dim):
         """Test model with different latent dimensions."""
