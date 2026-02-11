@@ -126,26 +126,27 @@ class VAETrainer:
         
         # Training state
         self.current_epoch = 0
-        self.best_val_loss = float('inf')
+        self.best_val_recon_loss = float('inf')
+        self.best_val_total_loss = float('inf')
         self.train_losses = []
         self.val_losses = []
         self.last_train_pre_clip_grad_norm = 0.0
         self.early_stopping_counter = 0
         self.best_epoch: Optional[int] = None
 
-    def _is_validation_improved(self, val_loss: float) -> bool:
+    def _is_validation_improved(self, val_recon_loss: float) -> bool:
         """
         Check whether current validation loss is meaningfully better.
 
         Args:
-            val_loss: Current validation loss
+            val_recon_loss: Current validation reconstruction loss
 
         Returns:
-            bool: True when improvement exceeds early_stopping_min_delta
+            bool: True when reconstruction-loss improvement exceeds early_stopping_min_delta
         """
-        if self.best_val_loss == float('inf'):
+        if self.best_val_recon_loss == float('inf'):
             return True
-        return (self.best_val_loss - val_loss) > self.early_stopping_min_delta
+        return (self.best_val_recon_loss - val_recon_loss) > self.early_stopping_min_delta
         
     def get_kl_weight(self, epoch: int) -> float:
         """
@@ -355,7 +356,11 @@ class VAETrainer:
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'scheduler_state_dict': self.scheduler.state_dict(),
-            'best_val_loss': self.best_val_loss,
+            # Keep legacy best_val_loss semantics (total validation loss) while
+            # exposing the recon-specific metric explicitly.
+            'best_val_recon_loss': self.best_val_recon_loss,
+            'best_val_total_loss': self.best_val_total_loss,
+            'best_val_loss': self.best_val_total_loss,
             'best_epoch': self.best_epoch,
             'early_stopping_patience': self.early_stopping_patience,
             'early_stopping_min_delta': self.early_stopping_min_delta,
@@ -400,7 +405,19 @@ class VAETrainer:
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         self.current_epoch = checkpoint['epoch']
-        self.best_val_loss = checkpoint['best_val_loss']
+        legacy_best_val_loss = checkpoint.get('best_val_loss', None)
+        self.best_val_recon_loss = checkpoint.get(
+            'best_val_recon_loss',
+            legacy_best_val_loss if legacy_best_val_loss is not None else float('inf'),
+        )
+        self.best_val_total_loss = checkpoint.get(
+            'best_val_total_loss',
+            (
+                legacy_best_val_loss
+                if legacy_best_val_loss is not None
+                else self.best_val_recon_loss
+            ),
+        )
         self.best_epoch = checkpoint.get('best_epoch', None)
         self.early_stopping_patience = checkpoint.get(
             'early_stopping_patience',
@@ -437,7 +454,7 @@ class VAETrainer:
             
             # Update learning rate
             old_lr = self.optimizer.param_groups[0]['lr']
-            self.scheduler.step(val_loss)
+            self.scheduler.step(val_recon)
             new_lr = self.optimizer.param_groups[0]['lr']
             
             # Print progress (classifier-style format)
@@ -469,14 +486,18 @@ class VAETrainer:
             self.train_losses.append(train_loss)
             self.val_losses.append(val_loss)
             
-            # Save best model based on validation loss
+            # Save best model based on validation reconstruction loss
             should_stop = False
-            if self._is_validation_improved(val_loss):
-                self.best_val_loss = val_loss
+            if self._is_validation_improved(val_recon):
+                self.best_val_recon_loss = val_recon
+                self.best_val_total_loss = val_loss
                 self.best_epoch = epoch
                 self.early_stopping_counter = 0
                 self.save_checkpoint(epoch, f'checkpoint_epoch_{epoch}.pth', is_best=True)
-                print(f"  → New best validation loss: {val_loss:.4f} - Saved checkpoint")
+                print(
+                    "  → New best recon loss: "
+                    f"{val_recon:.4f} (total: {val_loss:.4f}) - Saved checkpoint"
+                )
             else:
                 self.early_stopping_counter += 1
                 if (
@@ -488,7 +509,7 @@ class VAETrainer:
                     )
                     print(
                         "  → Early stopping triggered: "
-                        f"no val loss improvement > {self.early_stopping_min_delta:.6f} "
+                        f"no recon loss improvement > {self.early_stopping_min_delta:.6f} "
                         f"for {self.early_stopping_counter} epochs "
                         f"(best epoch: {best_epoch_display})"
                     )
@@ -511,7 +532,8 @@ class VAETrainer:
         self.save_checkpoint(self.current_epoch, 'final_vae.pth')
         
         print(f'\n✓ Training completed!')
-        print(f'  Best validation loss: {self.best_val_loss:.4f}')
+        print(f'  Best validation recon loss: {self.best_val_recon_loss:.4f}')
+        print(f'  Best validation total loss: {self.best_val_total_loss:.4f}')
         
         # Close tensorboard writer
         self.writer.close()

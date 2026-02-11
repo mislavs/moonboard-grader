@@ -84,7 +84,8 @@ class TestVAETrainer:
         assert trainer.optimizer is not None
         assert trainer.scheduler is not None
         assert trainer.current_epoch == 0
-        assert trainer.best_val_loss == float('inf')
+        assert trainer.best_val_recon_loss == float('inf')
+        assert trainer.best_val_total_loss == float('inf')
         assert trainer.weight_decay == pytest.approx(1e-5)
         assert trainer.optimizer.param_groups[0]['weight_decay'] == pytest.approx(1e-5)
         assert trainer.max_grad_norm == pytest.approx(1.0)
@@ -380,7 +381,7 @@ class TestVAETrainer:
 
         train_epochs = []
         val_epochs = []
-        val_losses = [1.0, 0.99995, 0.99992, 0.99991]
+        val_recon_losses = [0.4, 0.39995, 0.39992, 0.39991]
 
         def fake_train_epoch(epoch):
             train_epochs.append(epoch)
@@ -389,8 +390,8 @@ class TestVAETrainer:
 
         def fake_validate(epoch):
             val_epochs.append(epoch)
-            idx = min(len(val_epochs) - 1, len(val_losses) - 1)
-            return val_losses[idx], 0.4, 0.1
+            idx = min(len(val_epochs) - 1, len(val_recon_losses) - 1)
+            return 1.0, val_recon_losses[idx], 0.1
 
         monkeypatch.setattr(trainer, 'train_epoch', fake_train_epoch)
         monkeypatch.setattr(trainer, 'validate', fake_validate)
@@ -404,6 +405,8 @@ class TestVAETrainer:
         assert len(trainer.val_losses) == 3
         assert trainer.best_epoch == 0
         assert trainer.early_stopping_counter == 2
+        assert trainer.best_val_recon_loss == pytest.approx(0.4)
+        assert trainer.best_val_total_loss == pytest.approx(1.0)
 
     def test_train_does_not_stop_early_when_early_stopping_is_disabled(
         self, small_dataset_config, monkeypatch
@@ -448,6 +451,8 @@ class TestVAETrainer:
         assert len(trainer.val_losses) == 4
         assert trainer.best_epoch == 0
         assert trainer.early_stopping_counter == 3
+        assert trainer.best_val_recon_loss == pytest.approx(0.4)
+        assert trainer.best_val_total_loss == pytest.approx(1.0)
 
     def test_train_epoch_routes_through_compute_losses(
         self, small_dataset_config, monkeypatch
@@ -579,11 +584,16 @@ class TestVAETrainer:
             config=config,
             device='cpu'
         )
-        trainer.best_val_loss = 0.5
+        trainer.best_val_recon_loss = 0.5
+        trainer.best_val_total_loss = 0.8
         trainer.best_epoch = 4
         trainer.early_stopping_counter = 3
         checkpoint_path = Path(config['checkpoint_dir']) / 'early_stopping_checkpoint.pth'
         trainer.save_checkpoint(epoch=6, filename='early_stopping_checkpoint.pth')
+        checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
+        assert checkpoint['best_val_recon_loss'] == pytest.approx(0.5)
+        assert checkpoint['best_val_total_loss'] == pytest.approx(0.8)
+        assert checkpoint['best_val_loss'] == pytest.approx(0.8)
 
         new_model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
         new_config = dict(small_dataset_config)
@@ -601,10 +611,14 @@ class TestVAETrainer:
         assert new_trainer.early_stopping_patience == 9
         assert new_trainer.early_stopping_min_delta == pytest.approx(0.002)
         assert new_trainer.early_stopping_counter == 3
+        assert new_trainer.best_val_recon_loss == pytest.approx(0.5)
+        assert new_trainer.best_val_total_loss == pytest.approx(0.8)
         assert new_trainer.best_epoch == 4
 
         legacy_checkpoint_path = Path(config['checkpoint_dir']) / 'legacy_early_stopping_checkpoint.pth'
-        legacy_checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
+        legacy_checkpoint = dict(checkpoint)
+        legacy_checkpoint.pop('best_val_recon_loss', None)
+        legacy_checkpoint.pop('best_val_total_loss', None)
         legacy_checkpoint.pop('early_stopping_patience', None)
         legacy_checkpoint.pop('early_stopping_min_delta', None)
         legacy_checkpoint.pop('early_stopping_counter', None)
@@ -627,6 +641,8 @@ class TestVAETrainer:
         assert legacy_trainer.early_stopping_patience == 11
         assert legacy_trainer.early_stopping_min_delta == pytest.approx(0.003)
         assert legacy_trainer.early_stopping_counter == 0
+        assert legacy_trainer.best_val_recon_loss == pytest.approx(0.8)
+        assert legacy_trainer.best_val_total_loss == pytest.approx(0.8)
         assert legacy_trainer.best_epoch is None
 
         trainer.writer.close()
