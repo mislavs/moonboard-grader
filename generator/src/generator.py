@@ -109,7 +109,6 @@ class ProblemGenerator:
         self.threshold = threshold
         
         self.label_context = EvaluationLabelContext(
-            label_space_mode="global_legacy",
             grade_offset=0,
             min_grade_index=None,
             max_grade_index=None,

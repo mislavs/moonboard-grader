@@ -88,7 +88,7 @@ class TestMoonBoardDataset:
         dataset = MoonBoardDataset(data_path, min_grade_index=1, max_grade_index=4)
         
         assert dataset.get_num_model_grades() == 4
-        assert dataset.label_space_mode == "remapped"
+        assert dataset.grade_offset == 1
         # Actual labels in the dataset should be remapped to 0..3.
         # Verify by checking labels in the dataset
         labels_in_dataset = set()
@@ -165,7 +165,7 @@ class TestMoonBoardDataset:
             data_path,
             min_grade_index=2,
             max_grade_index=4,
-            label_space_mode="global_legacy",
+            grade_offset=0,
         )
         assert dataset.get_num_model_grades() == len(dataset.grade_names)
         _, label = dataset[0]

@@ -13,7 +13,6 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
 from .vae import ConditionalVAE, vae_loss
-from .label_space import LabelSpaceMode
 from .checkpoint_compat import load_state_dict_with_compatibility
 
 logger = logging.getLogger(__name__)
@@ -40,7 +39,7 @@ class VAETrainer:
         val_loader, 
         config: Dict, 
         device: str = 'cpu',
-        label_space_mode: LabelSpaceMode = "global_legacy",
+        label_space_mode: str = "global_legacy",
         grade_offset: int = 0,
         min_grade_index: Optional[int] = None,
         max_grade_index: Optional[int] = None

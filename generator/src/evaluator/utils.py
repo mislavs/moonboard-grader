@@ -35,7 +35,7 @@ def load_data_loader(
         num_workers=0,
         min_grade_index=min_grade_index,
         max_grade_index=max_grade_index,
-        label_space_mode=label_context.label_space_mode,
+        grade_offset=label_context.grade_offset,
     )
     
     return val_loader, dataset

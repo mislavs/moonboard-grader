@@ -12,8 +12,9 @@ from moonboard_core.grade_encoder import (
     decode_grade,
     get_all_grades,
     get_filtered_grade_names,
+    remap_label,
+    unmap_label,
 )
-from .label_space import LabelSpaceMode
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class MoonBoardDataset(Dataset):
         data_path: str, 
         min_grade_index: Optional[int] = None, 
         max_grade_index: Optional[int] = None, 
-        label_space_mode: Optional[LabelSpaceMode] = None,
+        grade_offset: Optional[int] = None,
         transform: Optional[Callable] = None
     ):
         """
@@ -62,13 +63,15 @@ class MoonBoardDataset(Dataset):
         self._validate_grade_filter_args()
 
         self.is_filtered = self.min_grade_index is not None and self.max_grade_index is not None
-        inferred_mode = "remapped" if self.is_filtered else "global_legacy"
-        self.label_space_mode = label_space_mode or inferred_mode
-        if self.label_space_mode not in ("remapped", "global_legacy"):
+        default_grade_offset = self.min_grade_index if self.is_filtered else 0
+        self.grade_offset = default_grade_offset if grade_offset is None else grade_offset
+        if self.grade_offset < 0:
+            raise ValueError(f"grade_offset must be >= 0, got {self.grade_offset}")
+        if self.is_filtered and self.grade_offset not in (0, self.min_grade_index):
             raise ValueError(
-                f"label_space_mode must be 'remapped' or 'global_legacy', got {self.label_space_mode}"
+                "For filtered datasets, grade_offset must be 0 (global) or min_grade_index "
+                f"({self.min_grade_index}), got {self.grade_offset}"
             )
-        self.grade_offset = self.min_grade_index if self.label_space_mode == "remapped" else 0
 
         # Load and filter dataset
         logger.info(f"Loading dataset from {data_path}")
@@ -167,29 +170,22 @@ class MoonBoardDataset(Dataset):
 
     def get_num_model_grades(self) -> int:
         """Return the number of grades in model label space."""
-        if self.label_space_mode == "remapped" and self.is_filtered:
+        if self.is_filtered and self.grade_offset > 0:
             return (self.max_grade_index - self.min_grade_index) + 1
         return len(self.grade_to_label)
 
     def global_to_model_label(self, global_label: int) -> int:
         """Map global moonboard_core label to model label space."""
-        if self.label_space_mode == "remapped":
-            if self.is_filtered:
-                if not self.min_grade_index <= global_label <= self.max_grade_index:
-                    raise ValueError(
-                        f"Global label {global_label} ({_safe_decode_grade(global_label)}) outside "
-                        f"filtered range [{self.min_grade_index}, {self.max_grade_index}]"
-                    )
-            return global_label - self.grade_offset
-
-        if self.label_space_mode == "global_legacy":
-            if global_label < 0 or global_label >= len(self.grade_names):
-                raise ValueError(
-                    f"Global label {global_label} out of range [0, {len(self.grade_names) - 1}]"
-                )
-            return global_label
-
-        raise ValueError(f"Unsupported label_space_mode: {self.label_space_mode}")
+        if global_label < 0 or global_label >= len(self.grade_names):
+            raise ValueError(
+                f"Global label {global_label} out of range [0, {len(self.grade_names) - 1}]"
+            )
+        if self.is_filtered and not self.min_grade_index <= global_label <= self.max_grade_index:
+            raise ValueError(
+                f"Global label {global_label} ({_safe_decode_grade(global_label)}) outside "
+                f"filtered range [{self.min_grade_index}, {self.max_grade_index}]"
+            )
+        return remap_label(global_label, self.grade_offset)
 
     def model_to_global_label(self, model_label: int) -> int:
         """Map model label space to global moonboard_core label."""
@@ -197,11 +193,7 @@ class MoonBoardDataset(Dataset):
             raise ValueError(
                 f"Model label {model_label} out of range [0, {self.get_num_model_grades() - 1}]"
             )
-        if self.label_space_mode == "remapped":
-            return model_label + self.grade_offset
-        if self.label_space_mode == "global_legacy":
-            return model_label
-        raise ValueError(f"Unsupported label_space_mode: {self.label_space_mode}")
+        return unmap_label(model_label, self.grade_offset)
 
     def get_grade_from_label(self, label: int) -> Optional[str]:
         """
@@ -246,7 +238,7 @@ def create_data_loaders(
     num_workers: int = 0, 
     min_grade_index: Optional[int] = None, 
     max_grade_index: Optional[int] = None,
-    label_space_mode: Optional[LabelSpaceMode] = None,
+    grade_offset: Optional[int] = None,
 ) -> Tuple:
     """
     Create train and validation data loaders.
@@ -259,7 +251,7 @@ def create_data_loaders(
         num_workers: Number of worker processes for data loading
         min_grade_index: Minimum grade index for filtering (e.g., 2 for 6A+)
         max_grade_index: Maximum grade index for filtering (e.g., 2 for 6A+ only)
-        label_space_mode: Optional override for dataset label mapping mode
+        grade_offset: Optional override for dataset label offset
         
     Returns:
         train_loader: DataLoader for training set
@@ -273,7 +265,7 @@ def create_data_loaders(
         data_path,
         min_grade_index=min_grade_index,
         max_grade_index=max_grade_index,
-        label_space_mode=label_space_mode,
+        grade_offset=grade_offset,
     )
     
     # Split into train and validation

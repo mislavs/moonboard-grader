@@ -485,7 +485,6 @@ class TestFormatProblemOutput:
             "grade_label": 0,
         }
         context = EvaluationLabelContext(
-            label_space_mode="remapped",
             grade_offset=2,
             min_grade_index=2,
             max_grade_index=2,

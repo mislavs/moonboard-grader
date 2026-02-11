@@ -126,8 +126,8 @@ def train_command(args):
         print(f"   Grade range: {', '.join(dataset.model_grade_names)}")
 
         # Extract filtering metadata from dataset
-        label_space_mode = dataset.label_space_mode
         grade_offset = dataset.grade_offset
+        label_space_mode = "remapped" if grade_offset > 0 else "global_legacy"
         min_grade_index = dataset.min_grade_index
         max_grade_index = dataset.max_grade_index
         

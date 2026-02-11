@@ -10,6 +10,8 @@ Review of how the `generator` project uses `moonboard_core` and identified areas
 
 ### 1. Refactor label remapping to use moonboard_core's `remap_label` / `unmap_label`
 
+**Status:** Done
+
 **Severity:** High
 
 `moonboard_core` exports `remap_label(label, offset)` and `unmap_label(label, offset)` specifically for converting between global grade labels and model-local labels. The classifier project uses them directly. The generator has built a parallel system that reimplements the same `label - offset` / `label + offset` arithmetic in three places:
