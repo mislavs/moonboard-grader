@@ -24,7 +24,7 @@ class ConditionalVAE(nn.Module):
 
     Args:
         latent_dim: Dimension of the latent space (default: 128)
-        num_grades: Number of unique grade labels (default: 17)
+        num_grades: Number of unique grade labels (default: 19)
         grade_embedding_dim: Dimension of grade embedding vector (default: 32)
         dropout_rate: Dropout rate for encoder/decoder feature regularization (default: 0.0)
     """
@@ -32,7 +32,7 @@ class ConditionalVAE(nn.Module):
     def __init__(
         self,
         latent_dim=128,
-        num_grades=17,
+        num_grades=19,
         grade_embedding_dim=32,
         dropout_rate=0.0,
     ):
