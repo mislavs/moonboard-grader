@@ -77,19 +77,19 @@ def evaluate_command(args):
     # Check checkpoint exists
     checkpoint_path = Path(args.checkpoint)
     if not checkpoint_path.exists():
-        print(f"❌ Error: Checkpoint not found: {checkpoint_path}")
+        print(f"[ERROR] Error: Checkpoint not found: {checkpoint_path}")
         sys.exit(1)
     
-    print(f"\n✓ Loading model from: {checkpoint_path}")
+    print(f"\n* Loading model from: {checkpoint_path}")
     
     # Load predictor (handles model loading)
     device = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
-    print(f"✓ Using device: {device}")
+    print(f"* Using device: {device}")
     
     predictor = Predictor(str(checkpoint_path), device=device)
     model_info = predictor.get_model_info()
     
-    print(f"\n🧠 Model Information:")
+    print(f"\n>> Model Information:")
     print(f"   Type: {model_info['model_type']}")
     print(f"   Parameters: {model_info['num_parameters']:,}")
     print(f"   Classes: {model_info['num_classes']}")
@@ -97,14 +97,14 @@ def evaluate_command(args):
     # Load evaluation data
     data_path = Path(args.data)
     if not data_path.exists():
-        print(f"❌ Error: Data file not found: {data_path}")
+        print(f"[ERROR] Error: Data file not found: {data_path}")
         sys.exit(1)
     
-    print(f"\n📂 Loading evaluation data from: {data_path}")
+    print(f"\n>> Loading evaluation data from: {data_path}")
     dataset = load_dataset(str(data_path))
     
     if len(dataset) == 0:
-        print("❌ Error: No problems found in dataset")
+        print("[ERROR] Error: No problems found in dataset")
         sys.exit(1)
     
     print(f"   Total problems: {len(dataset)}")
@@ -119,7 +119,7 @@ def evaluate_command(args):
     if grade_offset > 0:
         from src import filter_dataset_by_grades, remap_label, decode_grade
         
-        print(f"\n🔍 Detected filtered model:")
+        print(f"\n>> Detected filtered model:")
         print(f"   Grade range: {decode_grade(min_grade_idx)} - {decode_grade(max_grade_idx)}")
         print(f"   Label offset: {grade_offset}")
         
@@ -128,7 +128,7 @@ def evaluate_command(args):
         dataset = filter_dataset_by_grades(dataset, min_grade_idx, max_grade_idx)
         filtered_count = len(dataset)
         
-        print(f"   Filtered evaluation data: {original_count} → {filtered_count} problems")
+        print(f"   Filtered evaluation data: {original_count} -> {filtered_count} problems")
         
         # Remap labels to match model's expected range
         dataset = [(tensor, remap_label(label, grade_offset)) for tensor, label in dataset]
@@ -140,18 +140,18 @@ def evaluate_command(args):
     eval_loader = DataLoader(eval_dataset, batch_size=32, shuffle=False)
     
     # Evaluate
-    print(f"\n📈 Evaluating model...")
+    print(f"\n>> Evaluating model...")
     metrics = evaluate_model(predictor.model, eval_loader, device)
     
-    print(f"\n🎯 Evaluation Results:")
+    print(f"\n>> Evaluation Results:")
     print(f"   Exact Accuracy:    {metrics['exact_accuracy']:.2f}%")
     print(f"   Macro Accuracy:    {metrics['macro_accuracy']:.2f}%")
-    print(f"   ±1 Grade Accuracy: {metrics['tolerance_1_accuracy']:.2f}%")
-    print(f"   ±2 Grade Accuracy: {metrics['tolerance_2_accuracy']:.2f}%")
+    print(f"   +-1 Grade Accuracy: {metrics['tolerance_1_accuracy']:.2f}%")
+    print(f"   +-2 Grade Accuracy: {metrics['tolerance_2_accuracy']:.2f}%")
     print(f"   Loss:              {metrics['avg_loss']:.4f}")
     
     # Get detailed metrics
-    print(f"\n📊 Detailed Metrics:")
+    print(f"\n>> Detailed Metrics:")
     # Use filtered grade names if model is filtered
     if grade_offset > 0:
         from src import get_filtered_grade_names
@@ -168,7 +168,7 @@ def evaluate_command(args):
     print(f"   Mean Absolute Error: {metrics_summary['mean_absolute_error']:.2f} grades")
     
     # Per-grade metrics
-    print(f"\n📋 Per-Grade Performance:")
+    print(f"\n>> Per-Grade Performance:")
     per_grade = metrics_summary['per_grade_metrics']
     print(f"   {'Grade':<6} {'Precision':<10} {'Recall':<10} {'F1':<10} {'Support':<10}")
     print(f"   {'-'*50}")
@@ -207,7 +207,7 @@ def evaluate_command(args):
             str(output_path),
             normalize=True
         )
-        print(f"\n✓ Saved confusion matrix to: {output_path}")
+        print(f"\n* Saved confusion matrix to: {output_path}")
     
-    print_completion_message("✅ Evaluation completed successfully!")
+    print_completion_message("Evaluation completed successfully!")
 

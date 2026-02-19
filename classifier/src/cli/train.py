@@ -64,7 +64,7 @@ def train_command(args):
     
     # Load configuration
     config = load_config(args.config)
-    print(f"\n✓ Loaded configuration from: {args.config}")
+    print(f"\n* Loaded configuration from: {args.config}")
 
     # Validate filtered grade configuration early to fail fast on class-space mismatch.
     num_classes = config['model']['num_classes']
@@ -87,14 +87,29 @@ def train_command(args):
                 f"max_grade_index={max_grade_idx}, expected_classes={expected_classes}."
             )
     
+    # Set up reproducibility if configured
+    repro_seed = config.get('training', {}).get('reproducibility_seed', None)
+    if repro_seed is not None:
+        import random
+        random.seed(repro_seed)
+        np.random.seed(repro_seed)
+        torch.manual_seed(repro_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(repro_seed)
+        deterministic = config.get('training', {}).get('deterministic', False)
+        if deterministic:
+            torch.use_deterministic_algorithms(True)
+            torch.backends.cudnn.benchmark = False
+        print(f"* Reproducibility seed: {repro_seed} (deterministic={deterministic})")
+
     # Set device
     device_name = config.get('device', 'cpu')
     device, device_name = setup_device(device_name)
-    print(f"✓ Using device: {device}")
+    print(f"* Using device: {device}")
     
     # Load dataset
     data_path = config['data']['path']
-    print(f"\n📂 Loading dataset from: {data_path}")
+    print(f"\n>> Loading dataset from: {data_path}")
     
     # Check if repeats filtering is enabled
     filter_repeats_enabled = config.get('data', {}).get('filter_repeats', False)
@@ -107,12 +122,12 @@ def train_command(args):
     dataset = load_dataset(data_path, min_repeats=min_repeats)
     
     if len(dataset) == 0:
-        print("❌ Error: No problems found in dataset")
+        print("[ERROR] Error: No problems found in dataset")
         sys.exit(1)
     
     # Get dataset statistics
     stats = get_dataset_stats(dataset)
-    print(f"\n📊 Dataset Statistics:")
+    print(f"\n>> Dataset Statistics:")
     print(f"   Total problems: {stats['total_problems']}")
     print(f"   Grade distribution:")
     for grade_label, count in sorted(stats['grade_distribution'].items()):
@@ -137,7 +152,7 @@ def train_command(args):
         dataset = filter_dataset_by_grades(dataset, min_grade_idx, max_grade_idx)
         filtered_count = len(dataset)
         
-        print(f"\n🔍 Grade Filtering:")
+        print(f"\n>> Grade Filtering:")
         print(f"   Filtering to grades {decode_grade(min_grade_idx)} - {decode_grade(max_grade_idx)}")
         print(f"   Original problems: {original_count}")
         print(f"   Filtered problems: {filtered_count}")
@@ -148,7 +163,9 @@ def train_command(args):
         dataset = [(tensor, remap_label(label, grade_offset)) for tensor, label in dataset]
     
     # Create data splits
-    print(f"\n🔀 Creating train/val/test splits...")
+    group_by_layout = config.get('data', {}).get('group_by_layout', False)
+    split_mode = "grouped (layout-aware)" if group_by_layout else "stratified"
+    print(f"\n>> Creating train/val/test splits ({split_mode})...")
     tensors = np.array([x[0] for x in dataset])
     labels = np.array([x[1] for x in dataset])
     
@@ -210,7 +227,7 @@ def train_command(args):
             train_dataset, val_dataset, test_dataset, batch_size
         )
         
-        print(f"\n⚖️  Using balanced sampling ({sampling_strategy} strategy)")
+        print(f"\n>> Using balanced sampling ({sampling_strategy} strategy)")
         print(f"   Effective class weight range: {class_weights_sampling.min():.3f} - {class_weights_sampling.max():.3f}")
     else:
         train_loader, val_loader, test_loader = create_data_loaders(
@@ -219,7 +236,7 @@ def train_command(args):
     
     # Create model
     model_type = config['model']['type']
-    print(f"\n🧠 Creating model: {model_type.upper()}")
+    print(f"\n>> Creating model: {model_type.upper()}")
     
     # Extract model-specific parameters from config
     model_params = {
@@ -318,14 +335,16 @@ def train_command(args):
     use_scheduler = config['training'].get('use_scheduler', True)
     scheduler = None
     if use_scheduler:
+        scheduler_factor = config['training'].get('scheduler_factor', 0.3)
+        scheduler_patience = config['training'].get('scheduler_patience', 3)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
             mode='min',
-            factor=0.3,      # More aggressive reduction (was 0.5)
-            patience=3,      # Faster response to plateaus (was 5)
-            min_lr=1e-7      # Lower minimum (was 1e-6)
+            factor=scheduler_factor,
+            patience=scheduler_patience,
+            min_lr=1e-7
         )
-        print(f"   Using ReduceLROnPlateau scheduler (factor=0.3, patience=3)")
+        print(f"   Using ReduceLROnPlateau scheduler (factor={scheduler_factor}, patience={scheduler_patience})")
     
     # Create checkpoint directory
     checkpoint_dir = Path(config['checkpoint']['dir'])
@@ -357,7 +376,7 @@ def train_command(args):
     num_epochs = config['training']['num_epochs']
     early_stopping_patience = config['training'].get('early_stopping_patience')
     
-    print(f"\n🏋️  Training for {num_epochs} epochs...")
+    print(f"\n>> Training for {num_epochs} epochs...")
     if early_stopping_patience:
         print(f"   Early stopping: patience={early_stopping_patience}")
     
@@ -372,7 +391,7 @@ def train_command(args):
 
     # Persist training history for post-run analysis.
     history_path = trainer.save_history('training_history.json')
-    print(f"\n✓ Saved training history to: {history_path}")
+    print(f"\n* Saved training history to: {history_path}")
     
     # Calculate training duration
     training_end_time = datetime.now()
@@ -389,7 +408,7 @@ def train_command(args):
     else:
         duration_str = f"{seconds}s"
     
-    print(f"\n⏱️  Training duration: {duration_str}")
+    print(f"\n>> Training duration: {duration_str}")
     
     # Evaluate the same checkpoint artifact that will be saved with metrics.
     best_model_path = checkpoint_dir / "best_model.pth"
@@ -405,17 +424,17 @@ def train_command(args):
         checkpoint = torch.load(eval_checkpoint_path, map_location=device)
         model.load_state_dict(checkpoint["model_state_dict"])
         model = model.to(device)
-        print(f"\n📈 Evaluating on test set using checkpoint: {eval_checkpoint_path.name}")
+        print(f"\n>> Evaluating on test set using checkpoint: {eval_checkpoint_path.name}")
     else:
-        print("\n📈 Evaluating on test set using in-memory final model (no checkpoint found)")
+        print("\n>> Evaluating on test set using in-memory final model (no checkpoint found)")
 
     test_metrics = evaluate_model(model, test_loader, device)
     
-    print(f"\n🎯 Test Set Results:")
+    print(f"\n>> Test Set Results:")
     print(f"   Exact Accuracy:    {test_metrics['exact_accuracy']:.2f}%")
     print(f"   Macro Accuracy:    {test_metrics['macro_accuracy']:.2f}%")
-    print(f"   ±1 Grade Accuracy: {test_metrics['tolerance_1_accuracy']:.2f}%")
-    print(f"   ±2 Grade Accuracy: {test_metrics['tolerance_2_accuracy']:.2f}%")
+    print(f"   +-1 Grade Accuracy: {test_metrics['tolerance_1_accuracy']:.2f}%")
+    print(f"   +-2 Grade Accuracy: {test_metrics['tolerance_2_accuracy']:.2f}%")
     print(f"   Loss:              {test_metrics['avg_loss']:.4f}")
     
     # Generate unique timestamp for this training session
@@ -451,7 +470,7 @@ def train_command(args):
             str(cm_path),
             normalize=True
         )
-        print(f"\n✓ Saved confusion matrix to: {cm_path}")
+        print(f"\n* Saved confusion matrix to: {cm_path}")
     
     # Generate unique model filename with timestamp and accuracy metrics
     unique_model_filename = f"model_{timestamp}_acc{exact_acc}_tol1-{tol1_acc}_tol2-{tol2_acc}.pth"
@@ -460,11 +479,11 @@ def train_command(args):
     # Copy the evaluated checkpoint artifact to the unique filename.
     if eval_checkpoint_path is not None and eval_checkpoint_path.exists():
         shutil.copy2(eval_checkpoint_path, unique_model_path)
-        print(f"\n✓ Saved unique model to: {unique_model_path}")
+        print(f"\n* Saved unique model to: {unique_model_path}")
         print(f"   Source checkpoint: {eval_checkpoint_path.name}")
     
     # Log final test results to TensorBoard
     trainer.log_test_results(config, test_metrics, str(cm_path) if cm_path and cm_path.exists() else None)
     
-    print(f"\n✓ TensorBoard logs saved. View with: py -m tensorboard.main --logdir=runs")
-    print_completion_message("✅ Training completed successfully!")
+    print(f"\n* TensorBoard logs saved. View with: py -m tensorboard.main --logdir=runs")
+    print_completion_message("Training completed successfully!")

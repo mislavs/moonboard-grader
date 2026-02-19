@@ -46,10 +46,10 @@ def setup_device(device_name, fallback_to_cpu=True):
     """
     if device_name == 'cuda' and not torch.cuda.is_available():
         if fallback_to_cpu:
-            print(f"⚠ CUDA requested but not available, falling back to CPU")
+            print(f"[WARN] CUDA requested but not available, falling back to CPU")
             device_name = 'cpu'
         else:
-            print(f"❌ Error: CUDA requested but not available")
+            print(f"[ERROR] CUDA requested but not available")
             sys.exit(1)
     
     device = torch.device(device_name)

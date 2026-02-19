@@ -59,6 +59,8 @@ from .dataset import (
 
 from .data_splitter import (
     create_stratified_splits,
+    create_grouped_splits,
+    compute_layout_hashes,
     create_datasets,
     create_data_loaders
 )

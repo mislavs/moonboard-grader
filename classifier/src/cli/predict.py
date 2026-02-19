@@ -69,27 +69,27 @@ def predict_command(args):
     # Check checkpoint exists
     checkpoint_path = Path(args.checkpoint)
     if not checkpoint_path.exists():
-        print(f"❌ Error: Checkpoint not found: {checkpoint_path}")
+        print(f"[ERROR] Error: Checkpoint not found: {checkpoint_path}")
         sys.exit(1)
     
-    print(f"\n✓ Loading model from: {checkpoint_path}")
+    print(f"\n* Loading model from: {checkpoint_path}")
     
     # Load predictor
     device = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
-    print(f"✓ Using device: {device}")
+    print(f"* Using device: {device}")
     
     predictor = Predictor(str(checkpoint_path), device=device)
     model_info = predictor.get_model_info()
     
-    print(f"\n🧠 Model: {model_info['model_type']} ({model_info['num_parameters']:,} parameters)")
+    print(f"\n>> Model: {model_info['model_type']} ({model_info['num_parameters']:,} parameters)")
     
     # Load input problem
     input_path = Path(args.input)
     if not input_path.exists():
-        print(f"❌ Error: Input file not found: {input_path}")
+        print(f"[ERROR] Error: Input file not found: {input_path}")
         sys.exit(1)
     
-    print(f"\n📂 Loading problem from: {input_path}")
+    print(f"\n>> Loading problem from: {input_path}")
     
     with open(input_path, 'r') as f:
         data = json.load(f)
@@ -102,7 +102,7 @@ def predict_command(args):
         problems = [data]
         batch_mode = False
     else:
-        print("❌ Error: Invalid input format. Expected 'moves' field or 'data' array.")
+        print("[ERROR] Error: Invalid input format. Expected 'moves' field or 'data' array.")
         sys.exit(1)
     
     print(f"   Found {len(problems)} problem(s)")
@@ -111,24 +111,24 @@ def predict_command(args):
     top_k = args.top_k if args.top_k else 3
     
     if batch_mode:
-        print(f"\n🔮 Making predictions (top-{top_k})...")
+        print(f"\n>> Making predictions (top-{top_k})...")
         predictions = predictor.predict_batch(problems, return_top_k=top_k)
         
         for i, pred in enumerate(predictions):
             if 'error' in pred:
-                print(f"\n❌ Problem {i+1}: {pred['error']}")
+                print(f"\n[ERROR] Problem {i+1}: {pred['error']}")
             else:
-                print(f"\n📊 Problem {i+1}:")
+                print(f"\n>> Problem {i+1}:")
                 print(f"   Predicted Grade: {pred['predicted_grade']}")
                 print(f"   Confidence: {pred['confidence']*100:.2f}%")
                 print(f"\n   Top {top_k} Predictions:")
                 for j, (grade, prob) in enumerate(pred['top_k_predictions'], 1):
                     print(f"      {j}. {grade:<4} ({prob*100:.2f}%)")
     else:
-        print(f"\n🔮 Making prediction (top-{top_k})...")
+        print(f"\n>> Making prediction (top-{top_k})...")
         pred = predictor.predict(problems[0], return_top_k=top_k)
         
-        print(f"\n📊 Results:")
+        print(f"\n>> Results:")
         print(f"   Predicted Grade: {pred['predicted_grade']}")
         print(f"   Confidence: {pred['confidence']*100:.2f}%")
         print(f"\n   Top {top_k} Predictions:")
@@ -142,7 +142,7 @@ def predict_command(args):
             
             # Check if prediction was correct
             if pred['predicted_grade'] == actual_grade:
-                print(f"   ✅ Exact match!")
+                print(f"   [OK] Exact match!")
             else:
                 # Check if within tolerance
                 pred_idx = encode_grade(pred['predicted_grade'])
@@ -150,11 +150,11 @@ def predict_command(args):
                 diff = abs(pred_idx - actual_idx)
                 
                 if diff == 1:
-                    print(f"   ⚠️  Off by 1 grade")
+                    print(f"   [WARN] Off by 1 grade")
                 elif diff == 2:
-                    print(f"   ⚠️  Off by 2 grades")
+                    print(f"   [WARN] Off by 2 grades")
                 else:
-                    print(f"   ❌ Off by {diff} grades")
+                    print(f"   [ERROR] Off by {diff} grades")
     
     # Save output if requested
     if args.output:
@@ -167,7 +167,7 @@ def predict_command(args):
             else:
                 json.dump(pred, f, indent=2)
         
-        print(f"\n✓ Saved predictions to: {output_path}")
+        print(f"\n* Saved predictions to: {output_path}")
     
-    print_completion_message("✅ Prediction completed successfully!")
+    print_completion_message("Prediction completed successfully!")
 

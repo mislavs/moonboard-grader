@@ -19,6 +19,10 @@ from src.cli.predict import predict_command
 
 def main():
     """Main entry point."""
+    # Ensure safe output on non-UTF-8 consoles (e.g. Windows cp1252)
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(errors='replace')
+
     parser = argparse.ArgumentParser(
         description="Moonboard Grade Prediction Neural Network",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -50,10 +54,10 @@ Examples:
         elif args.command == 'predict':
             predict_command(args)
     except KeyboardInterrupt:
-        print("\n\n⚠️  Interrupted by user")
+        print("\n\n[WARN] Interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\n[ERROR] {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

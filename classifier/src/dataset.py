@@ -11,6 +11,11 @@ from torch.utils.data import Dataset
 from sklearn.model_selection import StratifiedShuffleSplit
 from typing import Tuple, List, Optional
 
+from .split_validation import (
+    raise_friendly_stratify_error,
+    validate_two_stage_stratified_feasibility,
+)
+
 
 class MoonboardDataset(Dataset):
     """
@@ -174,15 +179,10 @@ def create_data_splits(
             f"Dataset too small for splitting. Need at least 3 samples, got {n_samples}"
         )
     
-    # Check that each class has at least 2 samples for stratification
-    unique_labels, counts = np.unique(labels, return_counts=True)
-    min_class_count = np.min(counts)
-    if min_class_count < 2:
-        raise ValueError(
-            f"Cannot stratify: some classes have fewer than 2 samples. "
-            f"Minimum class count: {min_class_count}"
-        )
-    
+    context = validate_two_stage_stratified_feasibility(
+        labels, train_ratio, val_ratio, test_ratio
+    )
+
     # First split: separate test set
     test_size = test_ratio
     splitter_test = StratifiedShuffleSplit(
@@ -190,8 +190,10 @@ def create_data_splits(
         test_size=test_size,
         random_state=random_state
     )
-    
-    train_val_idx, test_idx = next(splitter_test.split(data, labels))
+    try:
+        train_val_idx, test_idx = next(splitter_test.split(data, labels))
+    except ValueError as e:
+        raise_friendly_stratify_error("test split", e, context)
     
     # Second split: separate train and validation from remaining data
     # val_ratio_adjusted is the proportion of validation in the train_val set
@@ -203,9 +205,12 @@ def create_data_splits(
         random_state=random_state
     )
     
-    train_idx, val_idx = next(
-        splitter_val.split(data[train_val_idx], labels[train_val_idx])
-    )
+    try:
+        train_idx, val_idx = next(
+            splitter_val.split(data[train_val_idx], labels[train_val_idx])
+        )
+    except ValueError as e:
+        raise_friendly_stratify_error("train/validation split", e, context)
     
     # Map back to original indices
     train_idx = train_val_idx[train_idx]

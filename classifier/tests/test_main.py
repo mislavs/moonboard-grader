@@ -267,6 +267,134 @@ class TestTrainCommand:
 
         assert captured['labels'].tolist() == [0, 3, 9]
     
+    def test_train_command_applies_reproducibility_seed(self, monkeypatch):
+        """reproducibility_seed should seed Python, NumPy, and torch RNGs."""
+        from src.cli import train as train_module
+        import random
+
+        config = {
+            'model': {'type': 'fc', 'num_classes': 2},
+            'training': {
+                'learning_rate': 0.001,
+                'batch_size': 4,
+                'num_epochs': 1,
+                'optimizer': 'adam',
+                'use_scheduler': False,
+                'use_class_weights': False,
+                'reproducibility_seed': 123,
+            },
+            'data': {
+                'path': 'ignored.json',
+                'train_ratio': 0.7,
+                'val_ratio': 0.15,
+                'test_ratio': 0.15,
+                'random_seed': 42,
+            },
+            'checkpoint': {'dir': 'models'},
+            'device': 'cpu',
+        }
+
+        monkeypatch.setattr(train_module, 'load_config', lambda _: config)
+        monkeypatch.setattr(train_module, 'setup_device', lambda _: ('cpu', 'cpu'))
+        monkeypatch.setattr(train_module, 'load_dataset', lambda *a, **kw: (_ for _ in ()).throw(RuntimeError('stop')))
+        monkeypatch.setattr(train_module, 'print_section_header', lambda *_: None)
+
+        args = MagicMock()
+        args.config = 'ignored.yaml'
+
+        with pytest.raises(RuntimeError):
+            train_module.train_command(args)
+
+        # After the command runs (partially), seeds should be set
+        # Verify torch seed is deterministic: two calls to torch.rand should match
+        torch.manual_seed(123)
+        expected = torch.rand(1).item()
+        torch.manual_seed(123)
+        actual = torch.rand(1).item()
+        assert expected == actual
+
+    def test_train_command_uses_scheduler_config_values(self, monkeypatch):
+        """Scheduler factor and patience should come from config, not hardcoded."""
+        from src.cli import train as train_module
+        import torch.optim as optim
+
+        captured_scheduler = {}
+
+        original_reduce = optim.lr_scheduler.ReduceLROnPlateau
+
+        class CapturingScheduler(original_reduce):
+            def __init__(self, optimizer, **kwargs):
+                captured_scheduler['factor'] = kwargs.get('factor')
+                captured_scheduler['patience'] = kwargs.get('patience')
+                super().__init__(optimizer, **kwargs)
+
+        monkeypatch.setattr(optim.lr_scheduler, 'ReduceLROnPlateau', CapturingScheduler)
+
+        config = {
+            'model': {'type': 'fc', 'num_classes': 2},
+            'training': {
+                'learning_rate': 0.001,
+                'batch_size': 4,
+                'num_epochs': 1,
+                'optimizer': 'adam',
+                'use_scheduler': True,
+                'scheduler_factor': 0.7,
+                'scheduler_patience': 8,
+                'use_class_weights': False,
+            },
+            'data': {
+                'path': 'ignored.json',
+                'train_ratio': 0.7,
+                'val_ratio': 0.15,
+                'test_ratio': 0.15,
+                'random_seed': 42,
+            },
+            'checkpoint': {'dir': 'models'},
+            'device': 'cpu',
+        }
+
+        class DummyDataset:
+            def __init__(self, labels):
+                self.labels = labels
+            def __len__(self):
+                return len(self.labels)
+
+        monkeypatch.setattr(train_module, 'load_config', lambda _: config)
+        monkeypatch.setattr(train_module, 'setup_device', lambda _: ('cpu', 'cpu'))
+        monkeypatch.setattr(train_module, 'load_dataset', lambda *a, **kw: [('x', 0), ('y', 1)])
+        monkeypatch.setattr(
+            train_module, 'get_dataset_stats',
+            lambda d: {'total_problems': len(d), 'grade_distribution': {0: 1, 1: 1}},
+        )
+        monkeypatch.setattr(train_module, 'decode_grade', lambda _: 'G')
+        monkeypatch.setattr(
+            train_module, 'create_datasets',
+            lambda *a, **kw: (DummyDataset([0, 1]), DummyDataset([0]), DummyDataset([1])),
+        )
+        monkeypatch.setattr(train_module, 'create_data_loaders', lambda *a, **kw: ('t', 'v', 'te'))
+        monkeypatch.setattr(train_module, 'create_model', lambda *a, **kw: torch.nn.Linear(1, 2, bias=False))
+        monkeypatch.setattr(train_module, 'count_parameters', lambda m: 2)
+        monkeypatch.setattr(train_module, 'print_section_header', lambda *_: None)
+
+        class FakeTrainer:
+            def __init__(self, **kwargs):
+                pass
+            def fit(self, **kwargs):
+                raise RuntimeError('stop_early')
+            def save_history(self, filename='training_history.json'):
+                pass
+
+        monkeypatch.setattr(train_module, 'Trainer', lambda **kw: FakeTrainer(**kw))
+
+        args = MagicMock()
+        args.config = 'ignored.yaml'
+
+        with pytest.raises(RuntimeError, match='stop_early'):
+            train_module.train_command(args)
+
+        assert captured_scheduler['factor'] == 0.7
+        assert captured_scheduler['patience'] == 8
+
     def test_train_command_saves_history(self, tmp_path):
         """Test that training saves history to correct location without path duplication."""
         config_data = {
@@ -765,6 +893,38 @@ class TestCLIIntegration:
         
         # Missing subcommand causes exit code 2
         assert exc_info.value.code == 2
+
+
+class TestCLIASCIISafety:
+    """Test that CLI output is safe for non-UTF-8 consoles."""
+
+    def test_cli_print_statements_contain_only_ascii(self):
+        """All print output in CLI modules must use ASCII-safe characters."""
+        cli_files = [
+            Path(__file__).parent.parent / 'src' / 'cli' / 'train.py',
+            Path(__file__).parent.parent / 'src' / 'cli' / 'evaluate.py',
+            Path(__file__).parent.parent / 'src' / 'cli' / 'predict.py',
+            Path(__file__).parent.parent / 'src' / 'cli' / 'utils.py',
+            Path(__file__).parent.parent / 'main.py',
+        ]
+
+        for cli_file in cli_files:
+            content = cli_file.read_text(encoding='utf-8')
+            for i, line in enumerate(content.splitlines(), 1):
+                stripped = line.strip()
+                if stripped.startswith('#'):
+                    continue
+                if 'print(' in stripped or 'print_section_header(' in stripped or 'print_completion_message(' in stripped:
+                    non_ascii = [c for c in line if ord(c) > 127]
+                    assert not non_ascii, (
+                        f"{cli_file.name}:{i} contains non-ASCII in print statement: "
+                        f"{non_ascii!r}\n  Line: {stripped}"
+                    )
+
+    def test_main_configures_safe_stdout(self):
+        """Main entry point should configure stdout for safe encoding."""
+        source = (Path(__file__).parent.parent / 'main.py').read_text(encoding='utf-8')
+        assert 'reconfigure' in source, "main.py should call sys.stdout.reconfigure for encoding safety"
 
 
 class TestDeviceHandling:

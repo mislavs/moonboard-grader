@@ -19,6 +19,9 @@ training:
   use_scheduler: true
   label_smoothing: 0.1
   gradient_clip: 1.0
+  # Reproducibility (optional)
+  # reproducibility_seed: 42   # Seed Python, NumPy, and PyTorch RNGs
+  # deterministic: false        # Use deterministic algorithms (may reduce perf)
 
 # Data Configuration
 data:

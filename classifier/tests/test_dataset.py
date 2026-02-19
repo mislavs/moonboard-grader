@@ -331,6 +331,18 @@ class TestCreateDataSplits:
         
         with pytest.raises(ValueError, match="some classes have fewer than 2 samples"):
             create_data_splits(data, labels)
+
+    def test_minority_class_two_stage_failure_returns_domain_error(self):
+        """Class count=2 should fail early with actionable, non-sklearn message."""
+        data = np.random.rand(8, 3, 18, 11).astype(np.float32)
+        labels = np.array([0, 0, 1, 1, 1, 1, 1, 1])
+
+        with pytest.raises(ValueError) as exc:
+            create_data_splits(data, labels, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15)
+
+        msg = str(exc.value).lower()
+        assert "at least 3 samples per class" in msg
+        assert "least populated class" not in msg
     
     def test_returns_dataset_instances(self):
         """Test that function returns MoonboardDataset instances."""

@@ -412,16 +412,18 @@ class Predictor:
         if len(problems) == 0:
             raise ValueError("Problems list cannot be empty")
 
-        # Process each problem individually
-        # Note: We could optimize this by batching, but individual processing
-        # is more robust to varying problem sizes and easier to debug
+        # Process each problem individually, capturing per-item errors
+        # instead of aborting the entire batch on first failure.
         results = []
         for i, problem in enumerate(problems):
             try:
                 result = self.predict(problem, return_top_k=return_top_k)
                 results.append(result)
             except Exception as e:
-                raise ValueError(f"Failed to process problem {i}: {e}")
+                results.append({
+                    "error": str(e),
+                    "index": i,
+                })
 
         return results
 

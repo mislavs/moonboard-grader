@@ -295,17 +295,23 @@ class TestPredictBatch:
         with pytest.raises(ValueError, match="cannot be empty"):
             predictor.predict_batch([])
     
-    def test_predict_batch_with_invalid_problem(self, temp_checkpoint_fc):
-        """Test batch prediction with one invalid problem."""
+    def test_predict_batch_with_invalid_problem_returns_per_item_error(self, temp_checkpoint_fc):
+        """Mixed valid/invalid input returns full-length result list with per-item errors."""
         predictor = Predictor(temp_checkpoint_fc)
-        
+
         problems = [
             EXAMPLE_PROBLEM,
-            {'invalid': 'problem'}  # Missing moves
+            {'invalid': 'problem'},  # Missing moves
+            EXAMPLE_PROBLEM_2,
         ]
-        
-        with pytest.raises(ValueError, match="Failed to process problem"):
-            predictor.predict_batch(problems)
+
+        results = predictor.predict_batch(problems)
+
+        assert len(results) == 3, "Result list must match input length"
+        assert 'predicted_grade' in results[0]
+        assert 'error' in results[1]
+        assert results[1]['index'] == 1
+        assert 'predicted_grade' in results[2]
 
 
 class TestPredictFromTensor:

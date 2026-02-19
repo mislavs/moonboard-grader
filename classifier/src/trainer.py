@@ -275,7 +275,7 @@ class Trainer:
                           f"Train Loss: {train_loss:.4f} - "
                           f"Val Loss: {val_loss:.4f} - "
                           f"Val Acc: {val_accuracy:.4f} - "
-                          f"Val ±1 Acc: {val_tolerance_1_accuracy:.4f}")
+                          f"Val +-1 Acc: {val_tolerance_1_accuracy:.4f}")
                 else:
                     print(f"Epoch {epoch+1}/{num_epochs} - "
                           f"Train Loss: {train_loss:.4f}")
@@ -286,7 +286,7 @@ class Trainer:
                 self.epochs_without_improvement = 0
                 self.save_checkpoint('best_model.pth')
                 if verbose:
-                    print(f"  → New best validation loss: {val_loss:.4f} - Saved checkpoint")
+                    print(f"  -> New best validation loss: {val_loss:.4f} - Saved checkpoint")
             else:
                 self.epochs_without_improvement += 1
             
@@ -435,8 +435,8 @@ class Trainer:
 
 **Test Results:**
 - Exact Accuracy: {test_metrics['exact_accuracy']:.2f}%
-- ±1 Grade Accuracy: {test_metrics['tolerance_1_accuracy']:.2f}%
-- ±2 Grade Accuracy: {test_metrics['tolerance_2_accuracy']:.2f}%
+- +-1 Grade Accuracy: {test_metrics['tolerance_1_accuracy']:.2f}%
+- +-2 Grade Accuracy: {test_metrics['tolerance_2_accuracy']:.2f}%
 - Loss: {test_metrics['avg_loss']:.4f}
 """
         self.writer.add_text('Hyperparameters_and_Results', hparam_text, 0)

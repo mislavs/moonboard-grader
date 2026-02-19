@@ -207,6 +207,24 @@ Your training data should be a JSON file with the following structure:
   - `isStart`: Boolean indicating start hold
   - `isEnd`: Boolean indicating end/finish hold
 
+## Recommended Configuration
+
+The default `config.yaml` uses 19 output classes covering the full Font grade
+range (5+ to 8C+). However, the current Moonboard dataset contains approximately
+15 observed grades, with the majority concentrated in the 6A+ to 7C range.
+Training with extra never-seen classes wastes model capacity and can hurt
+calibration.
+
+**For best results, use `config_improved.yaml`** which filters to the 10 most
+populated grades (6A+ through 7C, indices 2-11) and sets `num_classes: 10`:
+
+```bash
+python main.py train --config config_improved.yaml
+```
+
+If you need the full grade range (e.g., after adding data for extreme grades),
+use `config.yaml` with `num_classes: 19` and `filter_grades: false`.
+
 ## Tips
 
 1. **Start with CNN model**: Generally performs better than fully connected for spatial patterns
@@ -349,6 +367,8 @@ training:
 | `focal_gamma` | float | `2.0` | Focusing parameter for focal loss. Higher values focus more on hard examples. Range: 1.5-3.0 |
 | `ordinal_weight` | float | `0.5` | Weight for the ordinal component when using combined losses. Range: 0.0-1.0 |
 | `ordinal_alpha` | float | `2.0` | Distance penalty for ordinal loss. Controls how much to penalize predictions far from the true grade |
+| `reproducibility_seed` | int | `null` | Seed all RNGs (Python, NumPy, PyTorch) for repeatable training runs. Omit to use default random state |
+| `deterministic` | bool | `false` | Force deterministic algorithms in PyTorch. May reduce performance. Only applies when `reproducibility_seed` is set |
 
 ### Data Configuration
 
@@ -378,6 +398,7 @@ data:
 | `max_grade_index` | int | `18` | Maximum grade index to include (18=8C+). Only used when `filter_grades` is true |
 | `filter_repeats` | bool | `false` | Enable filtering by number of times a problem has been repeated/logged |
 | `min_repeats` | int | `0` | Minimum number of repeats required. 0 = include all, 1 = exclude zero-repeat routes |
+| `group_by_layout` | bool | `false` | Group-aware splitting: ensures identical hold layouts stay in the same split. Prevents data leakage from duplicate problems. Disables stratified splitting in favour of group-based splitting |
 
 ### Checkpoint Configuration
 
