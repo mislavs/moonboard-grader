@@ -11,6 +11,7 @@ import { useBeta } from '../hooks/useBeta';
 import { useBoardSetupParams } from '../contexts/BoardSetupContext';
 import type { Problem } from '../types/problem';
 import { ERROR_MESSAGES } from '../config/api';
+import { BOARD_CONFIG } from '../config/board';
 
 export default function ViewMode() {
   const [selectedProblemId, setSelectedProblemId] = useState<number | null>(null);
@@ -20,6 +21,7 @@ export default function ViewMode() {
   const [showAttention, setShowAttention] = useState(false);
   const [showBeta, setShowBeta] = useState(false);
   const setupParams = useBoardSetupParams();
+  const boardPanelWidth = BOARD_CONFIG.width + 40;
   
   const { prediction, predicting, predict, reset: resetPrediction } = usePrediction();
   const { beta, loading: betaLoading, fetchBeta, reset: resetBeta } = useBeta();
@@ -123,9 +125,23 @@ export default function ViewMode() {
         </div>
 
         {/* Right Panel: MoonBoard */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4" style={{ width: boardPanelWidth }}>
           <div className="relative">
             {error && <ErrorMessage message={error} />}
+            {!problem && !error && (
+              <div className="relative bg-gray-800 rounded-lg shadow-2xl p-4">
+                <div
+                  className="relative border-4 border-gray-700 rounded overflow-hidden"
+                  style={{ width: BOARD_CONFIG.width, height: BOARD_CONFIG.height }}
+                >
+                  {(loading || selectedProblemId === null) && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                      <LoadingSpinner message="Loading problem..." />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             {problem && !error && (
               <MoonBoard
                 problem={problem}
