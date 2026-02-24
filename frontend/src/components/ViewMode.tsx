@@ -25,6 +25,8 @@ export default function ViewMode() {
   const { beta, loading: betaLoading, fetchBeta, reset: resetBeta } = useBeta();
 
   useEffect(() => {
+    let isCancelled = false;
+
     async function loadProblem() {
       if (selectedProblemId === null) {
         setProblem(null);
@@ -33,23 +35,33 @@ export default function ViewMode() {
       }
       
       try {
-        setProblem(null);
         setLoading(true);
         setError(null);
-        const problem = await fetchProblem(selectedProblemId);
-        setProblem(problem);
+        const loadedProblem = await fetchProblem(selectedProblemId);
+        if (!isCancelled) {
+          setProblem(loadedProblem);
+        }
       } catch (err) {
+        if (isCancelled) {
+          return;
+        }
         const errorMessage = err instanceof ApiError 
           ? err.message 
           : ERROR_MESSAGES.PROBLEM_LOAD_FAILED;
         setError(errorMessage);
         console.error('Failed to load problem:', err);
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     }
 
     loadProblem();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [selectedProblemId]);
 
   // Reset prediction and beta when problem changes
@@ -89,7 +101,7 @@ export default function ViewMode() {
   };
 
   const handleProblemSelect = (problemId: number) => {
-    setSelectedProblemId(problemId);
+    setSelectedProblemId((current) => (current === problemId ? current : problemId));
   };
 
   const handleFirstProblemLoaded = useCallback((problemId: number) => {
