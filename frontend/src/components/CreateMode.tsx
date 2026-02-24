@@ -12,6 +12,7 @@ import { useBeta } from "../hooks/useBeta";
 import { useDuplicateCheck } from "../hooks/useDuplicateCheck";
 import { useBackendHealth } from "../hooks/useBackendHealth";
 import { useGeneration } from "../hooks/useGeneration";
+import { useBoardSetupParams } from "../contexts/BoardSetupContext";
 import type { Move } from "../types/problem";
 import { ERROR_MESSAGES } from "../config/api";
 import { AVAILABLE_GRADES } from "../constants/grades";
@@ -39,13 +40,13 @@ export default function CreateMode() {
     reset: resetGenerate,
   } = useGeneration();
   const backendHealthy = useBackendHealth();
+  const setupParams = useBoardSetupParams();
 
   // Clear duplicate result and beta when moves change
   useEffect(() => {
     resetDuplicate();
     resetBeta();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createdMoves]);
+  }, [createdMoves, resetDuplicate, resetBeta]);
 
   const handleClearAll = () => {
     setCreatedMoves([]);
@@ -58,12 +59,12 @@ export default function CreateMode() {
   const handleToggleBeta = async (checked: boolean) => {
     setShowBeta(checked);
     if (checked && createdMoves.length > 0 && !beta) {
-      await fetchBeta(createdMoves);
+      await fetchBeta(createdMoves, setupParams);
     }
   };
 
   const handlePredictGrade = async () => {
-    await predict(createdMoves);
+    await predict(createdMoves, setupParams);
   };
 
   const handleCheckDuplicate = async () => {
@@ -77,7 +78,7 @@ export default function CreateMode() {
     resetGenerate();
 
     // Generate new problem with selected grade
-    const result = await generate(selectedGrade);
+    const result = await generate(selectedGrade, 1.0, setupParams);
     if (result) {
       setCreatedMoves(result.moves);
     }

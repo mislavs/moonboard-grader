@@ -5,17 +5,20 @@ import PaginationControls from './PaginationControls';
 import BenchmarkFilter from './BenchmarkFilter';
 import GradeFilter from './GradeFilter';
 import { useProblems } from '../hooks/useProblems';
+import type { BoardSetupParams } from '../services/api';
 
 interface ProblemNavigatorProps {
   selectedProblemId: number | null;
   onProblemSelect: (problemId: number) => void;
   onFirstProblemLoaded?: (problemId: number) => void;
+  setupParams?: BoardSetupParams;
 }
 
 export default function ProblemNavigator({
   selectedProblemId,
   onProblemSelect,
   onFirstProblemLoaded,
+  setupParams,
 }: ProblemNavigatorProps) {
   const {
     problems,
@@ -33,7 +36,7 @@ export default function ProblemNavigator({
     gradeTo,
     setGradeFrom,
     setGradeTo,
-  } = useProblems(onFirstProblemLoaded);
+  } = useProblems(onFirstProblemLoaded, setupParams);
 
   return (
     <div className="bg-gray-800 rounded-lg p-4 shadow-lg flex flex-col relative" style={{ height: '976px' }}>

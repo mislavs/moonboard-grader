@@ -7,6 +7,7 @@
 
 import { useMemo, type ReactElement } from "react";
 import { BOARD_CONFIG } from "../config/board";
+import { getHeatmapColor } from "../constants/heatmapColors";
 
 const GRID_ROWS = 18;
 const GRID_COLS = 11;
@@ -31,30 +32,6 @@ interface DifficultyHeatmapProps {
   onHoldClick?: (position: string) => void;
   /** Callback when hovering over a hold */
   onHoldHover?: (position: string | null) => void;
-}
-
-/**
- * Convert normalized value (0-1) to a color on a blue-white-red scale
- * Blue = easy (low values), Red = hard (high values)
- */
-function getHeatmapColor(value: number): string {
-  const v = Math.max(0, Math.min(1, value));
-
-  if (v < 0.5) {
-    // Blue (59, 130, 246) to White (255, 255, 255)
-    const t = v * 2;
-    const r = Math.round(59 + (255 - 59) * t);
-    const g = Math.round(130 + (255 - 130) * t);
-    const b = Math.round(246 + (255 - 246) * t);
-    return `rgb(${r},${g},${b})`;
-  } else {
-    // White (255, 255, 255) to Red (239, 68, 68)
-    const t = (v - 0.5) * 2;
-    const r = Math.round(255 + (239 - 255) * t);
-    const g = Math.round(255 + (68 - 255) * t);
-    const b = Math.round(255 + (68 - 255) * t);
-    return `rgb(${r},${g},${b})`;
-  }
 }
 
 /**

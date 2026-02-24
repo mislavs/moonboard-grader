@@ -1,5 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
-import { fetchProblems, type ProblemSummary, ApiError } from '../services/api';
+import {
+  fetchProblems,
+  type ProblemSummary,
+  ApiError,
+  type BoardSetupParams,
+} from '../services/api';
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -22,7 +27,8 @@ interface UseProblemsReturn {
 }
 
 export function useProblems(
-  onFirstLoad?: (firstProblemId: number) => void
+  onFirstLoad?: (firstProblemId: number) => void,
+  setupParams?: BoardSetupParams
 ): UseProblemsReturn {
   const [problems, setProblems] = useState<ProblemSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,11 +40,22 @@ export function useProblems(
   const [gradeTo, setGradeTo] = useState<string | null>(null);
 
   useEffect(() => {
+    setPage(1);
+  }, [setupParams]);
+
+  useEffect(() => {
     async function loadProblems() {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetchProblems(page, DEFAULT_PAGE_SIZE, benchmarkFilter, gradeFrom, gradeTo);
+        const response = await fetchProblems(
+          page,
+          DEFAULT_PAGE_SIZE,
+          benchmarkFilter,
+          gradeFrom,
+          gradeTo,
+          setupParams
+        );
         
         setProblems(response.items);
         setTotalPages(response.total_pages);
@@ -58,8 +75,7 @@ export function useProblems(
     }
 
     loadProblems();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, benchmarkFilter, gradeFrom, gradeTo]);
+  }, [page, benchmarkFilter, gradeFrom, gradeTo, setupParams, onFirstLoad]);
 
   const goToNextPage = useCallback(() => {
     setPage((prev) => Math.min(prev + 1, totalPages));

@@ -7,6 +7,7 @@
 
 import { useMemo, type ReactElement } from "react";
 import { BOARD_CONFIG } from "../config/board";
+import { getHeatmapColor } from "../constants/heatmapColors";
 
 const GRID_ROWS = 18;
 const GRID_COLS = 11;
@@ -16,31 +17,6 @@ interface AttentionHeatmapProps {
   attentionMap: number[][];
   /** Opacity of the heatmap overlay (0-1) */
   opacity?: number;
-}
-
-/**
- * Convert attention value (0-1) to a color on a blue-white-red scale
- * Uses the same colors defined in constants/heatmapColors.ts
- */
-function getHeatmapColor(value: number): string {
-  // Clamp value to 0-1 range
-  const v = Math.max(0, Math.min(1, value));
-
-  if (v < 0.5) {
-    // Blue (0,0,255) to White (255,255,255)
-    const t = v * 2;
-    const r = Math.round(255 * t);
-    const g = Math.round(255 * t);
-    const b = 255;
-    return `rgb(${r},${g},${b})`;
-  } else {
-    // White (255,255,255) to Red (255,0,0)
-    const t = (v - 0.5) * 2;
-    const r = 255;
-    const g = Math.round(255 * (1 - t));
-    const b = Math.round(255 * (1 - t));
-    return `rgb(${r},${g},${b})`;
-  }
 }
 
 /**

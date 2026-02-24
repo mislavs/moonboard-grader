@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   type ReactNode,
 } from 'react';
 import type {
@@ -11,6 +12,7 @@ import type {
   AngleConfig,
   BoardSetupsResponse,
 } from '../types/boardSetup';
+import type { BoardSetupParams } from '../services/api';
 import { fetchBoardSetups } from '../services/api';
 
 const STORAGE_KEY = 'moonboard-selected-setup';
@@ -191,4 +193,20 @@ export function useBoardSetup(): BoardSetupContextType {
     throw new Error('useBoardSetup must be used within a BoardSetupProvider');
   }
   return context;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useBoardSetupParams(): BoardSetupParams | undefined {
+  const { currentHoldSetup, currentAngle } = useBoardSetup();
+
+  return useMemo(() => {
+    if (!currentHoldSetup || !currentAngle) {
+      return undefined;
+    }
+
+    return {
+      holdSetupId: currentHoldSetup.id,
+      angle: currentAngle.angle,
+    };
+  }, [currentHoldSetup, currentAngle]);
 }

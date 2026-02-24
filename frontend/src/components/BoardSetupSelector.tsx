@@ -91,15 +91,6 @@ export default function BoardSetupSelector() {
           </select>
         </div>
       )}
-
-      {/* Show current selection if only one of each */}
-      {holdSetups.length === 1 && availableAngles.length === 1 && (
-        <div className="inline-flex items-center gap-2 px-3 py-1 bg-gray-800 rounded-full text-sm">
-          <span className="text-gray-300">{currentHoldSetup.name}</span>
-          <span className="text-gray-500">|</span>
-          <span className="text-gray-400">{currentAngle.angle}°</span>
-        </div>
-      )}
     </div>
   );
 }

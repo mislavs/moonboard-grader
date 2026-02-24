@@ -3,7 +3,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { predictGrade, ApiError } from '../services/api';
+import { predictGrade, ApiError, type BoardSetupParams } from '../services/api';
 import type { Move } from '../types/problem';
 import type { PredictionResponse } from '../types/prediction';
 import { PREDICTION_TOP_K, ERROR_MESSAGES } from '../config/api';
@@ -13,7 +13,7 @@ export function usePrediction() {
   const [predicting, setPredicting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const predict = useCallback(async (moves: Move[]) => {
+  const predict = useCallback(async (moves: Move[], setupParams?: BoardSetupParams) => {
     if (moves.length === 0) {
       return;
     }
@@ -21,7 +21,7 @@ export function usePrediction() {
     try {
       setPredicting(true);
       setError(null);
-      const result = await predictGrade(moves, PREDICTION_TOP_K);
+      const result = await predictGrade(moves, PREDICTION_TOP_K, setupParams);
       setPrediction(result);
     } catch (err) {
       const errorMessage = err instanceof ApiError 

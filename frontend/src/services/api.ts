@@ -284,7 +284,10 @@ export async function fetchBoardAnalytics(
 /**
  * Solve beta for a climbing problem
  */
-export async function solveBeta(moves: Move[]): Promise<BetaResponse> {
+export async function solveBeta(
+  moves: Move[],
+  setupParams?: BoardSetupParams
+): Promise<BetaResponse> {
   const requestBody = {
     moves: moves.map(m => ({
       description: m.description,
@@ -293,7 +296,7 @@ export async function solveBeta(moves: Move[]): Promise<BetaResponse> {
     })),
   };
 
-  const url = `${BETA_API_BASE_URL}/solve`;
+  const url = appendSetupParams(`${BETA_API_BASE_URL}/solve`, setupParams);
   return tracedApiFetch<BetaResponse>(url, 'POST /solve', {
     method: 'POST',
     headers: {

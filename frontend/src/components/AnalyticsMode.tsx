@@ -17,6 +17,7 @@ import DifficultyHeatmap from "./DifficultyHeatmap";
 import HoldDetailsPanel from "./HoldDetailsPanel";
 import LoadingSpinner from "./LoadingSpinner";
 import ErrorMessage from "./ErrorMessage";
+import { useBoardSetupParams } from "../contexts/BoardSetupContext";
 import moonboardImage from "../assets/moonboard.jpg";
 
 const METRIC_OPTIONS: { value: HeatmapMetric; label: string }[] = [
@@ -96,6 +97,7 @@ export default function AnalyticsMode() {
   const [selectedMetric, setSelectedMetric] = useState<HeatmapMetric>("meanGrade");
   const [selectedHold, setSelectedHold] = useState<string | null>(null);
   const [hoveredHold, setHoveredHold] = useState<string | null>(null);
+  const setupParams = useBoardSetupParams();
 
   // Fetch analytics data on mount
   useEffect(() => {
@@ -103,7 +105,7 @@ export default function AnalyticsMode() {
       try {
         setLoading(true);
         setError(null);
-        const data = await fetchBoardAnalytics();
+        const data = await fetchBoardAnalytics(setupParams);
         setAnalytics(data);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load analytics";
@@ -115,7 +117,7 @@ export default function AnalyticsMode() {
     }
 
     loadAnalytics();
-  }, []);
+  }, [setupParams]);
 
   // Get the current heatmap data based on selected metric
   const currentHeatmap = analytics?.heatmaps[selectedMetric] ?? null;

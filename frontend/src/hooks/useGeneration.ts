@@ -2,8 +2,13 @@
  * Custom hook for managing problem generation state and logic
  */
 
-import { useState } from 'react';
-import { generateProblem, ApiError, type GenerateResponse } from '../services/api';
+import { useState, useCallback } from 'react';
+import {
+  generateProblem,
+  ApiError,
+  type GenerateResponse,
+  type BoardSetupParams,
+} from '../services/api';
 import { ERROR_MESSAGES } from '../config/api';
 
 export function useGeneration() {
@@ -11,11 +16,15 @@ export function useGeneration() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const generate = async (grade: string = '6A+', temperature: number = 1.0) => {
+  const generate = useCallback(async (
+    grade: string = '6A+',
+    temperature: number = 1.0,
+    setupParams?: BoardSetupParams
+  ) => {
     try {
       setGenerating(true);
       setError(null);
-      const result = await generateProblem(grade, temperature);
+      const result = await generateProblem(grade, temperature, setupParams);
       setGenerated(result);
       return result;
     } catch (err) {
@@ -28,12 +37,12 @@ export function useGeneration() {
     } finally {
       setGenerating(false);
     }
-  };
+  }, []);
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setGenerated(null);
     setError(null);
-  };
+  }, []);
 
   return {
     generated,

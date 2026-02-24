@@ -3,7 +3,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { solveBeta, ApiError } from '../services/api';
+import { solveBeta, ApiError, type BoardSetupParams } from '../services/api';
 import type { Move } from '../types/problem';
 import type { BetaResponse } from '../types/beta';
 
@@ -12,7 +12,10 @@ export function useBeta() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchBeta = useCallback(async (moves: Move[]) => {
+  const fetchBeta = useCallback(async (
+    moves: Move[],
+    setupParams?: BoardSetupParams
+  ) => {
     if (moves.length === 0) {
       return;
     }
@@ -20,7 +23,7 @@ export function useBeta() {
     try {
       setLoading(true);
       setError(null);
-      const result = await solveBeta(moves);
+      const result = await solveBeta(moves, setupParams);
       setBeta(result);
     } catch (err) {
       const errorMessage = err instanceof ApiError 

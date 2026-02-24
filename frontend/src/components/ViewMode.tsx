@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import MoonBoard from './MoonBoard';
 import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
@@ -8,16 +8,18 @@ import BetaToggle from './BetaToggle';
 import { fetchProblem, ApiError } from '../services/api';
 import { usePrediction } from '../hooks/usePrediction';
 import { useBeta } from '../hooks/useBeta';
+import { useBoardSetupParams } from '../contexts/BoardSetupContext';
 import type { Problem } from '../types/problem';
 import { ERROR_MESSAGES } from '../config/api';
 
 export default function ViewMode() {
   const [selectedProblemId, setSelectedProblemId] = useState<number | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAttention, setShowAttention] = useState(false);
   const [showBeta, setShowBeta] = useState(false);
+  const setupParams = useBoardSetupParams();
   
   const { prediction, predicting, predict, reset: resetPrediction } = usePrediction();
   const { beta, loading: betaLoading, fetchBeta, reset: resetBeta } = useBeta();
@@ -25,10 +27,13 @@ export default function ViewMode() {
   useEffect(() => {
     async function loadProblem() {
       if (selectedProblemId === null) {
+        setProblem(null);
+        setLoading(false);
         return;
       }
       
       try {
+        setProblem(null);
         setLoading(true);
         setError(null);
         const problem = await fetchProblem(selectedProblemId);
@@ -51,27 +56,27 @@ export default function ViewMode() {
   useEffect(() => {
     resetPrediction();
     resetBeta();
-  }, [selectedProblemId, resetPrediction, resetBeta]);
+  }, [selectedProblemId, setupParams, resetPrediction, resetBeta]);
 
   // Auto-fetch heatmap when problem loads and toggle is on
   useEffect(() => {
     if (showAttention && problem && !predicting && !prediction?.attention_map) {
-      predict(problem.moves);
+      predict(problem.moves, setupParams);
     }
-  }, [problem, showAttention, predicting, prediction?.attention_map, predict]);
+  }, [problem, showAttention, predicting, prediction?.attention_map, predict, setupParams]);
 
   // Auto-fetch beta when problem loads and toggle is on
   useEffect(() => {
     if (showBeta && problem && !betaLoading && !beta && !loading) {
-      fetchBeta(problem.moves);
+      fetchBeta(problem.moves, setupParams);
     }
-  }, [problem, showBeta, betaLoading, beta, fetchBeta, loading]);
+  }, [problem, showBeta, betaLoading, beta, fetchBeta, loading, setupParams]);
 
   // Fetch attention map when toggle is turned on
   const handleToggleAttention = async (checked: boolean) => {
     setShowAttention(checked);
     if (checked && problem && !prediction?.attention_map) {
-      await predict(problem.moves);
+      await predict(problem.moves, setupParams);
     }
   };
 
@@ -79,7 +84,7 @@ export default function ViewMode() {
   const handleToggleBeta = async (checked: boolean) => {
     setShowBeta(checked);
     if (checked && problem && !beta) {
-      await fetchBeta(problem.moves);
+      await fetchBeta(problem.moves, setupParams);
     }
   };
 
@@ -87,11 +92,9 @@ export default function ViewMode() {
     setSelectedProblemId(problemId);
   };
 
-  const handleFirstProblemLoaded = (problemId: number) => {
-    if (selectedProblemId === null) {
-      setSelectedProblemId(problemId);
-    }
-  };
+  const handleFirstProblemLoaded = useCallback((problemId: number) => {
+    setSelectedProblemId((current) => current ?? problemId);
+  }, []);
 
   return (
     <div className="flex flex-col items-center gap-6">
@@ -103,6 +106,7 @@ export default function ViewMode() {
             selectedProblemId={selectedProblemId}
             onProblemSelect={handleProblemSelect}
             onFirstProblemLoaded={handleFirstProblemLoaded}
+            setupParams={setupParams}
           />
         </div>
 
