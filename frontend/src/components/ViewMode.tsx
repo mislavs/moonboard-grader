@@ -138,9 +138,9 @@ export default function ViewMode() {
             )}
             
             {/* Loading Overlay */}
-            {(loading || predicting || betaLoading) && (
+            {(predicting || betaLoading) && (
               <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center z-10">
-                <LoadingSpinner message={betaLoading ? "Loading beta..." : predicting ? "Loading heatmap..." : "Loading problem..."} />
+                <LoadingSpinner message={betaLoading ? "Loading beta..." : "Loading heatmap..."} />
               </div>
             )}
           </div>
