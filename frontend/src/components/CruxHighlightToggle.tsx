@@ -12,20 +12,26 @@ interface CruxHighlightToggleProps {
   checked: boolean;
   /** Callback when toggle state changes */
   onChange: (checked: boolean) => void;
+  /** Whether the toggle is disabled */
+  disabled?: boolean;
 }
 
 export default function CruxHighlightToggle({
   checked,
   onChange,
+  disabled = false,
 }: CruxHighlightToggleProps) {
   return (
     <div className="bg-gray-800 rounded-lg px-4 py-3 border border-gray-700">
-      <label className="flex items-center gap-3 text-gray-300 cursor-pointer select-none">
+      <label
+        className={`flex items-center gap-3 text-gray-300 select-none ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+      >
         <input
           type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          className="w-5 h-5 rounded border-gray-600 bg-gray-700 text-green-500 focus:ring-green-500 focus:ring-offset-gray-800 cursor-pointer"
+          disabled={disabled}
+          className={`w-5 h-5 rounded border-gray-600 bg-gray-700 text-green-500 focus:ring-green-500 focus:ring-offset-gray-800 ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
         />
         <span className="text-sm font-medium">Show Crux Highlight</span>
       </label>

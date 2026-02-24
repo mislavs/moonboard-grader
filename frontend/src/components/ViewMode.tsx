@@ -22,6 +22,14 @@ export default function ViewMode() {
   const [showBeta, setShowBeta] = useState(false);
   const setupParams = useBoardSetupParams();
   const boardPanelWidth = BOARD_CONFIG.width + 40;
+  const displayProblem: Problem = problem ?? {
+    id: -1,
+    name: '',
+    grade: '',
+    setby: '',
+    repeats: 0,
+    moves: [],
+  };
   
   const { prediction, predicting, predict, reset: resetPrediction } = usePrediction();
   const { beta, loading: betaLoading, fetchBeta, reset: resetBeta } = useBeta();
@@ -128,23 +136,9 @@ export default function ViewMode() {
         <div className="flex flex-col gap-4" style={{ width: boardPanelWidth }}>
           <div className="relative">
             {error && <ErrorMessage message={error} />}
-            {!problem && !error && (
-              <div className="relative bg-gray-800 rounded-lg shadow-2xl p-4">
-                <div
-                  className="relative border-4 border-gray-700 rounded overflow-hidden"
-                  style={{ width: BOARD_CONFIG.width, height: BOARD_CONFIG.height }}
-                >
-                  {(loading || selectedProblemId === null) && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                      <LoadingSpinner message="Loading problem..." />
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            {problem && !error && (
+            {!error && (
               <MoonBoard
-                problem={problem}
+                problem={displayProblem}
                 mode="view"
                 attentionMap={prediction?.attention_map}
                 showAttention={showAttention}
@@ -162,18 +156,20 @@ export default function ViewMode() {
           </div>
 
           {/* Crux Highlight Toggle */}
-          {problem && !error && (
+          {!error && (
             <CruxHighlightToggle
               checked={showAttention}
               onChange={handleToggleAttention}
+              disabled={!problem}
             />
           )}
 
           {/* Beta Toggle */}
-          {problem && !error && (
+          {!error && (
             <BetaToggle
               checked={showBeta}
               onChange={handleToggleBeta}
+              disabled={!problem}
             />
           )}
         </div>
