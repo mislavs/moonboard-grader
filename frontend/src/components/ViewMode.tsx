@@ -8,7 +8,10 @@ import BetaToggle from './BetaToggle';
 import { fetchProblem, ApiError } from '../services/api';
 import { usePrediction } from '../hooks/usePrediction';
 import { useBeta } from '../hooks/useBeta';
-import { useBoardSetupParams } from '../contexts/BoardSetupContext';
+import {
+  useBoardSetup,
+  useBoardSetupParams,
+} from '../contexts/BoardSetupContext';
 import type { Problem } from '../types/problem';
 import { ERROR_MESSAGES } from '../config/api';
 import { BOARD_CONFIG } from '../config/board';
@@ -20,6 +23,7 @@ export default function ViewMode() {
   const [error, setError] = useState<string | null>(null);
   const [showAttention, setShowAttention] = useState(false);
   const [showBeta, setShowBeta] = useState(false);
+  const { currentHoldSetup } = useBoardSetup();
   const setupParams = useBoardSetupParams();
   const boardPanelWidth = BOARD_CONFIG.width + 40;
   const displayProblem: Problem = problem ?? {
@@ -79,6 +83,13 @@ export default function ViewMode() {
     resetPrediction();
     resetBeta();
   }, [selectedProblemId, setupParams, resetPrediction, resetBeta]);
+
+  useEffect(() => {
+    if (currentHoldSetup?.betaSolvingSupported === false) {
+      setShowBeta(false);
+      resetBeta();
+    }
+  }, [currentHoldSetup, resetBeta]);
 
   // Auto-fetch heatmap when problem loads and toggle is on
   useEffect(() => {
@@ -140,6 +151,7 @@ export default function ViewMode() {
               <MoonBoard
                 problem={displayProblem}
                 mode="view"
+                boardImage={currentHoldSetup?.boardImage}
                 attentionMap={prediction?.attention_map}
                 showAttention={showAttention}
                 beta={beta ?? undefined}
@@ -165,7 +177,7 @@ export default function ViewMode() {
           )}
 
           {/* Beta Toggle */}
-          {!error && (
+          {!error && (currentHoldSetup?.betaSolvingSupported ?? true) && (
             <BetaToggle
               checked={showBeta}
               onChange={handleToggleBeta}

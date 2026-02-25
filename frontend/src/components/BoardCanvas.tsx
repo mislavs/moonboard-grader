@@ -16,6 +16,7 @@ interface BoardCanvasViewProps {
   moves: Move[];
   mode: "view";
   onMovesChange?: never;
+  boardImage?: string | null;
   attentionMap?: number[][];
   showAttention?: boolean;
   beta?: BetaResponse;
@@ -26,6 +27,7 @@ interface BoardCanvasCreateProps {
   moves: Move[];
   mode: "create";
   onMovesChange: (moves: Move[]) => void;
+  boardImage?: string | null;
   attentionMap?: number[][];
   showAttention?: boolean;
   beta?: BetaResponse;
@@ -39,12 +41,14 @@ export default function BoardCanvas(props: BoardCanvasProps) {
     moves,
     mode,
     onMovesChange,
+    boardImage,
     attentionMap,
     showAttention = false,
     beta,
     showBeta = false,
   } = props;
   const { width, height, holdRadius } = BOARD_CONFIG;
+  const imageSrc = boardImage ? `/boards/${boardImage}` : moonboardImage;
 
   // Build lookup map from hold description to hand assignments (can have both hands on same hold)
   const holdToHands = new Map<string, Set<"LH" | "RH">>();
@@ -92,7 +96,7 @@ export default function BoardCanvas(props: BoardCanvasProps) {
     <div className="relative border-4 border-gray-700 rounded overflow-hidden">
       {/* Background Image */}
       <img
-        src={moonboardImage}
+        src={imageSrc}
         alt="Moonboard"
         className="absolute inset-0 w-full h-full object-cover"
         style={{ width, height }}

@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(py -m pytest moonboard_core/tests/test_board_config.py -v)",
+      "Bash(py -m pytest tests/test_board_setups.py -v)",
+      "Bash(npm run build:*)",
+      "Bash(npm run lint:*)",
+      "Bash(dotnet test:*)",
+      "Bash(py -m pytest:*)",
+      "mcp__aspire__list_resources",
+      "mcp__aspire__list_structured_logs",
+      "mcp__aspire__list_console_logs",
+      "mcp__aspire__list_traces",
+      "Bash(find:*)",
+      "Bash(uv sync:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(npm install)",
+      "Bash(npm install:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "aspire"
+  ]
+}

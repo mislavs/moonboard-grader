@@ -6,6 +6,7 @@ import BoardLegend from "./BoardLegend";
 interface MoonBoardViewProps {
   problem: Problem;
   mode: "view";
+  boardImage?: string | null;
   attentionMap?: number[][];
   showAttention?: boolean;
   beta?: BetaResponse;
@@ -16,6 +17,7 @@ interface MoonBoardCreateProps {
   moves: Move[];
   mode: "create";
   onMovesChange: (moves: Move[]) => void;
+  boardImage?: string | null;
   attentionMap?: number[][];
   showAttention?: boolean;
   beta?: BetaResponse;
@@ -25,7 +27,7 @@ interface MoonBoardCreateProps {
 type MoonBoardProps = MoonBoardViewProps | MoonBoardCreateProps;
 
 export default function MoonBoard(props: MoonBoardProps) {
-  const { attentionMap, showAttention, beta, showBeta } = props;
+  const { boardImage, attentionMap, showAttention, beta, showBeta } = props;
 
   return (
     <div className="flex flex-col items-center gap-6">
@@ -35,6 +37,7 @@ export default function MoonBoard(props: MoonBoardProps) {
           <BoardCanvas
             moves={props.problem.moves}
             mode="view"
+            boardImage={boardImage}
             attentionMap={attentionMap}
             showAttention={showAttention}
             beta={beta}
@@ -45,6 +48,7 @@ export default function MoonBoard(props: MoonBoardProps) {
             moves={props.moves}
             mode="create"
             onMovesChange={props.onMovesChange}
+            boardImage={boardImage}
             attentionMap={attentionMap}
             showAttention={showAttention}
             beta={beta}

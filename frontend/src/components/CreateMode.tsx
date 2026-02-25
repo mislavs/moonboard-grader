@@ -12,7 +12,10 @@ import { useBeta } from "../hooks/useBeta";
 import { useDuplicateCheck } from "../hooks/useDuplicateCheck";
 import { useBackendHealth } from "../hooks/useBackendHealth";
 import { useGeneration } from "../hooks/useGeneration";
-import { useBoardSetupParams } from "../contexts/BoardSetupContext";
+import {
+  useBoardSetup,
+  useBoardSetupParams,
+} from "../contexts/BoardSetupContext";
 import type { Move } from "../types/problem";
 import { ERROR_MESSAGES } from "../config/api";
 import { AVAILABLE_GRADES } from "../constants/grades";
@@ -24,6 +27,7 @@ export default function CreateMode() {
   );
   const [showAttention, setShowAttention] = useState(false);
   const [showBeta, setShowBeta] = useState(false);
+  const { currentHoldSetup } = useBoardSetup();
   const { prediction, predicting, error, predict, reset } = usePrediction();
   const { beta, loading: betaLoading, fetchBeta, reset: resetBeta } = useBeta();
   const {
@@ -47,6 +51,13 @@ export default function CreateMode() {
     resetDuplicate();
     resetBeta();
   }, [createdMoves, resetDuplicate, resetBeta]);
+
+  useEffect(() => {
+    if (currentHoldSetup?.betaSolvingSupported === false) {
+      setShowBeta(false);
+      resetBeta();
+    }
+  }, [currentHoldSetup, resetBeta]);
 
   const handleClearAll = () => {
     setCreatedMoves([]);
@@ -145,6 +156,7 @@ export default function CreateMode() {
           <MoonBoard
             moves={createdMoves}
             mode="create"
+            boardImage={currentHoldSetup?.boardImage}
             onMovesChange={setCreatedMoves}
             attentionMap={prediction?.attention_map}
             showAttention={showAttention}
@@ -161,7 +173,7 @@ export default function CreateMode() {
           )}
 
           {/* Beta Toggle */}
-          {createdMoves.length > 0 && (
+          {createdMoves.length > 0 && (currentHoldSetup?.betaSolvingSupported ?? true) && (
             <BetaToggle
               checked={showBeta}
               onChange={handleToggleBeta}
@@ -169,7 +181,7 @@ export default function CreateMode() {
           )}
 
           {/* Beta Loading */}
-          {betaLoading && (
+          {(currentHoldSetup?.betaSolvingSupported ?? true) && betaLoading && (
             <LoadingSpinner message="Loading beta..." />
           )}
         </div>

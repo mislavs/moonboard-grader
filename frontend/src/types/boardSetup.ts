@@ -6,6 +6,10 @@ export interface AngleConfig {
   angle: number;
   /** Whether a trained model exists for this configuration */
   hasModel: boolean;
+  /** Whether a generator model exists for this configuration */
+  hasGenerator: boolean;
+  /** Whether analytics data exists for this configuration */
+  hasAnalytics: boolean;
   /** Whether this is the default configuration */
   isDefault: boolean;
 }
@@ -18,6 +22,10 @@ export interface HoldSetup {
   id: string;
   /** Display name for the hold setup */
   name: string;
+  /** Whether beta solving is supported for this setup */
+  betaSolvingSupported: boolean;
+  /** Optional board image filename from public/boards */
+  boardImage: string | null;
   /** Available wall angles for this hold setup */
   angles: AngleConfig[];
 }

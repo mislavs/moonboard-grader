@@ -17,7 +17,10 @@ import DifficultyHeatmap from "./DifficultyHeatmap";
 import HoldDetailsPanel from "./HoldDetailsPanel";
 import LoadingSpinner from "./LoadingSpinner";
 import ErrorMessage from "./ErrorMessage";
-import { useBoardSetupParams } from "../contexts/BoardSetupContext";
+import {
+  useBoardSetup,
+  useBoardSetupParams,
+} from "../contexts/BoardSetupContext";
 import moonboardImage from "../assets/moonboard.jpg";
 
 const METRIC_OPTIONS: { value: HeatmapMetric; label: string }[] = [
@@ -97,7 +100,11 @@ export default function AnalyticsMode() {
   const [selectedMetric, setSelectedMetric] = useState<HeatmapMetric>("meanGrade");
   const [selectedHold, setSelectedHold] = useState<string | null>(null);
   const [hoveredHold, setHoveredHold] = useState<string | null>(null);
+  const { currentHoldSetup } = useBoardSetup();
   const setupParams = useBoardSetupParams();
+  const imageSrc = currentHoldSetup?.boardImage
+    ? `/boards/${currentHoldSetup.boardImage}`
+    : moonboardImage;
 
   // Fetch analytics data on mount
   useEffect(() => {
@@ -194,7 +201,7 @@ export default function AnalyticsMode() {
             >
               {/* Background Image */}
               <img
-                src={moonboardImage}
+                src={imageSrc}
                 alt="Moonboard"
                 className="absolute inset-0 w-full h-full object-cover"
                 style={{ width, height }}
