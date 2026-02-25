@@ -93,9 +93,9 @@ Add to dependencies:
 
 ---
 
-## Step 2: Frontend (React/Vite)
+## Step 2: Frontend (React/Vite) ✅
 
-### 2.1 Add npm packages
+### 2.1 Add npm packages ✅
 
 **File:** `frontend/package.json`
 
@@ -111,7 +111,7 @@ Add to dependencies:
 }
 ```
 
-### 2.2 Create telemetry setup
+### 2.2 Create telemetry setup ✅
 
 **New file:** `frontend/src/telemetry/setup.ts`
 
@@ -121,7 +121,7 @@ Add to dependencies:
 - Set service name: `moonboard-frontend`
 - Export function to get current trace context for manual propagation
 
-### 2.3 Configure OTLP endpoint proxy
+### 2.3 Configure OTLP endpoint proxy ✅
 
 **File:** `frontend/vite.config.ts`
 
@@ -134,14 +134,14 @@ Add proxy for OTLP endpoint to avoid CORS issues:
 }
 ```
 
-### 2.4 Initialize telemetry
+### 2.4 Initialize telemetry ✅
 
 **File:** `frontend/src/main.tsx`
 
 - Import and call telemetry setup before React renders
 - Ensure telemetry is initialized early
 
-### 2.5 Update error handling in hooks
+### 2.5 Update error handling in hooks ✅
 
 Files to update (replace `console.error` with span exception recording):
 - `frontend/src/hooks/usePrediction.ts`
