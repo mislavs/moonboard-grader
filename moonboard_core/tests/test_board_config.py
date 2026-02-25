@@ -108,11 +108,15 @@ class TestAngleConfig:
             angle=40,
             data_file="data/problems.json",
             model_file="models/model.pth",
+            generator_model_file="models/generator_model.pth",
+            analytics_file="data/hold_stats.json",
             is_default=True
         )
         assert config.angle == 40
         assert config.data_file == "data/problems.json"
         assert config.model_file == "models/model.pth"
+        assert config.generator_model_file == "models/generator_model.pth"
+        assert config.analytics_file == "data/hold_stats.json"
         assert config.is_default is True
 
     def test_angle_config_default_is_default(self):
@@ -122,6 +126,8 @@ class TestAngleConfig:
             data_file="data/problems.json",
             model_file=None
         )
+        assert config.generator_model_file is None
+        assert config.analytics_file is None
         assert config.is_default is False
 
     def test_angle_config_immutable(self):
@@ -140,12 +146,23 @@ class TestHoldSetup:
         setup = HoldSetup(
             id="test-setup",
             name="Test Setup",
-            angles=(angle,)
+            angles=(angle,),
+            board_image="custom-board.jpg",
+            beta_solving_supported=False
         )
         assert setup.id == "test-setup"
         assert setup.name == "Test Setup"
         assert len(setup.angles) == 1
         assert setup.angles[0].angle == 40
+        assert setup.board_image == "custom-board.jpg"
+        assert setup.beta_solving_supported is False
+
+    def test_hold_setup_defaults(self):
+        """Test HoldSetup default values for optional fields."""
+        angle = AngleConfig(angle=40, data_file="test.json", model_file=None)
+        setup = HoldSetup(id="test-setup", name="Test Setup", angles=(angle,))
+        assert setup.board_image is None
+        assert setup.beta_solving_supported is True
 
     def test_hold_setup_immutable(self):
         """Test that HoldSetup is immutable (frozen)."""
@@ -164,6 +181,12 @@ class TestBoardConfigRegistry:
         setups = registry.get_hold_setups()
         assert len(setups) == 1
         assert setups[0].id == "masters-2017"
+        assert setups[0].board_image is None
+        assert setups[0].beta_solving_supported is True
+
+        angle = setups[0].angles[0]
+        assert angle.generator_model_file is None
+        assert angle.analytics_file is None
 
     def test_file_not_found(self):
         """Test that FileNotFoundError is raised for missing file."""
@@ -243,6 +266,41 @@ class TestBoardConfigRegistry:
 
         with pytest.raises(ValueError, match="Multiple default configurations"):
             BoardConfigRegistry(config_path)
+
+    def test_load_optional_fields(self):
+        """Test that optional hold setup and angle fields are parsed."""
+        data = {
+            "holdSetups": [
+                {
+                    "id": "masters-2017",
+                    "name": "MoonBoard Masters 2017",
+                    "boardImage": "masters-2017.jpg",
+                    "betaSolvingSupported": False,
+                    "angles": [
+                        {
+                            "angle": 40,
+                            "dataFile": "data/problems.json",
+                            "modelFile": "models/model.pth",
+                            "generatorModelFile": "models/generator_model.pth",
+                            "analyticsFile": "data/hold_stats.json",
+                            "isDefault": True
+                        }
+                    ]
+                }
+            ]
+        }
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(data, f)
+            config_path = Path(f.name)
+
+        registry = BoardConfigRegistry(config_path)
+        setup = registry.get_hold_setup("masters-2017")
+        angle = registry.get_angle_config("masters-2017", 40)
+
+        assert setup.board_image == "masters-2017.jpg"
+        assert setup.beta_solving_supported is False
+        assert angle.generator_model_file == "models/generator_model.pth"
+        assert angle.analytics_file == "data/hold_stats.json"
 
 
 class TestGetHoldSetups:

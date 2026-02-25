@@ -10,15 +10,39 @@ from fastapi import HTTPException, status
 from ..services.predictor_service import PredictorService
 from ..services.problem_service import ProblemService
 from ..services.generator_service import GeneratorService
+from ..services.service_registry import ServiceRegistry
 
-# Global predictor service instance
-_predictor_service: Optional[PredictorService] = None
+# Global service registry instance
+_service_registry: Optional[ServiceRegistry] = None
 
-# Global problem service instance
-_problem_service: Optional[ProblemService] = None
 
-# Global generator service instance
-_generator_service: Optional[GeneratorService] = None
+def get_service_registry() -> ServiceRegistry:
+    """
+    Dependency that returns the service registry.
+
+    Returns:
+        ServiceRegistry instance
+
+    Raises:
+        HTTPException: If registry is not initialized
+    """
+    if _service_registry is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service registry not initialized",
+        )
+    return _service_registry
+
+
+def set_service_registry(registry: Optional[ServiceRegistry]) -> None:
+    """
+    Set the global service registry instance.
+
+    Args:
+        registry: ServiceRegistry instance to set
+    """
+    global _service_registry
+    _service_registry = registry
 
 
 def get_predictor_service() -> PredictorService:
@@ -31,23 +55,7 @@ def get_predictor_service() -> PredictorService:
     Raises:
         HTTPException: If service is not initialized
     """
-    if _predictor_service is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Predictor service not initialized"
-        )
-    return _predictor_service
-
-
-def set_predictor_service(service: PredictorService) -> None:
-    """
-    Set the global predictor service instance.
-
-    Args:
-        service: PredictorService instance to set
-    """
-    global _predictor_service
-    _predictor_service = service
+    return get_service_registry().get_predictor()
 
 
 def get_loaded_predictor() -> PredictorService:
@@ -60,18 +68,7 @@ def get_loaded_predictor() -> PredictorService:
     Raises:
         HTTPException: If model is not loaded
     """
-    service = get_predictor_service()
-
-    if not service.is_loaded:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                "Model not loaded. Please ensure model_for_inference.pth "
-                "exists in the models/ directory and restart the server."
-            )
-        )
-
-    return service
+    return get_service_registry().get_loaded_predictor()
 
 
 def get_problem_service() -> ProblemService:
@@ -84,23 +81,7 @@ def get_problem_service() -> ProblemService:
     Raises:
         HTTPException: If service is not initialized
     """
-    if _problem_service is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Problem service not initialized"
-        )
-    return _problem_service
-
-
-def set_problem_service(service: ProblemService) -> None:
-    """
-    Set the global problem service instance.
-
-    Args:
-        service: ProblemService instance to set
-    """
-    global _problem_service
-    _problem_service = service
+    return get_service_registry().get_problem_service()
 
 
 def get_generator_service() -> GeneratorService:
@@ -113,23 +94,7 @@ def get_generator_service() -> GeneratorService:
     Raises:
         HTTPException: If service is not initialized
     """
-    if _generator_service is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Generator service not initialized"
-        )
-    return _generator_service
-
-
-def set_generator_service(service: GeneratorService) -> None:
-    """
-    Set the global generator service instance.
-
-    Args:
-        service: GeneratorService instance to set
-    """
-    global _generator_service
-    _generator_service = service
+    return get_service_registry().get_generator()
 
 
 def get_loaded_generator() -> GeneratorService:
@@ -142,16 +107,4 @@ def get_loaded_generator() -> GeneratorService:
     Raises:
         HTTPException: If model is not loaded
     """
-    service = get_generator_service()
-
-    if not service.is_loaded:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                "Generator model not loaded. Please ensure "
-                "generator_model.pth exists in the models/ directory "
-                "and restart the server."
-            )
-        )
-
-    return service
+    return get_service_registry().get_loaded_generator()

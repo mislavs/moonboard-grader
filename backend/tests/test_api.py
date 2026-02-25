@@ -94,7 +94,7 @@ class TestPredictEndpoint:
     def test_predict_invalid_request_empty_moves(self, client_with_loaded_model, mock_predictor):
         """Test prediction with empty moves list."""
         # Configure mock to raise ValueError for empty moves
-        mock_predictor.predict.side_effect = ValueError("No moves provided")
+        mock_predictor.predict_with_attention.side_effect = ValueError("No moves provided")
         
         invalid_request = {"moves": [], "top_k": 3}
         response = client_with_loaded_model.post("/predict", json=invalid_request)

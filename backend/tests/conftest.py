@@ -14,22 +14,26 @@ from app.main import create_application
 from app.services.predictor_service import PredictorService
 from app.services.problem_service import ProblemService
 from app.services.generator_service import GeneratorService
-from app.api.dependencies import set_predictor_service, set_problem_service, set_generator_service
+from app.services.service_registry import ServiceRegistry
+from app.api.dependencies import set_service_registry
 
 
 @pytest.fixture
 def mock_predictor():
     """Mock Predictor instance for testing."""
     mock = MagicMock()
-    mock.predict.return_value = {
+    prediction_result = {
         'predicted_grade': '6B+',
         'confidence': 0.87,
         'top_k_predictions': [
             ('6B+', 0.87),
             ('6C', 0.09),
             ('6B', 0.03)
-        ]
+        ],
+        'attention_map': None,
     }
+    mock.predict.return_value = prediction_result
+    mock.predict_with_attention.return_value = prediction_result
     return mock
 
 
@@ -59,24 +63,28 @@ def unloaded_predictor_service(tmp_path: Path) -> PredictorService:
 def app_with_loaded_model(predictor_service: PredictorService, generator_service) -> Generator:
     """Create test app with loaded model."""
     app = create_application()
-    set_predictor_service(predictor_service)
-    set_generator_service(generator_service)
+    registry = ServiceRegistry()
+    registry.set_default("masters-2017", 40)
+    registry.register_predictor("masters-2017", 40, predictor_service)
+    registry.register_generator("masters-2017", 40, generator_service)
+    set_service_registry(registry)
     yield app
     # Cleanup
-    set_predictor_service(None)
-    set_generator_service(None)
+    set_service_registry(None)
 
 
 @pytest.fixture
 def app_with_unloaded_model(unloaded_predictor_service: PredictorService, unloaded_generator_service) -> Generator:
     """Create test app with unloaded model."""
     app = create_application()
-    set_predictor_service(unloaded_predictor_service)
-    set_generator_service(unloaded_generator_service)
+    registry = ServiceRegistry()
+    registry.set_default("masters-2017", 40)
+    registry.register_predictor("masters-2017", 40, unloaded_predictor_service)
+    registry.register_generator("masters-2017", 40, unloaded_generator_service)
+    set_service_registry(registry)
     yield app
     # Cleanup
-    set_predictor_service(None)
-    set_generator_service(None)
+    set_service_registry(None)
 
 
 @pytest.fixture
@@ -180,12 +188,14 @@ def problem_service(tmp_path: Path, sample_problems_data):
 def app_with_problem_service(predictor_service: PredictorService, problem_service: ProblemService) -> Generator:
     """Create test app with both predictor and problem services."""
     app = create_application()
-    set_predictor_service(predictor_service)
-    set_problem_service(problem_service)
+    registry = ServiceRegistry()
+    registry.set_default("masters-2017", 40)
+    registry.register_predictor("masters-2017", 40, predictor_service)
+    registry.register_problem_service("masters-2017", 40, problem_service)
+    set_service_registry(registry)
     yield app
     # Cleanup
-    set_predictor_service(None)
-    set_problem_service(None)
+    set_service_registry(None)
 
 
 @pytest.fixture
@@ -243,20 +253,26 @@ def unloaded_generator_service(tmp_path: Path) -> GeneratorService:
 def app_with_loaded_generator(generator_service: GeneratorService) -> Generator:
     """Create test app with loaded generator."""
     app = create_application()
-    set_generator_service(generator_service)
+    registry = ServiceRegistry()
+    registry.set_default("masters-2017", 40)
+    registry.register_generator("masters-2017", 40, generator_service)
+    set_service_registry(registry)
     yield app
     # Cleanup
-    set_generator_service(None)
+    set_service_registry(None)
 
 
 @pytest.fixture
 def app_with_unloaded_generator(unloaded_generator_service: GeneratorService) -> Generator:
     """Create test app with unloaded generator."""
     app = create_application()
-    set_generator_service(unloaded_generator_service)
+    registry = ServiceRegistry()
+    registry.set_default("masters-2017", 40)
+    registry.register_generator("masters-2017", 40, unloaded_generator_service)
+    set_service_registry(registry)
     yield app
     # Cleanup
-    set_generator_service(None)
+    set_service_registry(None)
 
 
 @pytest.fixture

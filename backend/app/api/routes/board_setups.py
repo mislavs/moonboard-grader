@@ -29,13 +29,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _model_exists(model_file: str | None) -> bool:
-    """Check if a model file exists."""
-    if model_file is None:
+def _config_file_exists(config_file: str | None) -> bool:
+    """Check if a file path from board config exists."""
+    if config_file is None:
         return False
-    # Model paths in config are relative to project root
-    model_path = Path(settings.board_config_path).parent.parent / model_file
-    return model_path.exists()
+    # Paths in config are relative to project root.
+    project_root = Path(settings.board_config_path).resolve().parent.parent
+    resolved_path = project_root / config_file
+    return resolved_path.exists()
 
 
 @router.get(
@@ -60,13 +61,21 @@ async def get_board_setups():
             for angle_config in setup.angles:
                 angles.append(AngleConfigResponse(
                     angle=angle_config.angle,
-                    hasModel=_model_exists(angle_config.model_file),
+                    hasModel=_config_file_exists(angle_config.model_file),
+                    hasGenerator=_config_file_exists(
+                        angle_config.generator_model_file
+                    ),
+                    hasAnalytics=_config_file_exists(
+                        angle_config.analytics_file
+                    ),
                     isDefault=angle_config.is_default
                 ))
 
             response_setups.append(HoldSetupResponse(
                 id=setup.id,
                 name=setup.name,
+                betaSolvingSupported=setup.beta_solving_supported,
+                boardImage=setup.board_image,
                 angles=angles
             ))
 

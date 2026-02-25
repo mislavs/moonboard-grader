@@ -19,11 +19,15 @@ def sample_board_config():
             {
                 "id": "masters-2017",
                 "name": "MoonBoard Masters 2017",
+                "betaSolvingSupported": False,
+                "boardImage": "masters-2017.jpg",
                 "angles": [
                     {
                         "angle": 40,
                         "dataFile": "data/problems.json",
                         "modelFile": "models/model_for_inference.pth",
+                        "generatorModelFile": "models/generator_model.pth",
+                        "analyticsFile": "data/hold_stats.json",
                         "isDefault": True
                     }
                 ]
@@ -40,6 +44,8 @@ def multi_setup_board_config():
             {
                 "id": "masters-2017",
                 "name": "MoonBoard Masters 2017",
+                "betaSolvingSupported": True,
+                "boardImage": "masters-2017.jpg",
                 "angles": [
                     {
                         "angle": 25,
@@ -57,6 +63,8 @@ def multi_setup_board_config():
             {
                 "id": "masters-2019",
                 "name": "MoonBoard Masters 2019",
+                "betaSolvingSupported": False,
+                "boardImage": "masters-2019.jpg",
                 "angles": [
                     {
                         "angle": 40,
@@ -74,6 +82,16 @@ def temp_board_config(tmp_path: Path, sample_board_config):
     """Create a temporary board config file."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
+
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    (models_dir / "model_for_inference.pth").touch()
+    (models_dir / "generator_model.pth").touch()
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "hold_stats.json").write_text("{}", encoding="utf-8")
+
     config_file = config_dir / "board_setups.json"
     config_file.write_text(json.dumps(sample_board_config, indent=2))
     return config_file
@@ -130,6 +148,8 @@ class TestBoardSetupsEndpoint:
         setup = data["holdSetups"][0]
         assert setup["id"] == "masters-2017"
         assert setup["name"] == "MoonBoard Masters 2017"
+        assert setup["betaSolvingSupported"] is False
+        assert setup["boardImage"] == "masters-2017.jpg"
         assert "angles" in setup
         assert len(setup["angles"]) == 1
 
@@ -141,7 +161,9 @@ class TestBoardSetupsEndpoint:
         angle = data["holdSetups"][0]["angles"][0]
         assert angle["angle"] == 40
         assert angle["isDefault"] is True
-        assert "hasModel" in angle
+        assert angle["hasModel"] is True
+        assert angle["hasGenerator"] is True
+        assert angle["hasAnalytics"] is True
 
     def test_get_board_setups_multiple_setups(self, client_with_multi_setup):
         """Test response with multiple setups."""

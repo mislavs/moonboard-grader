@@ -13,8 +13,8 @@ from ...models.schemas import (
     GenerateResponse,
     ProblemMove,
 )
-from ...services.generator_service import GeneratorService
-from ..dependencies import get_loaded_generator
+from ..dependencies import get_service_registry
+from ...services.service_registry import ServiceRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ async def generate_problem(
         None,
         description="Wall angle in degrees (e.g., 40). Uses default if not specified."
     ),
-    generator_service: GeneratorService = Depends(get_loaded_generator)
+    registry: ServiceRegistry = Depends(get_service_registry)
 ):
     """
     Generate a new climbing problem at the specified grade.
@@ -55,9 +55,10 @@ async def generate_problem(
     Raises:
         HTTPException: If model is not loaded or generation fails
     """
-    # Log the setup being used (for future multi-model support)
+    generator_service = registry.get_loaded_generator(hold_setup, angle)
+
     if hold_setup or angle:
-        logger.debug(f"Generation requested for setup={hold_setup}, angle={angle}")
+        logger.debug("Generation requested for setup=%s, angle=%s", hold_setup, angle)
     try:
         logger.info(
             f"Generation request received for grade {request.grade}"
@@ -99,6 +100,8 @@ async def generate_problem(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid generation parameters: {str(e)}"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Generation error: {e}")
         raise HTTPException(

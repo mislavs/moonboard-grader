@@ -464,6 +464,12 @@ class AngleConfigResponse(BaseModel):
     hasModel: bool = Field(
         ..., description="Whether a trained model exists for this configuration"
     )
+    hasGenerator: bool = Field(
+        ..., description="Whether a generator model exists for this configuration"
+    )
+    hasAnalytics: bool = Field(
+        ..., description="Whether pre-computed analytics exist for this configuration"
+    )
     isDefault: bool = Field(
         ..., description="Whether this is the default configuration"
     )
@@ -473,6 +479,8 @@ class AngleConfigResponse(BaseModel):
             "example": {
                 "angle": 40,
                 "hasModel": True,
+                "hasGenerator": True,
+                "hasAnalytics": True,
                 "isDefault": True
             }
         }
@@ -484,6 +492,12 @@ class HoldSetupResponse(BaseModel):
 
     id: str = Field(..., description="Unique identifier for the hold setup")
     name: str = Field(..., description="Display name for the hold setup")
+    betaSolvingSupported: bool = Field(
+        ..., description="Whether beta solving is supported for this hold setup"
+    )
+    boardImage: Optional[str] = Field(
+        None, description="Optional board image filename from frontend/public/boards/"
+    )
     angles: List[AngleConfigResponse] = Field(
         ..., description="Available wall angles for this hold setup"
     )
@@ -493,8 +507,16 @@ class HoldSetupResponse(BaseModel):
             "example": {
                 "id": "masters-2017",
                 "name": "MoonBoard Masters 2017",
+                "betaSolvingSupported": True,
+                "boardImage": None,
                 "angles": [
-                    {"angle": 40, "hasModel": True, "isDefault": True}
+                    {
+                        "angle": 40,
+                        "hasModel": True,
+                        "hasGenerator": True,
+                        "hasAnalytics": True,
+                        "isDefault": True
+                    }
                 ]
             }
         }
@@ -515,8 +537,16 @@ class BoardSetupsResponse(BaseModel):
                     {
                         "id": "masters-2017",
                         "name": "MoonBoard Masters 2017",
+                        "betaSolvingSupported": True,
+                        "boardImage": None,
                         "angles": [
-                            {"angle": 40, "hasModel": True, "isDefault": True}
+                            {
+                                "angle": 40,
+                                "hasModel": True,
+                                "hasGenerator": True,
+                                "hasAnalytics": True,
+                                "isDefault": True
+                            }
                         ]
                     }
                 ]

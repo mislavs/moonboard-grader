@@ -18,6 +18,8 @@ class AngleConfig:
     angle: int
     data_file: str
     model_file: Optional[str]
+    generator_model_file: Optional[str] = None
+    analytics_file: Optional[str] = None
     is_default: bool = False
 
 
@@ -27,6 +29,8 @@ class HoldSetup:
     id: str
     name: str
     angles: tuple[AngleConfig, ...]
+    board_image: Optional[str] = None
+    beta_solving_supported: bool = True
 
 
 class BoardConfigRegistry:
@@ -94,6 +98,8 @@ class BoardConfigRegistry:
 
         name = setup_data.get('name', setup_id)
         angles_data = setup_data.get('angles', [])
+        board_image = setup_data.get('boardImage')
+        beta_solving_supported = setup_data.get('betaSolvingSupported', True)
 
         if not angles_data:
             raise ValueError(f"Hold setup '{setup_id}' must have at least one angle configuration")
@@ -104,6 +110,8 @@ class BoardConfigRegistry:
                 angle=angle_data['angle'],
                 data_file=angle_data['dataFile'],
                 model_file=angle_data.get('modelFile'),
+                generator_model_file=angle_data.get('generatorModelFile'),
+                analytics_file=angle_data.get('analyticsFile'),
                 is_default=angle_data.get('isDefault', False)
             )
             angles.append(angle_config)
@@ -120,7 +128,9 @@ class BoardConfigRegistry:
         self._hold_setups[setup_id] = HoldSetup(
             id=setup_id,
             name=name,
-            angles=tuple(angles)
+            angles=tuple(angles),
+            board_image=board_image,
+            beta_solving_supported=beta_solving_supported
         )
 
     def get_hold_setups(self) -> list[HoldSetup]:

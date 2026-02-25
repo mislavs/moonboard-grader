@@ -8,6 +8,7 @@
           "angle": 40,
           "dataFile": "data/problems.json",
           "modelFile": "models/model_for_inference.pth",
+          "analyticsFile": "backend/data/hold_stats.json",
           "isDefault": true
         }
       ]

@@ -6,20 +6,17 @@ Provides endpoints for board-level analytics and hold statistics.
 
 import json
 import logging
-from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from ...models.schemas import BoardAnalyticsResponse
+from ...services.service_registry import ServiceRegistry
+from ..dependencies import get_service_registry
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-# Path to the pre-computed analytics data
-# This file should be copied from analysis/hold_stats.json
-ANALYTICS_DATA_PATH = Path(__file__).parent.parent.parent.parent / "data" / "hold_stats.json"
 
 
 @router.get(
@@ -35,7 +32,8 @@ async def get_board_analytics(
     angle: Optional[int] = Query(
         None,
         description="Wall angle in degrees (e.g., 40). Uses default if not specified."
-    )
+    ),
+    registry: ServiceRegistry = Depends(get_service_registry),
 ):
     """
     Get board-level analytics including hold difficulty statistics.
@@ -56,19 +54,18 @@ async def get_board_analytics(
     Raises:
         HTTPException: 500 if analytics data file is not found or invalid
     """
-    # Log the setup being used (for future multi-data-source support)
     if hold_setup or angle:
-        logger.debug(f"Analytics requested for setup={hold_setup}, angle={angle}")
+        logger.debug("Analytics requested for setup=%s, angle=%s", hold_setup, angle)
 
-    if not ANALYTICS_DATA_PATH.exists():
-        logger.error(f"Analytics data file not found: {ANALYTICS_DATA_PATH}")
+    analytics_path = registry.get_analytics_path(hold_setup, angle)
+    if analytics_path is None or not analytics_path.exists():
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Analytics data not available. Please ensure hold_stats.json is present in the data folder."
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analytics data unavailable for the requested configuration",
         )
 
     try:
-        with open(ANALYTICS_DATA_PATH, 'r', encoding='utf-8') as f:
+        with open(analytics_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
         return BoardAnalyticsResponse(**data)
@@ -79,6 +76,8 @@ async def get_board_analytics(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Analytics data file is corrupted"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error loading analytics data: {e}")
         raise HTTPException(

@@ -15,8 +15,8 @@ from ...models.schemas import (
     DuplicateCheckRequest,
     DuplicateCheckResponse,
 )
-from ...services.problem_service import ProblemService
-from ..dependencies import get_problem_service
+from ..dependencies import get_service_registry
+from ...services.service_registry import ServiceRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ async def get_problems_list(
         None,
         description="Wall angle in degrees (e.g., 40). Uses default if not specified."
     ),
-    problem_service: ProblemService = Depends(get_problem_service)
+    registry: ServiceRegistry = Depends(get_service_registry)
 ):
     """
     Get paginated list of problems with basic information.
@@ -104,7 +104,7 @@ async def get_problems_list(
             Case-insensitive. (default: None)
         hold_setup: Optional hold setup ID for filtering problems
         angle: Optional wall angle for filtering problems
-        problem_service: Injected problem service (dependency)
+        registry: Injected service registry (dependency)
 
     Returns:
         PaginatedProblemsResponse with items, pagination metadata,
@@ -152,6 +152,7 @@ async def get_problems_list(
         logger.debug(f"Problems requested for setup={hold_setup}, angle={angle}")
 
     try:
+        problem_service = registry.get_problem_service(hold_setup, angle)
         items, total = problem_service.get_all_problems(
             page=page,
             page_size=page_size,
@@ -175,7 +176,7 @@ async def get_problems_list(
 @router.get("/problems/{id}", response_model=ProblemDetail, tags=["Problems"])
 async def get_problem_detail(
     id: int,
-    problem_service: ProblemService = Depends(get_problem_service)
+    registry: ServiceRegistry = Depends(get_service_registry)
 ):
     """
     Get detailed information for a specific problem.
@@ -185,7 +186,7 @@ async def get_problem_detail(
 
     Args:
         id: The unique identifier of the problem
-        problem_service: Injected problem service (dependency)
+        registry: Injected service registry (dependency)
 
     Returns:
         ProblemDetail with complete problem information including moves
@@ -193,6 +194,7 @@ async def get_problem_detail(
     Raises:
         HTTPException: 404 if problem not found, 500 for other errors
     """
+    problem_service = registry.get_problem_service()
     try:
         problem = problem_service.get_problem_by_id(id)
         if problem is None:
@@ -212,7 +214,7 @@ async def get_problem_detail(
 )
 async def check_duplicate_problem(
     request: DuplicateCheckRequest,
-    problem_service: ProblemService = Depends(get_problem_service)
+    registry: ServiceRegistry = Depends(get_service_registry)
 ):
     """
     Check if a problem with the exact same moves already exists.
@@ -222,7 +224,7 @@ async def check_duplicate_problem(
 
     Args:
         request: Request containing list of moves to check
-        problem_service: Injected problem service
+        registry: Injected service registry
 
     Returns:
         Response indicating if duplicate exists and the problem ID if found
@@ -230,6 +232,7 @@ async def check_duplicate_problem(
     Raises:
         HTTPException: If problems data cannot be loaded
     """
+    problem_service = registry.get_problem_service()
     try:
         duplicate_id = problem_service.find_duplicate_by_moves(request.moves)
 
