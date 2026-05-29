@@ -16,8 +16,13 @@ export function initializeTelemetry(
   resourceAttributes: string = '',
   serviceName: string = ''
 ) {
+  const endpoint = otlpEndpoint.trim()
+  if (!endpoint) {
+    return
+  }
+
   const exporter = new OTLPTraceExporter({
-    url: `${otlpEndpoint}/v1/traces`,
+    url: `${endpoint}/v1/traces`,
     headers: parseDelimitedValues(headers),
   })
 
@@ -25,12 +30,14 @@ export function initializeTelemetry(
 
   attributes[ATTR_SERVICE_NAME] = serviceName?.trim() || 'browser'
 
+  const spanProcessors = [new SimpleSpanProcessor(exporter)]
+  if (import.meta.env.DEV) {
+    spanProcessors.unshift(new SimpleSpanProcessor(new ConsoleSpanExporter()))
+  }
+
   const provider = new WebTracerProvider({
     resource: resourceFromAttributes(attributes),
-    spanProcessors: [
-      new SimpleSpanProcessor(new ConsoleSpanExporter()),
-      new SimpleSpanProcessor(exporter),
-    ],
+    spanProcessors,
   })
 
   provider.register({

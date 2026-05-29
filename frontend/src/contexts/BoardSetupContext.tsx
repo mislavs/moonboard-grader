@@ -89,11 +89,16 @@ export function BoardSetupProvider({ children }: BoardSetupProviderProps) {
 
   // Load board setups on mount
   useEffect(() => {
+    let isCancelled = false;
+
     async function loadSetups() {
       try {
         setLoading(true);
         setError(null);
         const response: BoardSetupsResponse = await fetchBoardSetups();
+        if (isCancelled) {
+          return;
+        }
         setHoldSetups(response.holdSetups);
 
         // Try to restore previous selection from localStorage
@@ -121,17 +126,28 @@ export function BoardSetupProvider({ children }: BoardSetupProviderProps) {
           }
         }
 
-        setCurrentHoldSetup(selectedSetup);
-        setCurrentAngle(selectedAngle);
+        if (!isCancelled) {
+          setCurrentHoldSetup(selectedSetup);
+          setCurrentAngle(selectedAngle);
+        }
       } catch (err) {
+        if (isCancelled) {
+          return;
+        }
         console.error('Failed to load board setups:', err);
         setError('Failed to load board configurations');
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     }
 
     loadSetups();
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   // Save selection to localStorage when it changes
@@ -169,17 +185,27 @@ export function BoardSetupProvider({ children }: BoardSetupProviderProps) {
     }
   }, [currentHoldSetup]);
 
+  const contextValue = useMemo(() => ({
+    holdSetups,
+    currentHoldSetup,
+    currentAngle,
+    setHoldSetup,
+    setAngle,
+    loading,
+    error,
+  }), [
+    holdSetups,
+    currentHoldSetup,
+    currentAngle,
+    setHoldSetup,
+    setAngle,
+    loading,
+    error,
+  ]);
+
   return (
     <BoardSetupContext.Provider
-      value={{
-        holdSetups,
-        currentHoldSetup,
-        currentAngle,
-        setHoldSetup,
-        setAngle,
-        loading,
-        error,
-      }}
+      value={contextValue}
     >
       {children}
     </BoardSetupContext.Provider>

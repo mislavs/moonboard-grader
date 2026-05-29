@@ -8,7 +8,28 @@ import type { BoardAnalyticsResponse } from '../types/analytics';
 import type { BetaResponse } from '../types/beta';
 import type { BoardSetupsResponse } from '../types/boardSetup';
 import { API_BASE_URL, BETA_API_BASE_URL, ERROR_MESSAGES } from '../config/api';
-import { context, propagation, trace, SpanKind, SpanStatusCode } from '@opentelemetry/api';
+
+type OpenTelemetryApi = typeof import('@opentelemetry/api');
+let otelApiPromise: Promise<OpenTelemetryApi | null> | null = null;
+
+function telemetryEnabled(): boolean {
+  return typeof window !== 'undefined' && window.__MOONBOARD_TELEMETRY_ENABLED === true;
+}
+
+async function getOpenTelemetryApi(): Promise<OpenTelemetryApi | null> {
+  if (!telemetryEnabled()) {
+    return null;
+  }
+
+  if (!otelApiPromise) {
+    otelApiPromise = import('@opentelemetry/api').catch((error) => {
+      console.warn('OpenTelemetry API module failed to load:', error);
+      return null;
+    });
+  }
+
+  return otelApiPromise;
+}
 
 export class ApiError extends Error {
   statusCode?: number;
@@ -64,6 +85,12 @@ async function tracedApiFetch<T>(
   spanName: string,
   options?: RequestInit
 ): Promise<T> {
+  const openTelemetryApi = await getOpenTelemetryApi();
+  if (!openTelemetryApi) {
+    return apiFetch<T>(url, options);
+  }
+
+  const { context, propagation, trace, SpanKind, SpanStatusCode } = openTelemetryApi;
   const tracer = trace.getTracer('frontend');
   const span = tracer.startSpan(spanName, {
     kind: SpanKind.CLIENT,

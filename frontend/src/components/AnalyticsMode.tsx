@@ -108,22 +108,35 @@ export default function AnalyticsMode() {
 
   // Fetch analytics data on mount
   useEffect(() => {
+    let isCancelled = false;
+
     async function loadAnalytics() {
       try {
         setLoading(true);
         setError(null);
         const data = await fetchBoardAnalytics(setupParams);
-        setAnalytics(data);
+        if (!isCancelled) {
+          setAnalytics(data);
+        }
       } catch (err) {
+        if (isCancelled) {
+          return;
+        }
         const message = err instanceof Error ? err.message : "Failed to load analytics";
         setError(message);
         console.error("Failed to load analytics:", err);
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     }
 
     loadAnalytics();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [setupParams]);
 
   // Get the current heatmap data based on selected metric

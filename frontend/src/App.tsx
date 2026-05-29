@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import TabNavigation from './components/TabNavigation';
-import ViewMode from './components/ViewMode';
-import CreateMode from './components/CreateMode';
-import AnalyticsMode from './components/AnalyticsMode';
+import LoadingSpinner from './components/LoadingSpinner';
 import BoardSetupSelector from './components/BoardSetupSelector';
 import { BoardSetupProvider } from './contexts/BoardSetupContext';
 
 type Mode = 'view' | 'create' | 'analytics';
+const ViewMode = lazy(() => import('./components/ViewMode'));
+const CreateMode = lazy(() => import('./components/CreateMode'));
+const AnalyticsMode = lazy(() => import('./components/AnalyticsMode'));
 
 function App() {
   const [mode, setMode] = useState<Mode>('view');
@@ -29,9 +30,17 @@ function App() {
 
         <TabNavigation activeMode={mode} onModeChange={setMode} />
 
-        {mode === 'view' && <ViewMode />}
-        {mode === 'create' && <CreateMode />}
-        {mode === 'analytics' && <AnalyticsMode />}
+        <Suspense
+          fallback={(
+            <div className="flex justify-center py-12">
+              <LoadingSpinner message="Loading mode..." />
+            </div>
+          )}
+        >
+          {mode === 'view' && <ViewMode />}
+          {mode === 'create' && <CreateMode />}
+          {mode === 'analytics' && <AnalyticsMode />}
+        </Suspense>
       </div>
     </BoardSetupProvider>
   );

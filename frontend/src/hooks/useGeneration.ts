@@ -2,7 +2,7 @@
  * Custom hook for managing problem generation state and logic
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   generateProblem,
   ApiError,
@@ -15,32 +15,45 @@ export function useGeneration() {
   const [generated, setGenerated] = useState<GenerateResponse | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   const generate = useCallback(async (
     grade: string = '6A+',
     temperature: number = 1.0,
     setupParams?: BoardSetupParams
   ) => {
+    const requestId = ++requestIdRef.current;
+
     try {
       setGenerating(true);
       setError(null);
       const result = await generateProblem(grade, temperature, setupParams);
+      if (requestId !== requestIdRef.current) {
+        return null;
+      }
+
       setGenerated(result);
       return result;
     } catch (err) {
       const errorMessage = err instanceof ApiError 
         ? err.message 
         : ERROR_MESSAGES.SERVER_CONNECTION_FAILED;
-      setError(errorMessage);
+      if (requestId === requestIdRef.current) {
+        setError(errorMessage);
+      }
       console.error('Failed to generate problem:', err);
       return null;
     } finally {
-      setGenerating(false);
+      if (requestId === requestIdRef.current) {
+        setGenerating(false);
+      }
     }
   }, []);
 
   const reset = useCallback(() => {
+    requestIdRef.current += 1;
     setGenerated(null);
+    setGenerating(false);
     setError(null);
   }, []);
 

@@ -4,6 +4,31 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return undefined
+          }
+
+          if (id.includes('@opentelemetry')) {
+            return 'vendor-otel'
+          }
+
+          if (id.includes('react')) {
+            return 'vendor-react'
+          }
+
+          if (id.includes('rc-slider')) {
+            return 'vendor-slider'
+          }
+
+          return 'vendor'
+        },
+      },
+    },
+  },
   define: {
     'import.meta.env.OTEL_EXPORTER_OTLP_ENDPOINT': JSON.stringify(
       process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? ''
