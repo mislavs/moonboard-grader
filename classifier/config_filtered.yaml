@@ -36,6 +36,7 @@ data:
   # Repeats Filtering Configuration
   filter_repeats: false  # Enable/disable repeats filtering
   min_repeats: 1         # Minimum number of repeats (0 = include all, 1 = exclude zero-repeat routes)
+  group_by_layout: true  # Keep duplicate hold layouts in the same split
 
 # Checkpoint Configuration
 checkpoint:

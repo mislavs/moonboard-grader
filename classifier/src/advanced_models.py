@@ -10,6 +10,7 @@ Implements improved neural network architectures with:
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import inspect
 from typing import Optional
 from moonboard_core.grade_encoder import get_num_grades
 
@@ -303,12 +304,18 @@ class DeepResidualCNN(nn.Module):
     Args:
         num_classes: Number of grade classes (default: 19)
         use_attention: Whether to use attention (default: True)
+        dropout_conv: Dropout in convolutional layers (default: 0.1)
+        dropout_fc1: Dropout after first FC layer (default: 0.3)
+        dropout_fc2: Dropout after second FC layer (default: 0.4)
     """
     
     def __init__(
         self,
         num_classes: Optional[int] = None,
-        use_attention: bool = True
+        use_attention: bool = True,
+        dropout_conv: float = 0.1,
+        dropout_fc1: float = 0.3,
+        dropout_fc2: float = 0.4
     ):
         super().__init__()
         
@@ -321,13 +328,13 @@ class DeepResidualCNN(nn.Module):
         # Block 1: 3 → 32
         self.conv1 = nn.Conv2d(3, 32, 3, padding=1)
         self.bn1 = nn.BatchNorm2d(32)
-        self.res1 = nn.ModuleList([ResidualBlock(32) for _ in range(2)])
+        self.res1 = nn.ModuleList([ResidualBlock(32, dropout=dropout_conv) for _ in range(2)])
         self.pool1 = nn.MaxPool2d(2)
         
         # Block 2: 32 → 64
         self.conv2 = nn.Conv2d(32, 64, 3, padding=1)
         self.bn2 = nn.BatchNorm2d(64)
-        self.res2 = nn.ModuleList([ResidualBlock(64) for _ in range(2)])
+        self.res2 = nn.ModuleList([ResidualBlock(64, dropout=dropout_conv) for _ in range(2)])
         self.pool2 = nn.MaxPool2d(2)
         if use_attention:
             self.att2 = ChannelAttention(64)
@@ -335,7 +342,7 @@ class DeepResidualCNN(nn.Module):
         # Block 3: 64 → 128
         self.conv3 = nn.Conv2d(64, 128, 3, padding=1)
         self.bn3 = nn.BatchNorm2d(128)
-        self.res3 = nn.ModuleList([ResidualBlock(128) for _ in range(2)])
+        self.res3 = nn.ModuleList([ResidualBlock(128, dropout=dropout_conv) for _ in range(2)])
         if use_attention:
             self.att3 = ChannelAttention(128)
         
@@ -350,9 +357,9 @@ class DeepResidualCNN(nn.Module):
         
         # Classifier
         self.fc1 = nn.Linear(256, 256)
-        self.dropout1 = nn.Dropout(0.3)
+        self.dropout1 = nn.Dropout(dropout_fc1)
         self.fc2 = nn.Linear(256, 128)
-        self.dropout2 = nn.Dropout(0.4)
+        self.dropout2 = nn.Dropout(dropout_fc2)
         self.fc3 = nn.Linear(128, num_classes)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -393,6 +400,16 @@ class DeepResidualCNN(nn.Module):
         return x
 
 
+def _filter_constructor_kwargs(model_cls: type[nn.Module], kwargs: dict) -> dict:
+    """Keep only kwargs accepted by a model constructor."""
+    accepted_params = inspect.signature(model_cls.__init__).parameters
+    return {
+        key: value
+        for key, value in kwargs.items()
+        if key in accepted_params and key != "num_classes"
+    }
+
+
 def create_advanced_model(
     model_type: str = 'residual_cnn',
     num_classes: Optional[int] = None,
@@ -426,10 +443,12 @@ def create_advanced_model(
         >>> model = create_advanced_model('deep_residual_cnn')
     """
     if model_type == 'residual_cnn':
-        return ResidualCNN(num_classes=num_classes, **kwargs)
+        model_kwargs = _filter_constructor_kwargs(ResidualCNN, kwargs)
+        return ResidualCNN(num_classes=num_classes, **model_kwargs)
     
     elif model_type == 'deep_residual_cnn':
-        return DeepResidualCNN(num_classes=num_classes, **kwargs)
+        model_kwargs = _filter_constructor_kwargs(DeepResidualCNN, kwargs)
+        return DeepResidualCNN(num_classes=num_classes, **model_kwargs)
     
     else:
         raise ValueError(

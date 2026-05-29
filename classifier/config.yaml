@@ -30,6 +30,7 @@ data:
   val_ratio: 0.15
   test_ratio: 0.15
   random_seed: 42  # For reproducible splits
+  group_by_layout: true  # Keep duplicate hold layouts in the same split
 
 # Checkpoint Configuration
 checkpoint:

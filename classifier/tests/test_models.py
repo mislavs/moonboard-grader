@@ -17,6 +17,7 @@ from src.models import (
     create_model,
     count_parameters
 )
+from src.advanced_models import ResidualCNN, DeepResidualCNN
 from moonboard_core.grade_encoder import get_num_grades
 
 
@@ -344,6 +345,73 @@ def test_create_model_invalid_type():
     """Test create_model raises error for invalid model type."""
     with pytest.raises(ValueError, match="Invalid model_type"):
         create_model("invalid_type")
+
+
+def test_create_model_residual_cnn_with_dropout_kwargs():
+    """Test residual CNN accepts advanced dropout kwargs through factory."""
+    model = create_model(
+        "residual_cnn",
+        num_classes=10,
+        use_attention=True,
+        dropout_conv=0.2,
+        dropout_fc1=0.35,
+        dropout_fc2=0.45,
+    )
+
+    assert isinstance(model, ResidualCNN)
+    assert model.num_classes == 10
+    assert model.res1.dropout1.p == pytest.approx(0.2)
+    assert model.dropout1.p == pytest.approx(0.35)
+    assert model.dropout2.p == pytest.approx(0.45)
+
+    output = model(torch.randn(2, 3, 18, 11))
+    assert output.shape == (2, 10)
+
+
+def test_create_model_deep_residual_cnn_with_dropout_kwargs():
+    """Test deep residual CNN no longer rejects advanced dropout kwargs."""
+    model = create_model(
+        "deep_residual_cnn",
+        num_classes=10,
+        use_attention=True,
+        dropout_conv=0.2,
+        dropout_fc1=0.35,
+        dropout_fc2=0.45,
+    )
+
+    assert isinstance(model, DeepResidualCNN)
+    assert model.num_classes == 10
+    assert model.res1[0].dropout1.p == pytest.approx(0.2)
+    assert model.dropout1.p == pytest.approx(0.35)
+    assert model.dropout2.p == pytest.approx(0.45)
+
+    output = model(torch.randn(2, 3, 18, 11))
+    assert output.shape == (2, 10)
+
+
+def test_create_model_basic_models_ignore_advanced_kwargs():
+    """Test basic models tolerate advanced-only kwargs without changing behavior."""
+    fc_model = create_model(
+        "fc",
+        num_classes=10,
+        use_attention=True,
+        dropout_conv=0.2,
+        dropout_fc1=0.35,
+        dropout_fc2=0.45,
+    )
+    cnn_model = create_model(
+        "cnn",
+        num_classes=10,
+        use_attention=True,
+        dropout_conv=0.2,
+        dropout_fc1=0.35,
+        dropout_fc2=0.45,
+    )
+
+    assert isinstance(fc_model, FullyConnectedModel)
+    assert isinstance(cnn_model, ConvolutionalModel)
+    assert fc_model.network[3].p == pytest.approx(0.3)
+    assert cnn_model.dropout1.p == pytest.approx(0.5)
 
 
 # Test Model Device Movement

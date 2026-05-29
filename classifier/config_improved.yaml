@@ -65,7 +65,7 @@ data:
   min_repeats: 1         # Minimum number of repeats (0 = include all, 1 = exclude zero-repeat routes)
 
   # Group-aware splitting (prevents layout leakage across splits)
-  # group_by_layout: false  # Group identical hold layouts into the same split
+  group_by_layout: true  # Group identical hold layouts into the same split
 
 # Checkpoint Configuration
 checkpoint:

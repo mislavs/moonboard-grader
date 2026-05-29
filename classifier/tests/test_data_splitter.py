@@ -11,10 +11,32 @@ from torch.utils.data import DataLoader
 
 from src.data_splitter import (
     create_stratified_splits,
+    create_grouped_splits,
     create_datasets,
-    create_data_loaders
+    create_data_loaders,
+    compute_layout_hashes,
 )
 from src.dataset import MoonboardDataset
+
+
+def _make_grouped_dataset(class_group_counts, samples_per_group=1):
+    """Create deterministic tensors where each unique layout is a group."""
+    tensors = []
+    labels = []
+    position_idx = 0
+
+    for label, group_count in enumerate(class_group_counts):
+        for _ in range(group_count):
+            tensor = np.zeros((3, 18, 11), dtype=np.float32)
+            row, col = divmod(position_idx, 11)
+            tensor[label % 3, row, col] = 1.0
+            position_idx += 1
+
+            for _ in range(samples_per_group):
+                tensors.append(tensor.copy())
+                labels.append(label)
+
+    return np.stack(tensors), np.array(labels)
 
 
 class TestStratifiedSplits:
@@ -95,8 +117,6 @@ class TestGroupedSplits:
 
     def test_grouped_split_no_layout_overlap(self):
         """Same layout hash must not appear in more than one split."""
-        from src.data_splitter import create_grouped_splits, compute_layout_hashes
-
         # Create data with some duplicate layouts
         base = np.random.randn(50, 3, 18, 11).astype(np.float32)
         # Duplicate first 5 samples (same layout, different positions in array)
@@ -121,8 +141,6 @@ class TestGroupedSplits:
 
     def test_grouped_split_covers_all_indices(self):
         """All samples must be assigned to exactly one split."""
-        from src.data_splitter import create_grouped_splits
-
         tensors = np.random.randn(100, 3, 18, 11).astype(np.float32)
         labels = np.random.randint(0, 5, 100)
 
@@ -132,11 +150,10 @@ class TestGroupedSplits:
 
         all_idx = set(train_idx) | set(val_idx) | set(test_idx)
         assert len(all_idx) == 100
+        assert len(train_idx) + len(val_idx) + len(test_idx) == 100
 
     def test_create_datasets_with_group_by_layout(self):
         """create_datasets should use grouped mode when config enables it."""
-        from src.data_splitter import create_datasets, compute_layout_hashes
-
         base = np.random.randn(40, 3, 18, 11).astype(np.float32)
         tensors = np.concatenate([base, base[:5]], axis=0)
         labels = np.concatenate([np.random.randint(0, 3, 40), np.random.randint(0, 3, 5)])
@@ -157,6 +174,91 @@ class TestGroupedSplits:
         assert len(train_h & val_h) == 0
         assert len(train_h & test_h) == 0
         assert len(val_h & test_h) == 0
+
+    def test_grouped_split_reproducibility(self):
+        """Grouped splits should be reproducible with the same random seed."""
+        tensors, labels = _make_grouped_dataset([14, 14, 14], samples_per_group=2)
+
+        train_idx1, val_idx1, test_idx1, _, _, _ = create_grouped_splits(
+            tensors, labels, 0.7, 0.15, 0.15, 42
+        )
+        train_idx2, val_idx2, test_idx2, _, _, _ = create_grouped_splits(
+            tensors, labels, 0.7, 0.15, 0.15, 42
+        )
+
+        assert np.array_equal(train_idx1, train_idx2)
+        assert np.array_equal(val_idx1, val_idx2)
+        assert np.array_equal(test_idx1, test_idx2)
+
+    def test_grouped_split_sizes_are_reasonably_close_to_requested_ratios(self):
+        """Grouped split sizes are approximate because whole groups stay together."""
+        tensors, labels = _make_grouped_dataset([14, 14, 14], samples_per_group=2)
+
+        train_idx, val_idx, test_idx, _, _, _ = create_grouped_splits(
+            tensors, labels, 0.7, 0.15, 0.15, 42
+        )
+
+        total = len(tensors)
+        assert len(train_idx) / total == pytest.approx(0.7, abs=0.2)
+        assert len(val_idx) / total == pytest.approx(0.15, abs=0.1)
+        assert len(test_idx) / total == pytest.approx(0.15, abs=0.1)
+
+    def test_grouped_split_preserves_class_coverage_when_feasible(self):
+        """All splits should contain all classes when each class has enough groups."""
+        tensors, labels = _make_grouped_dataset([14, 14, 14], samples_per_group=1)
+
+        train_idx, val_idx, test_idx, _, _, _ = create_grouped_splits(
+            tensors, labels, 0.7, 0.15, 0.15, 42
+        )
+
+        expected_classes = {0, 1, 2}
+        assert set(labels[train_idx]) == expected_classes
+        assert set(labels[val_idx]) == expected_classes
+        assert set(labels[test_idx]) == expected_classes
+
+    def test_grouped_split_warns_when_class_has_too_few_layout_groups(self):
+        """Rare classes should warn, not fail, when they cannot appear everywhere."""
+        tensors, labels = _make_grouped_dataset([2, 8, 8], samples_per_group=1)
+
+        with pytest.warns(UserWarning, match="too few unique layout groups"):
+            train_idx, val_idx, test_idx, _, _, _ = create_grouped_splits(
+                tensors, labels, 0.7, 0.15, 0.15, 42
+            )
+
+        assert len(train_idx) + len(val_idx) + len(test_idx) == len(tensors)
+
+    def test_grouped_split_too_few_groups_returns_friendly_error(self):
+        """Globally infeasible grouped splits should fail before sklearn errors."""
+        tensors, labels = _make_grouped_dataset([2, 2], samples_per_group=1)
+
+        with pytest.raises(ValueError, match="unique layout groups"):
+            create_grouped_splits(tensors, labels, 0.7, 0.15, 0.15, 42)
+
+    def test_grouped_split_sklearn_error_is_wrapped_with_domain_message(self, monkeypatch):
+        """Unexpected sklearn ValueError should be wrapped with project guidance."""
+        import src.data_splitter as data_splitter
+
+        class FailingStratifiedGroupKFold:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def split(self, tensors, labels, groups):
+                raise ValueError(
+                    "The least populated class in y has only 1 member, which is too few."
+                )
+
+        monkeypatch.setattr(
+            data_splitter, "StratifiedGroupKFold", FailingStratifiedGroupKFold
+        )
+
+        tensors, labels = _make_grouped_dataset([14, 14, 14], samples_per_group=1)
+
+        with pytest.raises(ValueError) as exc:
+            data_splitter.create_grouped_splits(tensors, labels, 0.7, 0.15, 0.15, 42)
+
+        msg = str(exc.value).lower()
+        assert "grouped stratified split failed during test split" in msg
+        assert "least populated class" not in msg
 
 
 class TestStratifiedSplitEdgeCases:

@@ -8,13 +8,15 @@ leakage across splits.
 
 import hashlib
 import numpy as np
-from sklearn.model_selection import StratifiedShuffleSplit, GroupShuffleSplit
+from sklearn.model_selection import StratifiedShuffleSplit, StratifiedGroupKFold
 from typing import Tuple, Optional, Dict, Any
 from torch.utils.data import DataLoader
 
 from .dataset import MoonboardDataset
 from .split_validation import (
+    raise_friendly_grouped_split_error,
     raise_friendly_stratify_error,
+    validate_grouped_split_feasibility,
     validate_two_stage_stratified_feasibility,
 )
 
@@ -37,6 +39,15 @@ def compute_layout_hashes(tensors: np.ndarray) -> np.ndarray:
         digest = hashlib.md5(tensors[i].tobytes()).digest()
         hashes[i] = int.from_bytes(digest[:8], 'little', signed=True)
     return hashes
+
+
+def _n_splits_for_ratio(ratio: float, ratio_name: str) -> int:
+    """
+    Convert a desired holdout ratio into a fold count for StratifiedGroupKFold.
+    """
+    if ratio <= 0 or ratio >= 1:
+        raise ValueError(f"{ratio_name} must be between 0 and 1, got {ratio}")
+    return max(2, int(round(1.0 / ratio)))
 
 
 def create_stratified_splits(
@@ -131,21 +142,63 @@ def create_grouped_splits(
     """
     groups = compute_layout_hashes(tensors)
 
-    # First split: separate test groups
-    gss_test = GroupShuffleSplit(
-        n_splits=1, test_size=test_ratio, random_state=random_seed
+    if not np.isclose(train_ratio + val_ratio + test_ratio, 1.0):
+        raise ValueError(
+            f"Ratios must sum to 1.0. Got {train_ratio + val_ratio + test_ratio}"
+        )
+
+    ratio_denom = train_ratio + val_ratio
+    if ratio_denom <= 0:
+        raise ValueError(
+            "Invalid split ratios for grouped splitting: "
+            "(train_ratio + val_ratio) must be > 0."
+        )
+
+    test_n_splits = _n_splits_for_ratio(test_ratio, "test_ratio")
+    val_ratio_adjusted = val_ratio / ratio_denom
+    val_n_splits = _n_splits_for_ratio(val_ratio_adjusted, "val_ratio_adjusted")
+
+    context = validate_grouped_split_feasibility(
+        labels, groups, test_n_splits, val_n_splits
     )
-    train_val_idx, test_idx = next(gss_test.split(tensors, labels, groups))
+
+    # First split: separate test groups while preserving label balance where feasible.
+    splitter_test = StratifiedGroupKFold(
+        n_splits=test_n_splits,
+        shuffle=True,
+        random_state=random_seed
+    )
+    try:
+        train_val_idx, test_idx = next(splitter_test.split(tensors, labels, groups))
+    except ValueError as e:
+        raise_friendly_grouped_split_error("test split", e, context)
 
     # Second split: separate train and validation groups from remaining
-    val_ratio_adjusted = val_ratio / (train_ratio + val_ratio)
-    gss_val = GroupShuffleSplit(
-        n_splits=1, test_size=val_ratio_adjusted, random_state=random_seed
-    )
     remaining_groups = groups[train_val_idx]
-    rel_train_idx, rel_val_idx = next(
-        gss_val.split(tensors[train_val_idx], labels[train_val_idx], remaining_groups)
+    remaining_unique_groups = len(np.unique(remaining_groups))
+    if remaining_unique_groups < val_n_splits:
+        raise ValueError(
+            f"Cannot create grouped validation split: after the test split, only "
+            f"{remaining_unique_groups} unique layout groups remain, but "
+            f"{val_n_splits} validation folds are required. Add more unique "
+            "layouts, disable group_by_layout, or adjust split ratios."
+        )
+
+    splitter_val = StratifiedGroupKFold(
+        n_splits=val_n_splits,
+        shuffle=True,
+        random_state=random_seed
     )
+    try:
+        rel_train_idx, rel_val_idx = next(
+            splitter_val.split(
+                tensors[train_val_idx],
+                labels[train_val_idx],
+                remaining_groups
+            )
+        )
+    except ValueError as e:
+        raise_friendly_grouped_split_error("train/validation split", e, context)
 
     # Map back to original indices
     train_idx_final = train_val_idx[rel_train_idx]
