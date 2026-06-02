@@ -14,6 +14,7 @@ import os
 
 from src.predictor import Predictor
 from src.models import FullyConnectedModel, ConvolutionalModel
+from src.advanced_models import ResidualCNN
 from moonboard_core.grade_encoder import encode_grade, decode_grade, get_num_grades
 from moonboard_core.grid_builder import create_grid_tensor
 
@@ -84,6 +85,55 @@ def temp_checkpoint_cnn():
         os.remove(checkpoint_path)
 
 
+@pytest.fixture
+def temp_checkpoint_coord_cnn():
+    """Create a temporary checkpoint file with CoordConv-enabled CNN model."""
+    model = ConvolutionalModel(num_classes=get_num_grades())
+
+    checkpoint = {
+        'epoch': 20,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': {},
+        'best_val_loss': 1.2,
+        'history': {}
+    }
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.pth') as f:
+        torch.save(checkpoint, f.name)
+        checkpoint_path = f.name
+
+    yield checkpoint_path
+
+    if os.path.exists(checkpoint_path):
+        os.remove(checkpoint_path)
+
+
+@pytest.fixture
+def temp_checkpoint_coord_residual_cnn():
+    """Create a temporary checkpoint file with CoordConv-enabled ResidualCNN."""
+    model = ResidualCNN(
+        num_classes=get_num_grades(),
+        use_attention=True,
+    )
+
+    checkpoint = {
+        'epoch': 20,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': {},
+        'best_val_loss': 1.2,
+        'history': {}
+    }
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.pth') as f:
+        torch.save(checkpoint, f.name)
+        checkpoint_path = f.name
+
+    yield checkpoint_path
+
+    if os.path.exists(checkpoint_path):
+        os.remove(checkpoint_path)
+
+
 class TestPredictorInitialization:
     """Test Predictor initialization."""
     
@@ -103,6 +153,13 @@ class TestPredictorInitialization:
         assert predictor.device == 'cpu'
         assert isinstance(predictor.model, ConvolutionalModel)
         assert predictor.model.training is False
+
+    def test_init_with_coord_cnn_model(self, temp_checkpoint_coord_cnn):
+        """Test initialization auto-detects CoordConv CNN checkpoints."""
+        predictor = Predictor(temp_checkpoint_coord_cnn)
+
+        assert isinstance(predictor.model, ConvolutionalModel)
+        assert predictor.model.conv1.in_channels == 5
     
     def test_init_with_path_object(self, temp_checkpoint_fc):
         """Test initialization with Path object."""
@@ -136,6 +193,25 @@ class TestPredictorInitialization:
         
         try:
             with pytest.raises(ValueError, match="Invalid checkpoint"):
+                Predictor(checkpoint_path)
+        finally:
+            os.remove(checkpoint_path)
+
+    def test_init_checkpoint_with_legacy_three_channel_conv1(self):
+        """Test legacy 3-channel convolutional checkpoints fail clearly."""
+        model = ConvolutionalModel(num_classes=get_num_grades())
+        state_dict = model.state_dict()
+        state_dict['conv1.weight'] = torch.randn(32, 3, 3, 3)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pth') as f:
+            torch.save({
+                'model_state_dict': state_dict,
+                'optimizer_state_dict': {},
+            }, f.name)
+            checkpoint_path = f.name
+
+        try:
+            with pytest.raises(ValueError, match="Legacy 3-channel checkpoints"):
                 Predictor(checkpoint_path)
         finally:
             os.remove(checkpoint_path)
@@ -430,6 +506,29 @@ class TestCNNPredictor:
         results = predictor.predict_batch(problems)
         
         assert len(results) == 2
+
+    def test_coord_cnn_predict_basic(self, temp_checkpoint_coord_cnn):
+        """Test prediction with CoordConv-enabled CNN checkpoint."""
+        predictor = Predictor(temp_checkpoint_coord_cnn)
+        result = predictor.predict(EXAMPLE_PROBLEM)
+
+        assert isinstance(result['predicted_grade'], str)
+        assert 0 <= result['confidence'] <= 1
+
+    def test_coord_residual_cnn_predict_with_attention(
+        self,
+        temp_checkpoint_coord_residual_cnn,
+    ):
+        """Test attention prediction prepends coords for CoordConv residual models."""
+        predictor = Predictor(temp_checkpoint_coord_residual_cnn)
+        result = predictor.predict_with_attention(EXAMPLE_PROBLEM)
+
+        assert isinstance(predictor.model, ResidualCNN)
+        assert predictor.model.conv1.in_channels == 5
+        assert isinstance(result['predicted_grade'], str)
+        assert result['attention_map'] is not None
+        assert len(result['attention_map']) == 18
+        assert len(result['attention_map'][0]) == 11
 
 
 class TestEdgeCases:

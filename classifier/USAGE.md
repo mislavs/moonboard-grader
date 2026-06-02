@@ -325,6 +325,8 @@ model:
 | `dropout_fc1` | float | `0.3` | Dropout rate after the first fully connected layer. Range: 0.0-1.0 |
 | `dropout_fc2` | float | `0.4` | Dropout rate after the second fully connected layer. Range: 0.0-1.0 |
 
+Convolutional models always append CoordConv row/column coordinate channels before the first convolution. The fully connected model is already position-aware and does not use this mechanism.
+
 ### Training Configuration
 
 ```yaml

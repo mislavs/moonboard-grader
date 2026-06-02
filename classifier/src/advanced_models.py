@@ -13,6 +13,7 @@ import torch.nn.functional as F
 import inspect
 from typing import Optional
 from moonboard_core.grade_encoder import get_num_grades
+from .models import make_coord_channels
 
 
 class ResidualBlock(nn.Module):
@@ -204,9 +205,14 @@ class ResidualCNN(nn.Module):
         
         self.num_classes = num_classes
         self.use_attention = use_attention
+        self.register_buffer(
+            "coord_channels",
+            make_coord_channels(18, 11),
+            persistent=False,
+        )
         
         # First conv block: 3 → 64
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(5, 64, kernel_size=3, padding=1)
         self.bn1 = nn.BatchNorm2d(64)
         self.res1 = ResidualBlock(64, dropout=dropout_conv)
         self.pool1 = nn.MaxPool2d(kernel_size=2)
@@ -241,6 +247,12 @@ class ResidualCNN(nn.Module):
         self.dropout2 = nn.Dropout(dropout_fc2)
         
         self.fc3 = nn.Linear(128, num_classes)
+
+    def _prepend_coords(self, x: torch.Tensor) -> torch.Tensor:
+        """Append normalized row/column coordinate channels."""
+        coords = self.coord_channels.to(dtype=x.dtype)
+        coords = coords.unsqueeze(0).expand(x.size(0), -1, -1, -1)
+        return torch.cat([x, coords], dim=1)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -253,6 +265,7 @@ class ResidualCNN(nn.Module):
             Output logits of shape (batch, num_classes)
         """
         # Conv Block 1
+        x = self._prepend_coords(x)
         x = F.relu(self.bn1(self.conv1(x)))
         x = self.res1(x)
         if self.use_attention:
@@ -324,9 +337,14 @@ class DeepResidualCNN(nn.Module):
         
         self.num_classes = num_classes
         self.use_attention = use_attention
+        self.register_buffer(
+            "coord_channels",
+            make_coord_channels(18, 11),
+            persistent=False,
+        )
         
         # Block 1: 3 → 32
-        self.conv1 = nn.Conv2d(3, 32, 3, padding=1)
+        self.conv1 = nn.Conv2d(5, 32, 3, padding=1)
         self.bn1 = nn.BatchNorm2d(32)
         self.res1 = nn.ModuleList([ResidualBlock(32, dropout=dropout_conv) for _ in range(2)])
         self.pool1 = nn.MaxPool2d(2)
@@ -361,9 +379,16 @@ class DeepResidualCNN(nn.Module):
         self.fc2 = nn.Linear(256, 128)
         self.dropout2 = nn.Dropout(dropout_fc2)
         self.fc3 = nn.Linear(128, num_classes)
+
+    def _prepend_coords(self, x: torch.Tensor) -> torch.Tensor:
+        """Append normalized row/column coordinate channels."""
+        coords = self.coord_channels.to(dtype=x.dtype)
+        coords = coords.unsqueeze(0).expand(x.size(0), -1, -1, -1)
+        return torch.cat([x, coords], dim=1)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Block 1
+        x = self._prepend_coords(x)
         x = F.relu(self.bn1(self.conv1(x)))
         for res_block in self.res1:
             x = res_block(x)

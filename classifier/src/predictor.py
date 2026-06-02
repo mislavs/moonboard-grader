@@ -104,7 +104,7 @@ class Predictor:
             ValueError: If architecture cannot be inferred
         """
         # Import model classes dynamically to avoid circular dependencies
-        from .models import FullyConnectedModel, ConvolutionalModel, create_model
+        from .models import FullyConnectedModel, ConvolutionalModel
         from .advanced_models import ResidualCNN, DeepResidualCNN
 
         # Determine number of classes from final layer
@@ -121,7 +121,13 @@ class Predictor:
 
         # Infer architecture based on state dict keys
         state_keys = set(state_dict.keys())
-
+        if "conv1.weight" in state_dict:
+            input_channels = state_dict["conv1.weight"].shape[1]
+            if input_channels != 5:
+                raise ValueError(
+                    "Checkpoint conv1 expects 5 input channels (CoordConv). "
+                    "Legacy 3-channel checkpoints are no longer supported; please retrain."
+                )
         # Check for residual blocks (ResidualCNN or DeepResidualCNN)
         if any("res" in key for key in state_keys):
             # Check if it's deep version (has res3)
@@ -301,6 +307,7 @@ class Predictor:
             x = tensor
 
             # Block 1: (batch, 3, 18, 11) -> (batch, 64, 9, 5)
+            x = self.model._prepend_coords(x)
             x = F.relu(self.model.bn1(self.model.conv1(x)))
             x = self.model.res1(x)
             x = self.model.att1_channel(x)

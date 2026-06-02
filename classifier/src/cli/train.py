@@ -256,6 +256,8 @@ def train_command(args):
     # Print model-specific info
     if model_type in ['residual_cnn', 'deep_residual_cnn']:
         print(f"   Using advanced model with attention: {model_params['use_attention']}")
+    if model_type in ['cnn', 'residual_cnn', 'deep_residual_cnn']:
+        print("   Using CoordConv coordinate channels")
     
     model = model.to(device)
     

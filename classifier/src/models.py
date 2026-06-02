@@ -11,6 +11,19 @@ from typing import Literal
 from moonboard_core.grade_encoder import get_num_grades
 
 
+def make_coord_channels(rows: int = 18, cols: int = 11) -> torch.Tensor:
+    """
+    Create normalized row and column coordinate channels for CoordConv models.
+
+    Returns:
+        Tensor of shape (2, rows, cols), with row values increasing bottom-to-top
+        and column values increasing left-to-right.
+    """
+    row_map = torch.linspace(0, 1, rows).view(1, rows, 1).expand(1, rows, cols)
+    col_map = torch.linspace(0, 1, cols).view(1, 1, cols).expand(1, rows, cols)
+    return torch.cat([row_map, col_map], dim=0)
+
+
 class FullyConnectedModel(nn.Module):
     """
     Fully connected neural network for grade classification.
@@ -102,9 +115,14 @@ class ConvolutionalModel(nn.Module):
             num_classes = get_num_grades()
         
         self.num_classes = num_classes
+        self.register_buffer(
+            "coord_channels",
+            make_coord_channels(18, 11),
+            persistent=False,
+        )
         
         # Convolutional layers with batch normalization
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(5, 32, kernel_size=3, padding=1)
         self.bn1 = nn.BatchNorm2d(32)
         self.relu1 = nn.ReLU()
         self.pool1 = nn.MaxPool2d(kernel_size=2)
@@ -131,6 +149,12 @@ class ConvolutionalModel(nn.Module):
         self.dropout2 = nn.Dropout(0.5)  # Increased from 0.3 to combat overfitting
         
         self.fc3 = nn.Linear(128, num_classes)
+
+    def _prepend_coords(self, x: torch.Tensor) -> torch.Tensor:
+        """Append normalized row/column coordinate channels."""
+        coords = self.coord_channels.to(dtype=x.dtype)
+        coords = coords.unsqueeze(0).expand(x.size(0), -1, -1, -1)
+        return torch.cat([x, coords], dim=1)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -143,6 +167,7 @@ class ConvolutionalModel(nn.Module):
             Output logits of shape (batch, num_classes)
         """
         # Convolutional layers
+        x = self._prepend_coords(x)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu1(x)

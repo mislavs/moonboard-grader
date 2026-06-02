@@ -15,7 +15,8 @@ from src.models import (
     FullyConnectedModel,
     ConvolutionalModel,
     create_model,
-    count_parameters
+    count_parameters,
+    make_coord_channels
 )
 from src.advanced_models import ResidualCNN, DeepResidualCNN
 from moonboard_core.grade_encoder import get_num_grades
@@ -47,6 +48,31 @@ def test_cnn_model_initialization_custom_classes():
     """Test CNN model initializes with custom num_classes."""
     model = ConvolutionalModel(num_classes=10)
     assert model.num_classes == 10
+
+
+def test_make_coord_channels_shape_and_values():
+    """Test CoordConv helper creates normalized row/column channels."""
+    coords = make_coord_channels()
+
+    assert coords.shape == (2, 18, 11)
+    assert torch.allclose(coords[0, :, 0], torch.linspace(0, 1, 18))
+    assert torch.allclose(coords[1, 0, :], torch.linspace(0, 1, 11))
+
+
+@pytest.mark.parametrize(
+    "model_cls",
+    [ConvolutionalModel, ResidualCNN, DeepResidualCNN],
+)
+def test_coord_channel_models_always_use_five_input_channels(model_cls):
+    """Test convolutional models always use CoordConv input channels."""
+    model = model_cls(num_classes=10)
+
+    assert model.conv1.in_channels == 5
+    assert hasattr(model, "coord_channels")
+    assert "coord_channels" not in model.state_dict()
+
+    output = model(torch.randn(2, 3, 18, 11))
+    assert output.shape == (2, 10)
 
 
 # Test Forward Pass
@@ -333,6 +359,7 @@ def test_create_model_cnn():
     model = create_model("cnn", num_classes=19)
     assert isinstance(model, ConvolutionalModel)
     assert model.num_classes == 19
+    assert model.conv1.in_channels == 5
 
 
 def test_create_model_default_classes():
@@ -360,6 +387,7 @@ def test_create_model_residual_cnn_with_dropout_kwargs():
 
     assert isinstance(model, ResidualCNN)
     assert model.num_classes == 10
+    assert model.conv1.in_channels == 5
     assert model.res1.dropout1.p == pytest.approx(0.2)
     assert model.dropout1.p == pytest.approx(0.35)
     assert model.dropout2.p == pytest.approx(0.45)
@@ -381,6 +409,7 @@ def test_create_model_deep_residual_cnn_with_dropout_kwargs():
 
     assert isinstance(model, DeepResidualCNN)
     assert model.num_classes == 10
+    assert model.conv1.in_channels == 5
     assert model.res1[0].dropout1.p == pytest.approx(0.2)
     assert model.dropout1.p == pytest.approx(0.35)
     assert model.dropout2.p == pytest.approx(0.45)
