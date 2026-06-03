@@ -8,6 +8,7 @@ import argparse
 import logging
 import sys
 import json
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -18,7 +19,7 @@ from src.vae import ConditionalVAE
 from src.dataset import create_data_loaders
 from src.vae_trainer import VAETrainer
 from src.generator import ProblemGenerator, format_problem_output
-from src.evaluator import run_evaluation, get_metrics
+from src.evaluator import run_evaluation_iter, get_metrics, order_metrics
 from src.label_space import (
     EvaluationLabelContext,
     build_label_context,
@@ -408,9 +409,10 @@ def evaluate_command(args):
         original_evaluator_level = evaluator_logger.level
         original_dataset_level = dataset_logger.level
         
-        generator_logger.setLevel(logging.ERROR)
-        evaluator_logger.setLevel(logging.WARNING)
-        dataset_logger.setLevel(logging.WARNING)
+        if not args.verbose:
+            generator_logger.setLevel(logging.ERROR)
+            evaluator_logger.setLevel(logging.WARNING)
+            dataset_logger.setLevel(logging.WARNING)
         
         # Print header
         print("\n" + "=" * 50)
@@ -449,6 +451,8 @@ def evaluate_command(args):
                 print("No metrics to evaluate yet.")
             print()
             return
+
+        metrics_to_run = order_metrics(metrics_to_run)
         
         # Load model
         print(f"Loading model from {args.checkpoint}...")
@@ -479,8 +483,15 @@ def evaluate_command(args):
         print(f"Running metrics: {', '.join(metrics_to_run)}")
         print()
         
-        # Run evaluation
-        results = run_evaluation(
+        print("=" * 50)
+        print("=== RESULTS ===")
+        print("=" * 50)
+        
+        results = {'checkpoint': args.checkpoint, 'metrics': {}}
+        output_path = Path(args.output) if args.output else None
+        total_start = time.perf_counter()
+
+        for metric_name, metric_results, elapsed in run_evaluation_iter(
             model=model,
             checkpoint_path=args.checkpoint,
             data_path=args.data,
@@ -488,29 +499,22 @@ def evaluate_command(args):
             metrics=metrics_to_run,
             num_samples=args.num_samples,
             label_context=label_context,
-            device=device
-        )
-        
-        # Display results
-        print("=" * 50)
-        print("=== RESULTS ===")
-        print("=" * 50)
-        
-        for metric_name, metric_results in results.get('metrics', {}).items():
-            print(f"\n{metric_name.upper().replace('_', ' ')}:")
+            device=device,
+            on_event=_print_evaluation_event,
+        ):
+            results['metrics'][metric_name] = metric_results
+            print(f"\n{metric_name.upper().replace('_', ' ')} (done in {elapsed:.1f}s):")
             print("-" * 40)
             _print_metric_results(metric_results, indent=2)
-        
+
+            if output_path:
+                _atomic_write_json(results, output_path)
+
+        total_elapsed = time.perf_counter() - total_start
+        print(f"\nAll metrics finished in {total_elapsed:.1f}s")
         print()
         
-        # Save to JSON if requested
-        if args.output:
-            output_path = Path(args.output)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(output_path, 'w') as f:
-                json.dump(results, f, indent=2)
-            
+        if output_path:
             print(f"Results saved to: {output_path}")
             print()
         
@@ -534,6 +538,27 @@ def evaluate_command(args):
             dataset_logger.setLevel(original_dataset_level)
         except:
             pass
+
+
+def _print_evaluation_event(phase: str, item: str, index: int, total: int) -> None:
+    """Print concise evaluation progress events."""
+    if phase == 'start':
+        print(f"\n[{index}/{total}] Running {item}...", flush=True)
+    elif phase == 'generate':
+        print(f"  Generating samples for grade {item} ({index}/{total})...", flush=True)
+
+
+def _atomic_write_json(data: Dict, output_path: Path) -> None:
+    """
+    Write JSON results atomically so interrupted evaluations keep a valid file.
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = output_path.with_name(f"{output_path.name}.tmp")
+
+    with open(tmp_path, 'w') as f:
+        json.dump(data, f, indent=2)
+
+    tmp_path.replace(output_path)
 
 
 def _print_metric_results(results: Dict, indent: int = 0):
@@ -978,6 +1003,11 @@ def main():
         '--cpu',
         action='store_true',
         help='Force CPU usage even if CUDA is available'
+    )
+    evaluate_parser.add_argument(
+        '--verbose',
+        action='store_true',
+        help='Show detailed per-grade evaluation logs'
     )
     evaluate_parser.set_defaults(func=evaluate_command)
     

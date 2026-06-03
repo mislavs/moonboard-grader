@@ -2,8 +2,9 @@
 Shared utility functions for evaluation metrics.
 """
 
-from typing import Dict
+from typing import Any, Callable, Dict, List, Optional
 
+from moonboard_core import decode_grade
 from src.dataset import create_data_loaders
 from src.label_space import EvaluationLabelContext
 
@@ -70,4 +71,40 @@ def extract_problem_stats(problem: Dict) -> Dict[str, float]:
         'num_middle': num_middle,
         'vertical_spread': vertical_spread
     }
+
+
+def build_generation_pool(
+    generator,
+    label_context: EvaluationLabelContext,
+    *,
+    num_samples: int,
+    max_attempts: int = 50,
+    temperature: float = 1.0,
+    gen_batch_size: Optional[int] = None,
+    on_grade: Optional[Callable[[int, int, str], None]] = None,
+) -> Dict[int, List[Dict[str, Any]]]:
+    """
+    Generate valid problems once per grade for generation-based metrics.
+
+    Returns:
+        Dictionary keyed by global grade index.
+    """
+    global_grade_indices = label_context.get_global_grade_indices()
+    pool = {}
+
+    for index, global_grade_label in enumerate(global_grade_indices, 1):
+        grade_name = decode_grade(global_grade_label)
+        if on_grade:
+            on_grade(index, len(global_grade_indices), grade_name)
+
+        model_grade_label = label_context.global_to_model_label(global_grade_label)
+        pool[global_grade_label] = generator.generate_with_retry(
+            grade_label=model_grade_label,
+            num_samples=num_samples,
+            max_attempts=max_attempts,
+            temperature=temperature,
+            gen_batch_size=gen_batch_size or num_samples,
+        )
+
+    return pool
 

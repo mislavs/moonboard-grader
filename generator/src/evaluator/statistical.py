@@ -5,7 +5,7 @@ Evaluates how closely generated problems match the statistical distribution
 of real problems using Wasserstein distance.
 """
 
-from typing import Dict, Optional, Any
+from typing import Dict, List, Optional, Any
 import json
 import logging
 
@@ -25,7 +25,8 @@ def evaluate_statistical_similarity(
     data_path: Optional[str],
     label_context: EvaluationLabelContext,
     num_samples: int,
-    device: str
+    device: str,
+    pool: Optional[Dict[int, List[Dict[str, Any]]]] = None,
 ) -> Dict[str, Any]:
     """
     Evaluate statistical similarity to real problems.
@@ -107,8 +108,7 @@ def evaluate_statistical_similarity(
     
     logger.info(f"Grouped real problems into {len(real_by_grade)} grades")
     
-    # Create generator from model
-    generator = ProblemGenerator(model, device=device, threshold=0.5)
+    generator = None if pool is not None else ProblemGenerator(model, device=device, threshold=0.5)
     
     sorted_global_indices = label_context.get_global_grade_indices()
     logger.info(f"Generating problems for {len(sorted_global_indices)} grades")
@@ -129,14 +129,18 @@ def evaluate_statistical_similarity(
             continue
         
         logger.info(f"Generating samples for grade {grade_name}...")
-        
-        # Generate valid problems using retry logic (keeps trying until we get num_samples valid problems)
-        valid_problems = generator.generate_with_retry(
-            grade_label=model_grade_label,
-            num_samples=num_samples,
-            max_attempts=50,  # Increased from default 10 to handle difficult grades
-            temperature=1.0
-        )
+
+        if pool is not None:
+            valid_problems = pool.get(grade_label, [])
+        else:
+            # Generate valid problems using retry logic (keeps trying until we get num_samples valid problems)
+            valid_problems = generator.generate_with_retry(
+                grade_label=model_grade_label,
+                num_samples=num_samples,
+                max_attempts=50,  # Increased from default 10 to handle difficult grades
+                temperature=1.0,
+                gen_batch_size=num_samples,
+            )
         
         if len(valid_problems) < 10:  # Need enough samples for meaningful statistics
             logger.warning(

@@ -5,7 +5,7 @@ Evaluates the diversity of generated problems by measuring uniqueness
 and pairwise Hamming distances between generated samples.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 import logging
 
 import numpy as np
@@ -23,7 +23,8 @@ def evaluate_diversity(
     data_path: Optional[str],
     label_context: EvaluationLabelContext,
     num_samples: int, 
-    device: str
+    device: str,
+    pool: Optional[Dict[int, List[Dict[str, Any]]]] = None,
 ) -> Dict[str, Any]:
     """
     Evaluate diversity of generated problems.
@@ -50,8 +51,7 @@ def evaluate_diversity(
     logger.info(f"Evaluating diversity with {num_samples} samples per grade")
     _ = data_path  # Unused; kept for consistent metric function signature.
     
-    # Create generator from model
-    generator = ProblemGenerator(model, device=device, threshold=0.5)
+    generator = None if pool is not None else ProblemGenerator(model, device=device, threshold=0.5)
     
     global_grade_indices = label_context.get_global_grade_indices()
     logger.info(f"Generating problems for {len(global_grade_indices)} grades")
@@ -66,13 +66,17 @@ def evaluate_diversity(
             f"(global={global_grade_label}, model={model_grade_label})..."
         )
         
-        # Generate valid problems using retry logic (keeps trying until we get num_samples valid problems)
-        valid_problems = generator.generate_with_retry(
-            grade_label=model_grade_label,
-            num_samples=num_samples,
-            max_attempts=50,  # Increased from default 10 to handle difficult grades
-            temperature=1.0
-        )
+        if pool is not None:
+            valid_problems = pool.get(global_grade_label, [])
+        else:
+            # Generate valid problems using retry logic (keeps trying until we get num_samples valid problems)
+            valid_problems = generator.generate_with_retry(
+                grade_label=model_grade_label,
+                num_samples=num_samples,
+                max_attempts=50,  # Increased from default 10 to handle difficult grades
+                temperature=1.0,
+                gen_batch_size=num_samples,
+            )
         
         if len(valid_problems) < 2:
             logger.warning(

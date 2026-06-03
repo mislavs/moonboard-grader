@@ -8,7 +8,7 @@ to predict their grades, reporting accuracy statistics.
 import sys
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 import numpy as np
 import torch
 
@@ -22,7 +22,8 @@ def evaluate_classifier_check(
     classifier_checkpoint: Optional[str],
     label_context: EvaluationLabelContext,
     num_samples: int,
-    device: str
+    device: str,
+    pool: Optional[Dict[int, List[Dict[str, Any]]]] = None,
 ) -> Dict[str, Any]:
     """
     Evaluate generator by classifying generated problems.
@@ -69,8 +70,10 @@ def evaluate_classifier_check(
             'skipped': True
         }
 
-    from ..generator import ProblemGenerator
-    generator = ProblemGenerator(model, device=device)
+    generator = None
+    if pool is None:
+        from ..generator import ProblemGenerator
+        generator = ProblemGenerator(model, device=device)
     grade_indices_to_eval = label_context.get_global_grade_indices()
     min_grade_idx, max_grade_idx = label_context.get_global_grade_bounds()
     logger.info(
@@ -93,17 +96,21 @@ def evaluate_classifier_check(
         grade_name = decode_grade(global_grade_idx)
         logger.info(f"Evaluating grade {grade_name} (global_idx={global_grade_idx}, generator_idx={generator_relative_idx})")
         
-        # Generate problems
-        try:
-            problems = generator.generate_with_retry(
-                grade_label=generator_relative_idx,
-                num_samples=num_samples,
-                max_attempts=10,
-                temperature=1.0
-            )
-        except Exception as e:
-            logger.warning(f"Generation failed for grade {grade_name}: {e}")
-            continue
+        if pool is not None:
+            problems = pool.get(global_grade_idx, [])
+        else:
+            # Generate problems
+            try:
+                problems = generator.generate_with_retry(
+                    grade_label=generator_relative_idx,
+                    num_samples=num_samples,
+                    max_attempts=10,
+                    temperature=1.0,
+                    gen_batch_size=num_samples,
+                )
+            except Exception as e:
+                logger.warning(f"Generation failed for grade {grade_name}: {e}")
+                continue
 
         if not problems:
             logger.warning(f"No valid problems generated for grade {grade_name}")

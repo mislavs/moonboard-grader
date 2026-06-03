@@ -320,7 +320,8 @@ class ProblemGenerator:
         grade_label: int,
         num_samples: int = 1,
         max_attempts: int = 10,
-        temperature: float = 1.0
+        temperature: float = 1.0,
+        gen_batch_size: Optional[int] = None
     ) -> List[Dict]:
         """
         Generate valid problems with retry logic.
@@ -333,16 +334,21 @@ class ProblemGenerator:
             num_samples: Number of valid problems to generate
             max_attempts: Maximum number of generation attempts
             temperature: Sampling temperature
+            gen_batch_size: Optional generation batch cap (default: 10)
             
         Returns:
             List of valid problem dictionaries
         """
+        if gen_batch_size is not None and gen_batch_size < 1:
+            raise ValueError(f"gen_batch_size must be >= 1, got {gen_batch_size}")
+
         valid_problems = []
         attempts = 0
+        batch_cap = gen_batch_size or 10
         
         while len(valid_problems) < num_samples and attempts < max_attempts:
             # Generate a batch
-            batch_size = min(num_samples - len(valid_problems), 10)
+            batch_size = min(num_samples - len(valid_problems), batch_cap)
             problems = self.generate(
                 grade_label,
                 num_samples=batch_size,

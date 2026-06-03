@@ -135,8 +135,15 @@ problems = generator.generate_batch(grade_labels=[3,5,7], temperature=1.0)
 
 **With retry (ensures valid problems):**
 ```python
-problems = generator.generate_with_retry(grade_label=5, num_samples=10, max_attempts=10)
+problems = generator.generate_with_retry(
+    grade_label=5,
+    num_samples=10,
+    max_attempts=10,
+    gen_batch_size=10,
+)
 ```
+
+`gen_batch_size` is optional and defaults to the historical retry batch cap of 10.
 
 ### Parameters
 
@@ -318,14 +325,16 @@ def evaluate_classifier_check(generator, classifier_checkpoint, num_samples_per_
 
 **Design**:
 - `METRIC_FUNCTIONS`: Dispatch table mapping metric names to functions
-- `get_metrics()`: Auto-detects implemented metrics (checks for 'not_implemented' status)
-- `run_evaluation()`: Delegates to individual metric functions, aggregates results
+- `get_metrics()`: Lists implemented metrics from the dispatch table
+- `order_metrics()`: Runs fast feedback metrics first, generation metrics next, and latent visualization last
+- `run_evaluation_iter()`: Streams each metric result as soon as it completes, including elapsed time
+- `run_evaluation()`: Backward-compatible wrapper that aggregates streamed results into the historical dictionary shape
+- `build_generation_pool()`: Generates samples once per grade and shares them across `diversity`, `statistical`, and `classifier_check`
 
-**Auto-detection logic**:
+**Streaming logic**:
 ```python
-# Metric is "ready" if it doesn't return {'status': 'not_implemented'}
-result = metric_func(...)
-is_ready = result.get('status') != 'not_implemented'
+for metric_name, metric_result, elapsed in run_evaluation_iter(...):
+    results["metrics"][metric_name] = metric_result
 ```
 
 ### CLI Integration
@@ -340,6 +349,7 @@ is_ready = result.get('status') != 'not_implemented'
 - `--num-samples`: Samples per grade for generation metrics
 - `--output`: JSON output file
 - `--cpu`: Force CPU usage
+- `--verbose`: Show detailed per-grade evaluation logs
 
 **Output formats**:
 - **Console**: Human-readable tables with interpretations
@@ -387,10 +397,11 @@ py main.py evaluate \
   [--classifier-checkpoint ../classifier/test_models/best_model.pth] \
   [--num-samples 100] \
   [--output results.json] \
+  [--verbose] \
   [--cpu]
 ```
 
-**Available metrics**: `reconstruction`, `diversity`, `statistical`, `latent_space`, `classifier_check`
+**Available metrics**: `reconstruction`, `diversity`, `statistical`, `latent_space`, `latent_visualization`, `classifier_check`
 
 **Default behavior**: Runs all implemented metrics (auto-detected)
 

@@ -153,6 +153,7 @@ py main.py evaluate --checkpoint models/best_vae.pth --num-samples 50 --metrics 
 - `--num-samples N`: Samples per grade for generation metrics (default: 100)
 - `--output FILE`: Save results to JSON file
 - `--classifier-checkpoint PATH`: Classifier for `classifier_check` metric
+- `--verbose`: Show detailed per-grade evaluation logs
 - `--cpu`: Force CPU usage
 
 #### Examples
@@ -176,12 +177,15 @@ py main.py evaluate --checkpoint models/best_vae.pth --output best.json
 #### Interpreting Results
 
 **Console Output:**
+- Results stream as each metric completes with `[i/n]` progress
+- Per-metric and total evaluation timing
 - Human-readable tables for each metric
 - Overall scores and per-grade breakdowns
 - Warnings for metrics with limitations
 
 **JSON Output:**
 - Complete nested structure for programmatic access
+- With `--output`, results are written incrementally after each metric
 - Includes all raw data (centroid vectors, per-grade details, etc.)
 - Use for automated evaluation pipelines
 
