@@ -10,6 +10,8 @@ from typing import Dict, Optional, Tuple
 
 import torch
 import torch.optim as optim
+from rich.console import Console
+from rich.panel import Panel
 from torch.utils.tensorboard import SummaryWriter
 
 from .vae import ConditionalVAE, vae_loss
@@ -42,13 +44,15 @@ class VAETrainer:
         label_space_mode: str = "global_legacy",
         grade_offset: int = 0,
         min_grade_index: Optional[int] = None,
-        max_grade_index: Optional[int] = None
+        max_grade_index: Optional[int] = None,
+        console: Optional[Console] = None,
     ):
         self.model = model.to(device)
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.config = config
         self.device = device
+        self.console = console or Console()
         
         # Grade filtering metadata (for checkpoint saving)
         self.label_space_mode = label_space_mode
@@ -132,6 +136,11 @@ class VAETrainer:
         self.last_train_pre_clip_grad_norm = 0.0
         self.early_stopping_counter = 0
         self.best_epoch: Optional[int] = None
+
+    def _format_patience(self) -> str:
+        if self.early_stopping_patience is None:
+            return f"{self.early_stopping_counter}/off"
+        return f"{self.early_stopping_counter}/{self.early_stopping_patience}"
 
     def _is_validation_improved(self, val_recon_loss: float) -> bool:
         """
@@ -437,10 +446,17 @@ class VAETrainer:
         Args:
             start_epoch: Epoch to start training from (for resuming)
         """
-        print(f'\n🏋️  Training for {self.num_epochs} epochs...')
-        print(f'   Device: {self.device}')
-        print(f'   Training samples: {len(self.train_loader.dataset)}')
-        print(f'   Validation samples: {len(self.val_loader.dataset)}')
+        self.console.print()
+        self.console.print(
+            Panel.fit(
+                f"[bold]Epochs:[/bold] {self.num_epochs}\n"
+                f"[bold]Device:[/bold] {self.device}\n"
+                f"[bold]Training samples:[/bold] {len(self.train_loader.dataset)}\n"
+                f"[bold]Validation samples:[/bold] {len(self.val_loader.dataset)}",
+                title="[bold cyan]Training[/bold cyan]",
+                border_style="cyan",
+            )
+        )
         
         for epoch in range(start_epoch, self.num_epochs):
             self.current_epoch = epoch
@@ -455,18 +471,7 @@ class VAETrainer:
             old_lr = self.optimizer.param_groups[0]['lr']
             self.scheduler.step(val_recon)
             new_lr = self.optimizer.param_groups[0]['lr']
-            
-            # Print progress (classifier-style format)
-            print(f"Epoch {epoch+1}/{self.num_epochs} - "
-                  f"Train Loss: {train_loss:.4f} - "
-                  f"Val Loss: {val_loss:.4f} - "
-                  f"Recon: {val_recon:.4f} - "
-                  f"KL: {val_kl:.4f}")
-            
-            # Show LR reduction
-            if old_lr != new_lr:
-                print(f"  → Learning rate reduced from {old_lr:.6f} to {new_lr:.6f}")
-            
+
             # TensorBoard logging
             self.writer.add_scalar('Loss/train', train_loss, epoch)
             self.writer.add_scalar('Loss/val', val_loss, epoch)
@@ -487,14 +492,16 @@ class VAETrainer:
             
             # Save best model based on validation reconstruction loss
             should_stop = False
+            best_checkpoint_message = None
+            early_stop_message = None
             if self._is_validation_improved(val_recon):
                 self.best_val_recon_loss = val_recon
                 self.best_val_total_loss = val_loss
                 self.best_epoch = epoch
                 self.early_stopping_counter = 0
                 self.save_checkpoint(epoch, f'checkpoint_epoch_{epoch}.pth', is_best=True)
-                print(
-                    "  → New best recon loss: "
+                best_checkpoint_message = (
+                    "New best recon loss: "
                     f"{val_recon:.4f} (total: {val_loss:.4f}) - Saved checkpoint"
                 )
             else:
@@ -506,8 +513,8 @@ class VAETrainer:
                     best_epoch_display = (
                         self.best_epoch + 1 if self.best_epoch is not None else "N/A"
                     )
-                    print(
-                        "  → Early stopping triggered: "
+                    early_stop_message = (
+                        "Early stopping triggered: "
                         f"no recon loss improvement > {self.early_stopping_min_delta:.6f} "
                         f"for {self.early_stopping_counter} epochs "
                         f"(best epoch: {best_epoch_display})"
@@ -524,15 +531,45 @@ class VAETrainer:
                 ),
                 epoch,
             )
+            self.console.print(
+                f"Epoch {epoch + 1:03d}/{self.num_epochs:03d} | "
+                f"train {train_loss:.4f} | "
+                f"val {val_loss:.4f} | "
+                f"recon {val_recon:.4f} | "
+                f"kl {val_kl:.4f} | "
+                f"lr {new_lr:.2e} | "
+                f"patience {self._format_patience()}"
+            )
+            if old_lr != new_lr:
+                self.console.print(
+                    f"  Learning rate reduced from {old_lr:.6f} to {new_lr:.6f}",
+                    style="yellow",
+                )
+            if best_checkpoint_message is not None:
+                self.console.print(f"  {best_checkpoint_message}", style="green")
+            if early_stop_message is not None:
+                self.console.print(f"  {early_stop_message}", style="yellow")
             if should_stop:
                 break
         
         # Save final model
         self.save_checkpoint(self.current_epoch, 'final_vae.pth')
-        
-        print(f'\n✓ Training completed!')
-        print(f'  Best validation recon loss: {self.best_val_recon_loss:.4f}')
-        print(f'  Best validation total loss: {self.best_val_total_loss:.4f}')
+
+        best_epoch_display = (
+            self.best_epoch + 1 if self.best_epoch is not None else "N/A"
+        )
+        self.console.print()
+        self.console.print(
+            Panel.fit(
+                "[bold green]Training completed[/bold green]\n"
+                f"[bold]Best validation recon loss:[/bold] {self.best_val_recon_loss:.4f}\n"
+                f"[bold]Best validation total loss:[/bold] {self.best_val_total_loss:.4f}\n"
+                f"[bold]Best epoch:[/bold] {best_epoch_display}\n"
+                f"[bold]Final checkpoint:[/bold] {self.checkpoint_dir / 'final_vae.pth'}",
+                title="[bold green]Complete[/bold green]",
+                border_style="green",
+            )
+        )
         
         # Close tensorboard writer
         self.writer.close()

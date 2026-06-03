@@ -106,14 +106,21 @@ def train_command(args):
     try:
         # Load configuration
         config = load_config(args.config)
-        print(f"\n📋 Configuration loaded from: {args.config}")
-        
+
         # Set device
         device = torch.device(config.get('device', 'cuda') if torch.cuda.is_available() else 'cpu')
-        print(f"   Device: {device}")
-        
+        console.print()
+        console.print(
+            Panel.fit(
+                f"[bold]Config:[/bold] {args.config}\n"
+                f"[bold]Device:[/bold] {device}",
+                title="[bold cyan]Training Setup[/bold cyan]",
+                border_style="cyan",
+            )
+        )
+
         # Create data loaders
-        print(f"\n📊 Loading dataset...")
+        console.print("Loading dataset...", style="cyan")
         data_config = config['data']
         train_loader, val_loader, dataset = create_data_loaders(
             data_path=data_config['data_path'],
@@ -126,9 +133,6 @@ def train_command(args):
         )
         
         num_grades = dataset.get_num_model_grades()
-        print(f"   Total problems: {len(dataset)}")
-        print(f"   Model grades: {num_grades}")
-        print(f"   Grade range: {', '.join(dataset.model_grade_names)}")
 
         # Extract filtering metadata from dataset
         grade_offset = dataset.grade_offset
@@ -137,7 +141,7 @@ def train_command(args):
         max_grade_index = dataset.max_grade_index
         
         # Create model
-        print(f"\n🧠 Creating model...")
+        console.print("Creating model...", style="cyan")
         model_config = config['model']
         model = ConditionalVAE(
             latent_dim=model_config['latent_dim'],
@@ -145,9 +149,21 @@ def train_command(args):
             grade_embedding_dim=model_config['grade_embedding_dim'],
             dropout_rate=model_config.get('dropout_rate', 0.1),
         )
-        
-        print(f"   Latent dim: {model_config['latent_dim']}")
-        print(f"   Grade embedding dim: {model_config['grade_embedding_dim']}")
+
+        setup_table = Table(title="Dataset and Model", show_lines=False)
+        setup_table.add_column("Area", style="bold")
+        setup_table.add_column("Setting")
+        setup_table.add_column("Value", overflow="fold")
+        setup_table.add_row("Dataset", "Total problems", str(len(dataset)))
+        setup_table.add_row("Dataset", "Training samples", str(len(train_loader.dataset)))
+        setup_table.add_row("Dataset", "Validation samples", str(len(val_loader.dataset)))
+        setup_table.add_row("Dataset", "Model grades", str(num_grades))
+        setup_table.add_row("Dataset", "Grade range", ", ".join(dataset.model_grade_names))
+        setup_table.add_row("Model", "Latent dim", str(model_config['latent_dim']))
+        setup_table.add_row("Model", "Grade embedding dim", str(model_config['grade_embedding_dim']))
+        setup_table.add_row("Model", "Dropout", str(model_config.get('dropout_rate', 0.1)))
+        console.print()
+        console.print(setup_table)
         
         # Prepare training config
         training_config = build_training_config(config)
@@ -162,7 +178,8 @@ def train_command(args):
             label_space_mode=label_space_mode,
             grade_offset=grade_offset,
             min_grade_index=min_grade_index,
-            max_grade_index=max_grade_index
+            max_grade_index=max_grade_index,
+            console=console,
         )
         
         # Load checkpoint if resuming
@@ -170,24 +187,31 @@ def train_command(args):
         if args.resume:
             resume_path = Path(args.resume)
             if resume_path.exists():
-                print(f"\n↻  Resuming from checkpoint: {resume_path}")
+                console.print()
+                console.print(f"Resuming from checkpoint: {resume_path}", style="cyan")
                 trainer.load_checkpoint(str(resume_path))
                 start_epoch = trainer.current_epoch + 1
-                print(f"   Starting from epoch {start_epoch}")
+                console.print(f"Starting from epoch {start_epoch}")
             else:
-                print(f"\n⚠️  Checkpoint {args.resume} not found. Starting from scratch.")
+                console.print()
+                console.print(
+                    f"Checkpoint {args.resume} not found. Starting from scratch.",
+                    style="yellow",
+                )
         
         # Train
         trainer.train(start_epoch=start_epoch)
         
     except KeyboardInterrupt:
-        print("\n\n⚠️  Training interrupted by user")
+        console.print()
+        console.print("Training interrupted by user", style="bold yellow")
         if trainer is not None:
             trainer.save_checkpoint(trainer.current_epoch, 'interrupted_checkpoint.pth')
-            print("   Saved interrupted checkpoint")
+            console.print("Saved interrupted checkpoint", style="yellow")
         sys.exit(0)
     except Exception as e:
-        print(f"\n❌ Training failed with error: {e}")
+        console.print()
+        console.print(f"Training failed with error: {e}", style="bold red")
         logger.error(f"Training failed with error: {e}", exc_info=True)
         sys.exit(1)
 

@@ -2,11 +2,13 @@
 Tests for the VAE Trainer.
 """
 
+from io import StringIO
 import pytest
 import torch
 from pathlib import Path
 import shutil
 from uuid import uuid4
+from rich.console import Console
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.vae import ConditionalVAE
@@ -407,6 +409,74 @@ class TestVAETrainer:
         assert trainer.early_stopping_counter == 2
         assert trainer.best_val_recon_loss == pytest.approx(0.4)
         assert trainer.best_val_total_loss == pytest.approx(1.0)
+
+    def test_train_console_output_uses_rich_summary(
+        self, small_dataset_config, monkeypatch
+    ):
+        """train() should emit stable, human-readable Rich console output."""
+        model = ConditionalVAE(latent_dim=32, num_grades=17, grade_embedding_dim=16)
+        train_loader, val_loader = _create_tiny_loaders()
+        config = dict(small_dataset_config)
+        config['num_epochs'] = 3
+        config['early_stopping_patience'] = 2
+        config['early_stopping_min_delta'] = 1e-4
+        output = StringIO()
+        console = Console(
+            file=output,
+            force_terminal=False,
+            color_system=None,
+            width=160,
+        )
+
+        trainer = VAETrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=config,
+            device='cpu',
+            console=console,
+        )
+        trainer.writer.close()
+
+        class SpyWriter:
+            def add_scalar(self, tag, scalar_value, global_step):
+                pass
+
+            def close(self):
+                pass
+
+        trainer.writer = SpyWriter()
+        train_epochs = []
+        val_epochs = []
+        val_recon_losses = [0.4, 0.39995, 0.39992]
+
+        def fake_train_epoch(epoch):
+            train_epochs.append(epoch)
+            trainer.last_train_pre_clip_grad_norm = 0.0
+            return 1.23456, 0.5, 0.1
+
+        def fake_validate(epoch):
+            val_epochs.append(epoch)
+            idx = min(len(val_epochs) - 1, len(val_recon_losses) - 1)
+            return 1.11111, val_recon_losses[idx], 0.12345
+
+        monkeypatch.setattr(trainer, 'train_epoch', fake_train_epoch)
+        monkeypatch.setattr(trainer, 'validate', fake_validate)
+
+        trainer.train(start_epoch=0)
+
+        rendered = output.getvalue()
+        assert train_epochs == [0, 1, 2]
+        assert val_epochs == [0, 1, 2]
+        assert "Training samples:" in rendered
+        assert (
+            "Epoch 001/003 | train 1.2346 | val 1.1111 | recon 0.4000 | "
+            "kl 0.1235 | lr 1.00e-03 | patience 0/2"
+        ) in rendered
+        assert "New best recon loss: 0.4000 (total: 1.1111) - Saved checkpoint" in rendered
+        assert "Early stopping triggered: no recon loss improvement > 0.000100" in rendered
+        assert "Training completed" in rendered
+        assert "Best validation recon loss: 0.4000" in rendered
 
     def test_train_does_not_stop_early_when_early_stopping_is_disabled(
         self, small_dataset_config, monkeypatch
