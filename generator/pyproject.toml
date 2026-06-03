@@ -12,6 +12,7 @@ dependencies = [
     "moonboard_core",
     "scikit-learn>=1.3.0",
     "matplotlib>=3.7.0",
+    "rich",
 ]
 
 [project.optional-dependencies]

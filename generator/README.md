@@ -177,6 +177,7 @@ py main.py evaluate --checkpoint models/best_vae.pth --output best.json
 #### Interpreting Results
 
 **Console Output:**
+- Rich-rendered panels, status lines, and metric tables
 - Results stream as each metric completes with `[i/n]` progress
 - Per-metric and total evaluation timing
 - Human-readable tables for each metric
@@ -186,6 +187,7 @@ py main.py evaluate --checkpoint models/best_vae.pth --output best.json
 **JSON Output:**
 - Complete nested structure for programmatic access
 - With `--output`, results are written incrementally after each metric
+- Console formatting does not change JSON field names or structure
 - Includes all raw data (centroid vectors, per-grade details, etc.)
 - Use for automated evaluation pipelines
 

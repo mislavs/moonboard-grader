@@ -14,6 +14,9 @@ from typing import Dict, List, Optional, Tuple
 
 import yaml
 import torch
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from src.vae import ConditionalVAE
 from src.dataset import create_data_loaders
@@ -37,6 +40,7 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+console = Console()
 
 
 def load_config(config_path: str) -> Dict:
@@ -414,30 +418,32 @@ def evaluate_command(args):
             evaluator_logger.setLevel(logging.WARNING)
             dataset_logger.setLevel(logging.WARNING)
         
-        # Print header
-        print("\n" + "=" * 50)
-        print("=== GENERATOR EVALUATION ===")
-        print("=" * 50)
-        print(f"Model: {args.checkpoint}")
-        print(f"Device: {device}")
-        print()
+        console.print()
+        console.print(
+            Panel.fit(
+                f"[bold]Model:[/bold] {args.checkpoint}\n"
+                f"[bold]Device:[/bold] {device}",
+                title="Generator Evaluation",
+                border_style="cyan",
+            )
+        )
         
         # Check what's available
         available_metrics = get_metrics()
         
         if available_metrics:
-            print(f"Available metrics: {', '.join(available_metrics)}")
+            console.print(f"[bold]Available metrics:[/bold] {', '.join(available_metrics)}")
         else:
-            print("No metrics available yet.")
-        print()
+            console.print("No metrics available yet.", style="yellow")
+        console.print()
         
         # Determine which metrics to run
         if args.metrics:
             requested_metrics = [m.strip() for m in args.metrics.split(',') if m.strip()]
             unknown_metrics = [m for m in requested_metrics if m not in available_metrics]
             if unknown_metrics:
-                print(f"Unknown metric name(s): {', '.join(unknown_metrics)}")
-                print(f"Available metrics: {', '.join(available_metrics)}")
+                console.print(f"Unknown metric name(s): {', '.join(unknown_metrics)}", style="bold red")
+                console.print(f"Available metrics: {', '.join(available_metrics)}", style="yellow")
                 sys.exit(1)
             metrics_to_run = requested_metrics
         else:
@@ -445,17 +451,17 @@ def evaluate_command(args):
         
         if not metrics_to_run:
             if args.metrics and available_metrics:
-                print(f"Requested metrics not ready yet.")
-                print(f"Available: {', '.join(available_metrics)}")
+                console.print("Requested metrics not ready yet.", style="yellow")
+                console.print(f"Available: {', '.join(available_metrics)}")
             else:
-                print("No metrics to evaluate yet.")
-            print()
+                console.print("No metrics to evaluate yet.", style="yellow")
+            console.print()
             return
 
         metrics_to_run = order_metrics(metrics_to_run)
         
         # Load model
-        print(f"Loading model from {args.checkpoint}...")
+        console.print(f"Loading model from {args.checkpoint}...", style="cyan")
         checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
         num_model_grades = infer_num_model_grades(checkpoint)
         label_context = build_label_context(checkpoint, num_model_grades=num_model_grades)
@@ -476,16 +482,14 @@ def evaluate_command(args):
         model.to(device)
         model.eval()
 
-        print(f"Model loaded successfully")
+        console.print("Model loaded successfully", style="green")
         min_idx, max_idx = label_context.get_global_grade_bounds()
-        print(f"Label space mode: {label_context.label_space_mode}")
-        print(f"Global grade range: {decode_grade(min_idx)} to {decode_grade(max_idx)}")
-        print(f"Running metrics: {', '.join(metrics_to_run)}")
-        print()
+        console.print(f"[bold]Label space mode:[/bold] {label_context.label_space_mode}")
+        console.print(f"[bold]Global grade range:[/bold] {decode_grade(min_idx)} to {decode_grade(max_idx)}")
+        console.print(f"[bold]Running metrics:[/bold] {', '.join(metrics_to_run)}")
+        console.print()
         
-        print("=" * 50)
-        print("=== RESULTS ===")
-        print("=" * 50)
+        console.rule("[bold cyan]Results[/bold cyan]")
         
         results = {'checkpoint': args.checkpoint, 'metrics': {}}
         output_path = Path(args.output) if args.output else None
@@ -503,20 +507,21 @@ def evaluate_command(args):
             on_event=_print_evaluation_event,
         ):
             results['metrics'][metric_name] = metric_results
-            print(f"\n{metric_name.upper().replace('_', ' ')} (done in {elapsed:.1f}s):")
-            print("-" * 40)
+            console.print()
+            console.rule(f"[bold]{metric_name.upper().replace('_', ' ')}[/bold] [dim](done in {elapsed:.1f}s)[/dim]")
             _print_metric_results(metric_results, indent=2)
 
             if output_path:
                 _atomic_write_json(results, output_path)
 
         total_elapsed = time.perf_counter() - total_start
-        print(f"\nAll metrics finished in {total_elapsed:.1f}s")
-        print()
+        console.print()
+        console.print(f"All metrics finished in {total_elapsed:.1f}s", style="bold green")
+        console.print()
         
         if output_path:
-            print(f"Results saved to: {output_path}")
-            print()
+            console.print(f"Results saved to: {output_path}", style="green")
+            console.print()
         
         # Restore original logging levels
         generator_logger.setLevel(original_generator_level)
@@ -524,10 +529,10 @@ def evaluate_command(args):
         dataset_logger.setLevel(original_dataset_level)
         
     except FileNotFoundError as e:
-        print(f"\n[!] {e}")
+        console.print(f"\n[!] {e}", style="bold red")
         sys.exit(1)
     except Exception as e:
-        print(f"\n[!] Evaluation failed: {e}")
+        console.print(f"\n[!] Evaluation failed: {e}", style="bold red")
         logger.error(f"Evaluation failed: {e}", exc_info=True)
         sys.exit(1)
     finally:
@@ -543,9 +548,11 @@ def evaluate_command(args):
 def _print_evaluation_event(phase: str, item: str, index: int, total: int) -> None:
     """Print concise evaluation progress events."""
     if phase == 'start':
-        print(f"\n[{index}/{total}] Running {item}...", flush=True)
+        console.print(f"\n[bold cyan][{index}/{total}][/bold cyan] Running [bold]{item}[/bold]...")
     elif phase == 'generate':
-        print(f"  Generating samples for grade {item} ({index}/{total})...", flush=True)
+        console.print(f"  [cyan]Generating samples[/cyan] for grade [bold]{item}[/bold] ({index}/{total})...")
+    elif phase == 'pool_ready':
+        console.print("  [green]Generation sample pool ready[/green]")
 
 
 def _atomic_write_json(data: Dict, output_path: Path) -> None:
@@ -573,13 +580,13 @@ def _print_metric_results(results: Dict, indent: int = 0):
     
     for key, value in results.items():
         if key == 'per_grade_iou' and isinstance(value, dict):
-            print(f"{prefix}{key}:")
+            console.print(f"{prefix}{key}:")
             _print_grade_iou_table(value, indent + 2)
         elif key == 'per_grade_centroids' and isinstance(value, dict):
-            print(f"{prefix}{key}:")
+            console.print(f"{prefix}{key}:")
             _print_grade_centroids_table(value, indent + 2)
         elif key == 'per_grade' and isinstance(value, dict):
-            print(f"{prefix}{key}:")
+            console.print(f"{prefix}{key}:")
             # Detect which type of per_grade data we have
             # Check first non-empty value to determine type
             sample_value = next((v for v in value.values() if v), None)
@@ -600,17 +607,17 @@ def _print_metric_results(results: Dict, indent: int = 0):
                 # Empty data
                 _print_metric_results(value, indent + 2)
         elif key == 'per_statistic' and isinstance(value, dict):
-            print(f"{prefix}{key}:")
+            console.print(f"{prefix}{key}:")
             _print_per_statistic_table(value, indent + 2)
         elif isinstance(value, dict):
-            print(f"{prefix}{key}:")
+            console.print(f"{prefix}{key}:")
             _print_metric_results(value, indent + 2)
         elif isinstance(value, (list, tuple)):
-            print(f"{prefix}{key}: {value}")
+            console.print(f"{prefix}{key}: {value}")
         elif isinstance(value, float):
-            print(f"{prefix}{key}: {value:.4f}")
+            console.print(f"{prefix}{key}: {value:.4f}")
         else:
-            print(f"{prefix}{key}: {value}")
+            console.print(f"{prefix}{key}: {value}")
 
 
 def _print_grade_iou_table(grade_data: Dict, indent: int = 0):
@@ -621,15 +628,11 @@ def _print_grade_iou_table(grade_data: Dict, indent: int = 0):
         grade_data: Dictionary mapping grade labels to IoU statistics
         indent: Indentation level
     """
-    prefix = " " * indent
-    
-    # Table header
-    header = f"{prefix}{'Grade':<8} {'Mean IoU':<12} {'Std IoU':<12} {'Samples':<10}"
-    separator = f"{prefix}{'-' * 42}"
-    
-    print(separator)
-    print(header)
-    print(separator)
+    table = Table(title="Per-Grade Reconstruction IoU", show_lines=False)
+    table.add_column("Grade", style="bold")
+    table.add_column("Mean IoU", justify="right")
+    table.add_column("Std IoU", justify="right")
+    table.add_column("Samples", justify="right")
     
     # Sort grades by their keys for consistent display
     for grade, stats in sorted(grade_data.items()):
@@ -637,10 +640,9 @@ def _print_grade_iou_table(grade_data: Dict, indent: int = 0):
         std_iou = stats.get('std_iou', 0.0)
         num_samples = stats.get('num_samples', 0)
         
-        row = f"{prefix}{grade:<8} {mean_iou:<12.4f} {std_iou:<12.4f} {num_samples:<10}"
-        print(row)
+        table.add_row(grade, f"{mean_iou:.4f}", f"{std_iou:.4f}", str(num_samples))
     
-    print(separator)
+    console.print(table)
 
 
 def _print_grade_diversity_table(grade_data: Dict, indent: int = 0):
@@ -651,15 +653,13 @@ def _print_grade_diversity_table(grade_data: Dict, indent: int = 0):
         grade_data: Dictionary mapping grade names to diversity statistics
         indent: Indentation level
     """
-    prefix = " " * indent
-    
-    # Table header
-    header = f"{prefix}{'Grade':<8} {'Diversity':<12} {'Uniqueness':<12} {'Valid':<10} {'Requested':<12} {'Status':<20}"
-    separator = f"{prefix}{'-' * 74}"
-    
-    print(separator)
-    print(header)
-    print(separator)
+    table = Table(title="Per-Grade Diversity", show_lines=False)
+    table.add_column("Grade", style="bold")
+    table.add_column("Diversity", justify="right")
+    table.add_column("Uniqueness", justify="right")
+    table.add_column("Valid", justify="right")
+    table.add_column("Requested", justify="right")
+    table.add_column("Status")
     
     # Sort grades by their keys for consistent display
     for grade, stats in sorted(grade_data.items()):
@@ -668,8 +668,8 @@ def _print_grade_diversity_table(grade_data: Dict, indent: int = 0):
             reason = stats.get('reason', 'unknown')
             num_valid = stats.get('num_valid', 0)
             num_requested = stats.get('num_requested', 0)
-            status = f"SKIPPED ({reason})"
-            row = f"{prefix}{grade:<8} {'-':<12} {'-':<12} {num_valid:<10} {num_requested:<12} {status:<20}"
+            status = f"[yellow]SKIPPED ({reason})[/yellow]"
+            table.add_row(grade, "-", "-", str(num_valid), str(num_requested), status)
         else:
             # Valid grade
             mean_diversity = stats.get('mean_diversity', 0.0)
@@ -681,13 +681,10 @@ def _print_grade_diversity_table(grade_data: Dict, indent: int = 0):
             diversity_str = f"{mean_diversity:.4f}"
             uniqueness_str = f"{uniqueness:.1%}"
             valid_str = f"{total_valid} ({unique}u)"
-            status = "OK"
-            
-            row = f"{prefix}{grade:<8} {diversity_str:<12} {uniqueness_str:<12} {valid_str:<10} {num_requested:<12} {status:<20}"
-        
-        print(row)
+            status = "[green]OK[/green]"
+            table.add_row(grade, diversity_str, uniqueness_str, valid_str, str(num_requested), status)
     
-    print(separator)
+    console.print(table)
 
 
 def _print_grade_statistical_table(grade_data: Dict, indent: int = 0):
@@ -698,24 +695,19 @@ def _print_grade_statistical_table(grade_data: Dict, indent: int = 0):
         grade_data: Dictionary mapping grade names to statistical similarity metrics
         indent: Indentation level
     """
-    prefix = " " * indent
-    
-    # Table header
-    header = f"{prefix}{'Grade':<8} {'Mean Dist':<12} {'Gen/Real':<12} {'Status':<30}"
-    separator = f"{prefix}{'-' * 62}"
-    
-    print(separator)
-    print(header)
-    print(separator)
+    table = Table(title="Per-Grade Statistical Similarity", show_lines=False)
+    table.add_column("Grade", style="bold")
+    table.add_column("Mean Dist", justify="right")
+    table.add_column("Gen/Real", justify="right")
+    table.add_column("Status")
     
     # Sort grades by their keys for consistent display
     for grade, stats in sorted(grade_data.items()):
         if stats.get('skipped', False):
             # Skipped grade
             reason = stats.get('reason', 'unknown')
-            num_real = stats.get('num_real', 0)
-            status = f"SKIPPED ({reason})"
-            row = f"{prefix}{grade:<8} {'-':<12} {'-':<12} {status:<30}"
+            status = f"[yellow]SKIPPED ({reason})[/yellow]"
+            table.add_row(grade, "-", "-", status)
         else:
             # Valid grade
             mean_distance = stats.get('mean_distance', 0.0)
@@ -724,13 +716,10 @@ def _print_grade_statistical_table(grade_data: Dict, indent: int = 0):
             
             mean_dist_str = f"{mean_distance:.4f}" if mean_distance is not None else "N/A"
             gen_real_str = f"{num_generated}/{num_real}"
-            status = "OK"
-            
-            row = f"{prefix}{grade:<8} {mean_dist_str:<12} {gen_real_str:<12} {status:<30}"
-        
-        print(row)
+            status = "[green]OK[/green]"
+            table.add_row(grade, mean_dist_str, gen_real_str, status)
     
-    print(separator)
+    console.print(table)
 
 
 def _print_per_statistic_table(statistic_data: Dict, indent: int = 0):
@@ -741,15 +730,12 @@ def _print_per_statistic_table(statistic_data: Dict, indent: int = 0):
         statistic_data: Dictionary mapping statistic names to their distance metrics
         indent: Indentation level
     """
-    prefix = " " * indent
-    
-    # Table header
-    header = f"{prefix}{'Statistic':<20} {'Mean':<12} {'Std':<12} {'Min':<12} {'Max':<12}"
-    separator = f"{prefix}{'-' * 68}"
-    
-    print(separator)
-    print(header)
-    print(separator)
+    table = Table(title="Per-Statistic Wasserstein Distance", show_lines=False)
+    table.add_column("Statistic", style="bold")
+    table.add_column("Mean", justify="right")
+    table.add_column("Std", justify="right")
+    table.add_column("Min", justify="right")
+    table.add_column("Max", justify="right")
     
     # Define display order for statistics
     stat_order = ['num_holds', 'num_start', 'num_end', 'num_middle', 'vertical_spread']
@@ -760,16 +746,20 @@ def _print_per_statistic_table(statistic_data: Dict, indent: int = 0):
         if stat_name in statistic_data:
             stats = statistic_data[stat_name]
             if stats is None:
-                row = f"{prefix}{stat_name:<20} {'N/A':<12} {'N/A':<12} {'N/A':<12} {'N/A':<12}"
+                table.add_row(stat_name, "N/A", "N/A", "N/A", "N/A")
             else:
                 mean_val = stats.get('mean', 0.0)
                 std_val = stats.get('std', 0.0)
                 min_val = stats.get('min', 0.0)
                 max_val = stats.get('max', 0.0)
                 
-                row = f"{prefix}{stat_name:<20} {mean_val:<12.4f} {std_val:<12.4f} {min_val:<12.4f} {max_val:<12.4f}"
-            
-            print(row)
+                table.add_row(
+                    stat_name,
+                    f"{mean_val:.4f}",
+                    f"{std_val:.4f}",
+                    f"{min_val:.4f}",
+                    f"{max_val:.4f}",
+                )
             displayed.add(stat_name)
     
     # Print any remaining statistics not in the predefined order
@@ -777,18 +767,22 @@ def _print_per_statistic_table(statistic_data: Dict, indent: int = 0):
         if stat_name not in displayed:
             stats = statistic_data[stat_name]
             if stats is None:
-                row = f"{prefix}{stat_name:<20} {'N/A':<12} {'N/A':<12} {'N/A':<12} {'N/A':<12}"
+                table.add_row(stat_name, "N/A", "N/A", "N/A", "N/A")
             else:
                 mean_val = stats.get('mean', 0.0)
                 std_val = stats.get('std', 0.0)
                 min_val = stats.get('min', 0.0)
                 max_val = stats.get('max', 0.0)
                 
-                row = f"{prefix}{stat_name:<20} {mean_val:<12.4f} {std_val:<12.4f} {min_val:<12.4f} {max_val:<12.4f}"
-            
-            print(row)
+                table.add_row(
+                    stat_name,
+                    f"{mean_val:.4f}",
+                    f"{std_val:.4f}",
+                    f"{min_val:.4f}",
+                    f"{max_val:.4f}",
+                )
     
-    print(separator)
+    console.print(table)
 
 
 def _print_classifier_check_table(grade_data: Dict, indent: int = 0):
@@ -799,15 +793,14 @@ def _print_classifier_check_table(grade_data: Dict, indent: int = 0):
         grade_data: Dictionary mapping grade names to classifier check metrics
         indent: Indentation level
     """
-    prefix = " " * indent
-    
-    # Table header
-    header = f"{prefix}{'Grade':<8} {'Exact':<10} {'Off±1':<10} {'Off±2':<10} {'Off>2':<10} {'Classified':<15}"
-    separator = f"{prefix}{'-' * 63}"
-    
-    print(separator)
-    print(header)
-    print(separator)
+    table = Table(title="Classifier Check by Grade", show_lines=False)
+    table.add_column("Grade", style="bold")
+    table.add_column("Exact", justify="right")
+    table.add_column("Off +/-1", justify="right")
+    table.add_column("Off +/-2", justify="right")
+    table.add_column("Off >2", justify="right")
+    table.add_column("Classified", justify="right")
+    table.add_column("Top Predictions")
     
     # Sort grades by their keys for consistent display
     for grade, stats in sorted(grade_data.items()):
@@ -823,19 +816,16 @@ def _print_classifier_check_table(grade_data: Dict, indent: int = 0):
         off2_str = f"{off2:.1f}%"
         off_more_str = f"{off_more:.1f}%"
         classified_str = f"{classified}/{generated}"
-        
-        row = f"{prefix}{grade:<8} {exact_str:<10} {off1_str:<10} {off2_str:<10} {off_more_str:<10} {classified_str:<15}"
-        print(row)
-        
-        # Print prediction distribution if available
+        pred_str = ""
         if 'prediction_distribution' in stats and stats['prediction_distribution']:
             pred_dist = stats['prediction_distribution']
             # Sort by count (descending) and format as: "Predicted: 6B(35), 6A+(28), 6C(20)"
             sorted_preds = sorted(pred_dist.items(), key=lambda x: x[1], reverse=True)
-            pred_str = ", ".join([f"{pred}({count})" for pred, count in sorted_preds[:5]])  # Top 5
-            print(f"{prefix}  └─ Predicted: {pred_str}")
+            pred_str = ", ".join([f"{pred}({count})" for pred, count in sorted_preds[:5]])
+
+        table.add_row(grade, exact_str, off1_str, off2_str, off_more_str, classified_str, pred_str)
     
-    print(separator)
+    console.print(table)
 
 
 def _print_grade_centroids_table(centroid_data: Dict, indent: int = 0):
@@ -849,15 +839,10 @@ def _print_grade_centroids_table(centroid_data: Dict, indent: int = 0):
         centroid_data: Dictionary mapping grade names to centroid statistics
         indent: Indentation level
     """
-    prefix = " " * indent
-    
-    # Table header
-    header = f"{prefix}{'Grade':<10} {'Latent Std':<15} {'Samples':<10}"
-    separator = f"{prefix}{'-' * 35}"
-    
-    print(separator)
-    print(header)
-    print(separator)
+    table = Table(title="Per-Grade Latent Centroids", show_lines=False)
+    table.add_column("Grade", style="bold")
+    table.add_column("Latent Std", justify="right")
+    table.add_column("Samples", justify="right")
     
     # Grades are already strings, just sort them alphabetically
     # (they should be in order since they come from a sorted numeric label list)
@@ -865,11 +850,13 @@ def _print_grade_centroids_table(centroid_data: Dict, indent: int = 0):
         latent_std = stats.get('std', 0.0)
         count = stats.get('count', 0)
         
-        row = f"{prefix}{grade_name:<10} {latent_std:<15.4f} {count:<10}"
-        print(row)
+        table.add_row(grade_name, f"{latent_std:.4f}", str(count))
     
-    print(separator)
-    print(f"{prefix}Note: Full {len(next(iter(centroid_data.values()))['mean'])}-dimensional centroid vectors available in JSON output")
+    console.print(table)
+    console.print(
+        f"Note: Full {len(next(iter(centroid_data.values()))['mean'])}-dimensional centroid vectors available in JSON output",
+        style="dim",
+    )
 
 
 def main():

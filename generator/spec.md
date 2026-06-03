@@ -352,8 +352,8 @@ for metric_name, metric_result, elapsed in run_evaluation_iter(...):
 - `--verbose`: Show detailed per-grade evaluation logs
 
 **Output formats**:
-- **Console**: Human-readable tables with interpretations
-- **JSON**: Complete nested structure for programmatic access
+- **Console**: Rich-rendered panels, progress/status lines, and human-readable metric tables with interpretations
+- **JSON**: Complete nested structure for programmatic access; unaffected by console formatting
 
 ### Expected Performance
 
