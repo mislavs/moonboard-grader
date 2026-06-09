@@ -11,6 +11,9 @@ This module provides comprehensive evaluation tools including:
 import numpy as np
 import torch
 from typing import Dict, List, Tuple, Optional
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import precision_recall_fscore_support, confusion_matrix, balanced_accuracy_score
@@ -426,4 +429,3 @@ def get_metrics_summary(
             grade_names=grade_names
         )
     }
-

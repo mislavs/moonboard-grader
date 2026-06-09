@@ -7,9 +7,11 @@ import json
 import sys
 import tempfile
 from pathlib import Path
+from io import StringIO
 from unittest.mock import patch, MagicMock
 import yaml
 import torch
+from rich.console import Console
 
 # Import the functions we're testing
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -648,6 +650,126 @@ class TestTrainCommand:
             unique_checkpoint["model_state_dict"]["weight"],
             best_checkpoint["model_state_dict"]["weight"],
         )
+
+    def test_train_command_renders_rich_summary_output(self, tmp_path, monkeypatch):
+        """Training command should emit stable Rich summaries without real training."""
+        from src.cli import train as train_module
+
+        output = StringIO()
+        rich_console = Console(
+            file=output,
+            force_terminal=False,
+            color_system=None,
+            width=160,
+        )
+        monkeypatch.setattr(train_module, "console", rich_console)
+        monkeypatch.setattr(
+            train_module,
+            "print_section_header",
+            lambda message: rich_console.print(message),
+        )
+        monkeypatch.setattr(
+            train_module,
+            "print_completion_message",
+            lambda message: rich_console.print(message),
+        )
+
+        class DummyDataset:
+            def __init__(self, labels):
+                self.labels = torch.tensor(labels).numpy()
+
+            def __len__(self):
+                return len(self.labels)
+
+        class FakeTrainer:
+            def __init__(self, model, train_loader, val_loader, optimizer, criterion, device, checkpoint_dir, **kwargs):
+                self.model = model
+                self.checkpoint_dir = Path(checkpoint_dir)
+
+            def fit(self, num_epochs, early_stopping_patience=None, verbose=True):
+                torch.save(
+                    {"model_state_dict": self.model.state_dict()},
+                    self.checkpoint_dir / "best_model.pth",
+                )
+                return {}, {}
+
+            def save_history(self, filename="training_history.json"):
+                output_path = self.checkpoint_dir / filename
+                output_path.write_text("{}", encoding="utf-8")
+                return output_path
+
+            def log_test_results(self, config, test_metrics, confusion_matrix_path=None):
+                return None
+
+        config = {
+            "model": {"type": "fc", "num_classes": 2},
+            "training": {
+                "learning_rate": 0.001,
+                "batch_size": 4,
+                "num_epochs": 1,
+                "early_stopping_patience": None,
+                "optimizer": "adam",
+                "use_scheduler": False,
+                "use_class_weights": False,
+            },
+            "data": {
+                "path": "ignored.json",
+                "train_ratio": 0.7,
+                "val_ratio": 0.15,
+                "test_ratio": 0.15,
+                "random_seed": 42,
+            },
+            "checkpoint": {"dir": str(tmp_path / "models")},
+            "evaluation": {"save_confusion_matrix": False},
+            "device": "cpu",
+        }
+
+        monkeypatch.setattr(train_module, "load_config", lambda _: config)
+        monkeypatch.setattr(train_module, "setup_device", lambda _: ("cpu", "cpu"))
+        monkeypatch.setattr(train_module, "load_dataset", lambda *args, **kwargs: [("x", 0), ("y", 1)])
+        monkeypatch.setattr(
+            train_module,
+            "get_dataset_stats",
+            lambda dataset: {"total_problems": len(dataset), "grade_distribution": {0: 1, 1: 1}},
+        )
+        monkeypatch.setattr(
+            train_module,
+            "create_datasets",
+            lambda *args, **kwargs: (DummyDataset([0, 1]), DummyDataset([0]), DummyDataset([1])),
+        )
+        monkeypatch.setattr(train_module, "create_data_loaders", lambda *args, **kwargs: ("train", "val", "test"))
+        monkeypatch.setattr(train_module, "create_model", lambda *args, **kwargs: torch.nn.Linear(1, 2, bias=False))
+        monkeypatch.setattr(train_module, "count_parameters", lambda model: 2)
+        monkeypatch.setattr(train_module, "decode_grade", lambda idx: f"G{idx}")
+        monkeypatch.setattr(train_module, "Trainer", FakeTrainer)
+        monkeypatch.setattr(
+            train_module,
+            "evaluate_model",
+            lambda *args, **kwargs: {
+                "exact_accuracy": 50.0,
+                "macro_accuracy": 40.0,
+                "tolerance_1_accuracy": 75.0,
+                "tolerance_2_accuracy": 90.0,
+                "avg_loss": 0.5,
+                "predictions": [0],
+                "labels": [0],
+            },
+        )
+
+        args = MagicMock()
+        args.config = "ignored.yaml"
+        train_module.train_command(args)
+
+        rendered = output.getvalue()
+        assert "Training Setup" in rendered
+        assert "Dataset Statistics" in rendered
+        assert "Train" in rendered
+        assert "Val" in rendered
+        assert "Test" in rendered
+        assert "Parameters" in rendered
+        assert "Test Set Results" in rendered
+        assert "TensorBoard logs saved" in rendered
+        assert "Training completed successfully!" in rendered
 
 
 class TestEvaluateCommand:

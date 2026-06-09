@@ -14,6 +14,9 @@ import numpy as np
 from pathlib import Path
 from datetime import datetime
 import json
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
 
 
 class Trainer:
@@ -49,7 +52,8 @@ class Trainer:
         gradient_clip: Optional[float] = None,
         grade_offset: int = 0,
         min_grade_index: int = 0,
-        max_grade_index: int = 18
+        max_grade_index: int = 18,
+        console: Optional[Console] = None,
     ):
         """
         Initialize the Trainer.
@@ -67,6 +71,7 @@ class Trainer:
             grade_offset: Offset for grade label remapping (0 if not using filtering)
             min_grade_index: Minimum grade index in filtered range
             max_grade_index: Maximum grade index in filtered range
+            console: Optional Rich console for human-readable progress output
             
         Raises:
             ValueError: If train_loader is None or empty
@@ -96,6 +101,7 @@ class Trainer:
         self.grade_offset = grade_offset
         self.min_grade_index = min_grade_index
         self.max_grade_index = max_grade_index
+        self.console = console or Console()
         
         # Create checkpoint directory if it doesn't exist
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -194,7 +200,7 @@ class Trainer:
                 _, predicted = torch.max(outputs, 1)
                 correct_predictions += (predicted == batch_labels).sum().item()
                 
-                # Calculate tolerance 1 accuracy (within ±1 grade)
+                # Calculate tolerance 1 accuracy (within +-1 grade)
                 differences = torch.abs(predicted - batch_labels)
                 tolerance_1_correct += (differences <= 1).sum().item()
                 
@@ -241,12 +247,21 @@ class Trainer:
             raise ValueError("num_epochs must be positive")
         
         if verbose:
-            print(f"Training for {num_epochs} epochs...")
-            print(f"Device: {self.device}")
-            print(f"Checkpoint directory: {self.checkpoint_dir}")
-            if early_stopping_patience is not None:
-                print(f"Early stopping patience: {early_stopping_patience}")
-            print("-" * 60)
+            early_stopping_display = (
+                early_stopping_patience if early_stopping_patience is not None else "off"
+            )
+            self.console.print()
+            self.console.print(
+                Panel.fit(
+                    f"[bold]Epochs:[/bold] {num_epochs}\n"
+                    f"[bold]Device:[/bold] {self.device}\n"
+                    f"[bold]Checkpoint directory:[/bold] {self.checkpoint_dir}\n"
+                    f"[bold]Early stopping:[/bold] {early_stopping_display}",
+                    title="Training Loop",
+                    border_style="cyan",
+                    box=box.ASCII,
+                )
+            )
         
         for epoch in range(num_epochs):
             self.current_epoch = epoch
@@ -271,14 +286,18 @@ class Trainer:
             # Print progress
             if verbose:
                 if self.val_loader is not None:
-                    print(f"Epoch {epoch+1}/{num_epochs} - "
-                          f"Train Loss: {train_loss:.4f} - "
-                          f"Val Loss: {val_loss:.4f} - "
-                          f"Val Acc: {val_accuracy:.4f} - "
-                          f"Val +-1 Acc: {val_tolerance_1_accuracy:.4f}")
+                    self.console.print(
+                        f"Epoch {epoch + 1:03d}/{num_epochs:03d} | "
+                        f"train {train_loss:.4f} | "
+                        f"val {val_loss:.4f} | "
+                        f"acc {val_accuracy * 100:.2f}% | "
+                        f"+-1 {val_tolerance_1_accuracy * 100:.2f}%"
+                    )
                 else:
-                    print(f"Epoch {epoch+1}/{num_epochs} - "
-                          f"Train Loss: {train_loss:.4f}")
+                    self.console.print(
+                        f"Epoch {epoch + 1:03d}/{num_epochs:03d} | "
+                        f"train {train_loss:.4f}"
+                    )
             
             # Save best model based on validation loss
             if self.val_loader is not None and val_loss < self.best_val_loss:
@@ -286,7 +305,10 @@ class Trainer:
                 self.epochs_without_improvement = 0
                 self.save_checkpoint('best_model.pth')
                 if verbose:
-                    print(f"  -> New best validation loss: {val_loss:.4f} - Saved checkpoint")
+                    self.console.print(
+                        f"  New best validation loss: {val_loss:.4f} - Saved checkpoint",
+                        style="green",
+                    )
             else:
                 self.epochs_without_improvement += 1
             
@@ -301,18 +323,34 @@ class Trainer:
             if early_stopping_patience is not None and self.val_loader is not None:
                 if self.epochs_without_improvement >= early_stopping_patience:
                     if verbose:
-                        print(f"\nEarly stopping triggered after {epoch+1} epochs")
-                        print(f"Best validation loss: {self.best_val_loss:.4f}")
+                        self.console.print()
+                        self.console.print(
+                            f"Early stopping triggered after {epoch + 1} epochs",
+                            style="yellow",
+                        )
+                        self.console.print(
+                            f"Best validation loss: {self.best_val_loss:.4f}",
+                            style="yellow",
+                        )
                     break
         
         # Save final model
         self.save_checkpoint('final_model.pth')
         
         if verbose:
-            print("-" * 60)
-            print("Training completed!")
+            panel_body = "[bold green]Training completed![/bold green]"
             if self.val_loader is not None:
-                print(f"Best validation loss: {self.best_val_loss:.4f}")
+                panel_body += f"\n[bold]Best validation loss:[/bold] {self.best_val_loss:.4f}"
+            panel_body += f"\n[bold]Final checkpoint:[/bold] {self.checkpoint_dir / 'final_model.pth'}"
+            self.console.print()
+            self.console.print(
+                Panel.fit(
+                    panel_body,
+                    title="Training Complete",
+                    border_style="green",
+                    box=box.ASCII,
+                )
+            )
         
         # Prepare final metrics
         final_metrics = {

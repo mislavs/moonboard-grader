@@ -14,8 +14,17 @@ from torch import nn, optim
 from torch.utils.data import DataLoader, WeightedRandomSampler
 import numpy as np
 from sklearn.utils.class_weight import compute_class_weight
+from rich import box
+from rich.panel import Panel
+from rich.table import Table
 
-from .utils import load_config, setup_device, print_section_header, print_completion_message
+from .utils import (
+    console,
+    load_config,
+    setup_device,
+    print_section_header,
+    print_completion_message,
+)
 from src import (
     load_dataset,
     get_dataset_stats,
@@ -30,6 +39,53 @@ from src import (
     decode_grade,
     get_all_grades,
 )
+
+
+def _print_key_value_table(title, rows):
+    """Print a compact two-column Rich table."""
+    table = Table(title=title, show_lines=False, box=box.ASCII)
+    table.add_column("Setting", style="bold")
+    table.add_column("Value", overflow="fold")
+    for setting, value in rows:
+        table.add_row(str(setting), str(value))
+    console.print()
+    console.print(table)
+
+
+def _print_dataset_stats(stats):
+    table = Table(title="Dataset Statistics", show_lines=False, box=box.ASCII)
+    table.add_column("Grade", style="bold")
+    table.add_column("Problems", justify="right")
+    for grade_label, count in sorted(stats['grade_distribution'].items()):
+        table.add_row(decode_grade(grade_label), str(count))
+
+    console.print()
+    console.print(f"[bold]Total problems:[/bold] {stats['total_problems']}")
+    console.print(table)
+
+
+def _print_split_summary(split_mode, splits):
+    table = Table(title=f"Train/Val/Test Splits ({split_mode})", show_lines=False, box=box.ASCII)
+    table.add_column("Split", style="bold")
+    table.add_column("Samples", justify="right")
+    table.add_column("Ratio", justify="right")
+    for name, size, ratio in splits:
+        table.add_row(name, str(size), f"{ratio * 100:.0f}%")
+    console.print()
+    console.print(table)
+
+
+def _print_test_metrics(test_metrics):
+    table = Table(title="Test Set Results", show_lines=False, box=box.ASCII)
+    table.add_column("Metric", style="bold")
+    table.add_column("Value", justify="right")
+    table.add_row("Exact Accuracy", f"{test_metrics['exact_accuracy']:.2f}%")
+    table.add_row("Macro Accuracy", f"{test_metrics['macro_accuracy']:.2f}%")
+    table.add_row("+-1 Grade Accuracy", f"{test_metrics['tolerance_1_accuracy']:.2f}%")
+    table.add_row("+-2 Grade Accuracy", f"{test_metrics['tolerance_2_accuracy']:.2f}%")
+    table.add_row("Loss", f"{test_metrics['avg_loss']:.4f}")
+    console.print()
+    console.print(table)
 
 
 def setup_train_parser(subparsers):
@@ -64,7 +120,14 @@ def train_command(args):
     
     # Load configuration
     config = load_config(args.config)
-    print(f"\n* Loaded configuration from: {args.config}")
+    console.print(
+        Panel.fit(
+            f"[bold]Config:[/bold] {args.config}",
+            title="Training Setup",
+            border_style="cyan",
+            box=box.ASCII,
+        )
+    )
 
     # Validate filtered grade configuration early to fail fast on class-space mismatch.
     num_classes = config['model']['num_classes']
@@ -100,16 +163,20 @@ def train_command(args):
         if deterministic:
             torch.use_deterministic_algorithms(True)
             torch.backends.cudnn.benchmark = False
-        print(f"* Reproducibility seed: {repro_seed} (deterministic={deterministic})")
+        console.print(
+            f"Reproducibility seed: {repro_seed} (deterministic={deterministic})",
+            style="cyan",
+        )
 
     # Set device
     device_name = config.get('device', 'cpu')
     device, device_name = setup_device(device_name)
-    print(f"* Using device: {device}")
+    console.print(f"Using device: {device}", style="cyan")
     
     # Load dataset
     data_path = config['data']['path']
-    print(f"\n>> Loading dataset from: {data_path}")
+    console.print()
+    console.print(f"Loading dataset from: {data_path}", style="cyan")
     
     # Check if repeats filtering is enabled
     filter_repeats_enabled = config.get('data', {}).get('filter_repeats', False)
@@ -117,22 +184,17 @@ def train_command(args):
     
     if filter_repeats_enabled:
         min_repeats = config['data'].get('min_repeats', 1)
-        print(f"   Filtering routes with minimum {min_repeats} repeat(s)")
+        console.print(f"Filtering routes with minimum {min_repeats} repeat(s)", style="cyan")
     
     dataset = load_dataset(data_path, min_repeats=min_repeats)
     
     if len(dataset) == 0:
-        print("[ERROR] Error: No problems found in dataset")
+        console.print("[ERROR] Error: No problems found in dataset", style="bold red")
         sys.exit(1)
     
     # Get dataset statistics
     stats = get_dataset_stats(dataset)
-    print(f"\n>> Dataset Statistics:")
-    print(f"   Total problems: {stats['total_problems']}")
-    print(f"   Grade distribution:")
-    for grade_label, count in sorted(stats['grade_distribution'].items()):
-        grade_name = decode_grade(grade_label)
-        print(f"      {grade_name}: {count}")
+    _print_dataset_stats(stats)
     
     # Check if grade filtering is enabled
     filter_enabled = config.get('data', {}).get('filter_grades', False)
@@ -152,12 +214,16 @@ def train_command(args):
         dataset = filter_dataset_by_grades(dataset, min_grade_idx, max_grade_idx)
         filtered_count = len(dataset)
         
-        print(f"\n>> Grade Filtering:")
-        print(f"   Filtering to grades {decode_grade(min_grade_idx)} - {decode_grade(max_grade_idx)}")
-        print(f"   Original problems: {original_count}")
-        print(f"   Filtered problems: {filtered_count}")
-        print(f"   Removed: {original_count - filtered_count}")
-        print(f"   Using label offset: {grade_offset}")
+        _print_key_value_table(
+            "Grade Filtering",
+            [
+                ("Grade range", f"{decode_grade(min_grade_idx)} - {decode_grade(max_grade_idx)}"),
+                ("Original problems", original_count),
+                ("Filtered problems", filtered_count),
+                ("Removed", original_count - filtered_count),
+                ("Label offset", grade_offset),
+            ],
+        )
         
         # Remap labels to start from 0
         dataset = [(tensor, remap_label(label, grade_offset)) for tensor, label in dataset]
@@ -165,7 +231,8 @@ def train_command(args):
     # Create data splits
     group_by_layout = config.get('data', {}).get('group_by_layout', False)
     split_mode = "grouped (layout-aware)" if group_by_layout else "stratified"
-    print(f"\n>> Creating train/val/test splits ({split_mode})...")
+    console.print()
+    console.print(f"Creating train/val/test splits ({split_mode})...", style="cyan")
     tensors = np.array([x[0] for x in dataset])
     labels = np.array([x[1] for x in dataset])
     
@@ -179,9 +246,14 @@ def train_command(args):
         tensors, labels, config, train_ratio, val_ratio, test_ratio, random_seed
     )
     
-    print(f"   Train: {len(train_dataset)} ({train_ratio*100:.0f}%)")
-    print(f"   Val:   {len(val_dataset)} ({val_ratio*100:.0f}%)")
-    print(f"   Test:  {len(test_dataset)} ({test_ratio*100:.0f}%)")
+    _print_split_summary(
+        split_mode,
+        [
+            ("Train", len(train_dataset), train_ratio),
+            ("Val", len(val_dataset), val_ratio),
+            ("Test", len(test_dataset), test_ratio),
+        ],
+    )
     
     # Create data loaders
     batch_size = config['training']['batch_size']
@@ -227,16 +299,33 @@ def train_command(args):
             train_dataset, val_dataset, test_dataset, batch_size
         )
         
-        print(f"\n>> Using balanced sampling ({sampling_strategy} strategy)")
-        print(f"   Effective class weight range: {class_weights_sampling.min():.3f} - {class_weights_sampling.max():.3f}")
+        _print_key_value_table(
+            "Data Loader",
+            [
+                ("Batch size", batch_size),
+                ("Balanced sampling", f"{sampling_strategy} strategy"),
+                (
+                    "Sampling weight range",
+                    f"{class_weights_sampling.min():.3f} - {class_weights_sampling.max():.3f}",
+                ),
+            ],
+        )
     else:
         train_loader, val_loader, test_loader = create_data_loaders(
             train_dataset, val_dataset, test_dataset, batch_size
         )
+        _print_key_value_table(
+            "Data Loader",
+            [
+                ("Batch size", batch_size),
+                ("Balanced sampling", "off"),
+            ],
+        )
     
     # Create model
     model_type = config['model']['type']
-    print(f"\n>> Creating model: {model_type.upper()}")
+    console.print()
+    console.print(f"Creating model: {model_type.upper()}", style="cyan")
     
     # Extract model-specific parameters from config
     model_params = {
@@ -254,15 +343,15 @@ def train_command(args):
     )
     
     # Print model-specific info
+    model_notes = []
     if model_type in ['residual_cnn', 'deep_residual_cnn']:
-        print(f"   Using advanced model with attention: {model_params['use_attention']}")
+        model_notes.append(f"Advanced model with attention: {model_params['use_attention']}")
     if model_type in ['cnn', 'residual_cnn', 'deep_residual_cnn']:
-        print("   Using CoordConv coordinate channels")
+        model_notes.append("CoordConv coordinate channels")
     
     model = model.to(device)
     
     num_params = count_parameters(model)
-    print(f"   Parameters: {num_params:,}")
     
     # Create optimizer
     optimizer_type = config['training'].get('optimizer', 'adam').lower()
@@ -275,8 +364,6 @@ def train_command(args):
         optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=weight_decay)
     else:
         raise ValueError(f"Unknown optimizer: {optimizer_type}")
-    
-    print(f"   Optimizer: {optimizer_type.upper()} (lr={learning_rate}, weight_decay={weight_decay})")
     
     # Calculate class weights for imbalanced dataset
     label_smoothing = config['training'].get('label_smoothing', 0.0)
@@ -303,11 +390,13 @@ def train_command(args):
         class_weights = np.clip(class_weights, 0.1, max_weight)
         
         class_weights = torch.FloatTensor(class_weights).to(device)
-        
-        print(f"   Using balanced class weights (capped at {max_weight})")
-        print(f"   Weight range: {class_weights.min():.2f} - {class_weights.max():.2f}")
+        class_weight_summary = (
+            f"balanced, cap={max_weight}, "
+            f"range={class_weights.min().item():.2f} - {class_weights.max().item():.2f}"
+        )
     else:
         class_weights = None
+        class_weight_summary = "off"
     
     # Create loss function (support advanced loss functions)
     loss_type = config['training'].get('loss_type', 'ce')
@@ -322,16 +411,17 @@ def train_command(args):
             ordinal_alpha=config['training'].get('ordinal_alpha', 2.0),
             smoothing=label_smoothing
         )
-        print(f"   Using {loss_type} loss")
+        loss_notes = [f"Loss: {loss_type}"]
         if loss_type in ['focal', 'focal_ordinal']:
-            print(f"   Focal gamma: {config['training'].get('focal_gamma', 2.0)}")
+            loss_notes.append(f"Focal gamma: {config['training'].get('focal_gamma', 2.0)}")
         if loss_type in ['ordinal', 'focal_ordinal']:
-            print(f"   Ordinal alpha: {config['training'].get('ordinal_alpha', 2.0)}")
+            loss_notes.append(f"Ordinal alpha: {config['training'].get('ordinal_alpha', 2.0)}")
     else:
         criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)
+        loss_notes = ["Loss: cross entropy"]
     
     if label_smoothing > 0:
-        print(f"   Using label smoothing: {label_smoothing}")
+        loss_notes.append(f"Label smoothing: {label_smoothing}")
     
     # Create learning rate scheduler
     use_scheduler = config['training'].get('use_scheduler', True)
@@ -346,7 +436,12 @@ def train_command(args):
             patience=scheduler_patience,
             min_lr=1e-7
         )
-        print(f"   Using ReduceLROnPlateau scheduler (factor={scheduler_factor}, patience={scheduler_patience})")
+        scheduler_summary = (
+            f"ReduceLROnPlateau, factor={scheduler_factor}, "
+            f"patience={scheduler_patience}"
+        )
+    else:
+        scheduler_summary = "off"
     
     # Create checkpoint directory
     checkpoint_dir = Path(config['checkpoint']['dir'])
@@ -368,19 +463,42 @@ def train_command(args):
         gradient_clip=gradient_clip,
         grade_offset=grade_offset,
         min_grade_index=min_grade_idx,
-        max_grade_index=max_grade_idx
+        max_grade_index=max_grade_idx,
+        console=console,
     )
+
+    training_rows = [
+        ("Model type", model_type.upper()),
+        ("Parameters", f"{num_params:,}"),
+        ("Optimizer", f"{optimizer_type.upper()} (lr={learning_rate}, weight_decay={weight_decay})"),
+        ("Class weights", class_weight_summary),
+        ("Scheduler", scheduler_summary),
+    ]
+    if model_notes:
+        training_rows.append(("Model notes", "; ".join(model_notes)))
+    if loss_notes:
+        training_rows.append(("Loss", "; ".join(loss_notes)))
     
     if gradient_clip is not None:
-        print(f"   Using gradient clipping: max_norm={gradient_clip}")
+        training_rows.append(("Gradient clipping", f"max_norm={gradient_clip}"))
+
+    _print_key_value_table("Model and Training Configuration", training_rows)
     
     # Train model
     num_epochs = config['training']['num_epochs']
     early_stopping_patience = config['training'].get('early_stopping_patience')
     
-    print(f"\n>> Training for {num_epochs} epochs...")
-    if early_stopping_patience:
-        print(f"   Early stopping: patience={early_stopping_patience}")
+    console.print()
+    console.print(
+        Panel.fit(
+            f"[bold]Epochs:[/bold] {num_epochs}\n"
+            f"[bold]Early stopping:[/bold] "
+            f"{early_stopping_patience if early_stopping_patience else 'off'}",
+            title="Training",
+            border_style="cyan",
+            box=box.ASCII,
+        )
+    )
     
     # Record start time
     training_start_time = datetime.now()
@@ -393,7 +511,8 @@ def train_command(args):
 
     # Persist training history for post-run analysis.
     history_path = trainer.save_history('training_history.json')
-    print(f"\n* Saved training history to: {history_path}")
+    console.print()
+    console.print(f"Saved training history to: {history_path}", style="green")
     
     # Calculate training duration
     training_end_time = datetime.now()
@@ -410,7 +529,7 @@ def train_command(args):
     else:
         duration_str = f"{seconds}s"
     
-    print(f"\n>> Training duration: {duration_str}")
+    console.print(f"Training duration: {duration_str}", style="cyan")
     
     # Evaluate the same checkpoint artifact that will be saved with metrics.
     best_model_path = checkpoint_dir / "best_model.pth"
@@ -426,18 +545,20 @@ def train_command(args):
         checkpoint = torch.load(eval_checkpoint_path, map_location=device)
         model.load_state_dict(checkpoint["model_state_dict"])
         model = model.to(device)
-        print(f"\n>> Evaluating on test set using checkpoint: {eval_checkpoint_path.name}")
+        console.print()
+        console.print(
+            f"Evaluating on test set using checkpoint: {eval_checkpoint_path.name}",
+            style="cyan",
+        )
     else:
-        print("\n>> Evaluating on test set using in-memory final model (no checkpoint found)")
+        console.print()
+        console.print(
+            "Evaluating on test set using in-memory final model (no checkpoint found)",
+            style="cyan",
+        )
 
     test_metrics = evaluate_model(model, test_loader, device)
-    
-    print(f"\n>> Test Set Results:")
-    print(f"   Exact Accuracy:    {test_metrics['exact_accuracy']:.2f}%")
-    print(f"   Macro Accuracy:    {test_metrics['macro_accuracy']:.2f}%")
-    print(f"   +-1 Grade Accuracy: {test_metrics['tolerance_1_accuracy']:.2f}%")
-    print(f"   +-2 Grade Accuracy: {test_metrics['tolerance_2_accuracy']:.2f}%")
-    print(f"   Loss:              {test_metrics['avg_loss']:.4f}")
+    _print_test_metrics(test_metrics)
     
     # Generate unique timestamp for this training session
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -472,7 +593,8 @@ def train_command(args):
             str(cm_path),
             normalize=True
         )
-        print(f"\n* Saved confusion matrix to: {cm_path}")
+        console.print()
+        console.print(f"Saved confusion matrix to: {cm_path}", style="green")
     
     # Generate unique model filename with timestamp and accuracy metrics
     unique_model_filename = f"model_{timestamp}_acc{exact_acc}_tol1-{tol1_acc}_tol2-{tol2_acc}.pth"
@@ -481,11 +603,20 @@ def train_command(args):
     # Copy the evaluated checkpoint artifact to the unique filename.
     if eval_checkpoint_path is not None and eval_checkpoint_path.exists():
         shutil.copy2(eval_checkpoint_path, unique_model_path)
-        print(f"\n* Saved unique model to: {unique_model_path}")
-        print(f"   Source checkpoint: {eval_checkpoint_path.name}")
+        _print_key_value_table(
+            "Saved Model Artifact",
+            [
+                ("Unique model", unique_model_path),
+                ("Source checkpoint", eval_checkpoint_path.name),
+            ],
+        )
     
     # Log final test results to TensorBoard
     trainer.log_test_results(config, test_metrics, str(cm_path) if cm_path and cm_path.exists() else None)
     
-    print(f"\n* TensorBoard logs saved. View with: py -m tensorboard.main --logdir=runs")
+    console.print()
+    console.print(
+        "TensorBoard logs saved. View with: py -m tensorboard.main --logdir=runs",
+        style="green",
+    )
     print_completion_message("Training completed successfully!")

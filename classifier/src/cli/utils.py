@@ -8,6 +8,12 @@ import sys
 import torch
 import yaml
 from pathlib import Path
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+
+
+console = Console()
 
 
 def load_config(config_path):
@@ -46,10 +52,10 @@ def setup_device(device_name, fallback_to_cpu=True):
     """
     if device_name == 'cuda' and not torch.cuda.is_available():
         if fallback_to_cpu:
-            print(f"[WARN] CUDA requested but not available, falling back to CPU")
+            console.print("[WARN] CUDA requested but not available, falling back to CPU", style="yellow")
             device_name = 'cpu'
         else:
-            print(f"[ERROR] CUDA requested but not available")
+            console.print("[ERROR] CUDA requested but not available", style="bold red")
             sys.exit(1)
     
     device = torch.device(device_name)
@@ -63,9 +69,15 @@ def print_section_header(title):
     Args:
         title: Title text to display
     """
-    print("=" * 70)
-    print(title)
-    print("=" * 70)
+    console.print()
+    console.print(
+        Panel.fit(
+            title,
+            title="Moonboard Classifier",
+            border_style="cyan",
+            box=box.ASCII,
+        )
+    )
 
 
 def print_completion_message(message):
@@ -75,7 +87,13 @@ def print_completion_message(message):
     Args:
         message: Completion message to display
     """
-    print("\n" + "=" * 70)
-    print(message)
-    print("=" * 70)
+    console.print()
+    console.print(
+        Panel.fit(
+            message,
+            title="Complete",
+            border_style="green",
+            box=box.ASCII,
+        )
+    )
 

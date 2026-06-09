@@ -13,6 +13,8 @@ from torch.utils.data import DataLoader, TensorDataset
 import tempfile
 import json
 from pathlib import Path
+from io import StringIO
+from rich.console import Console
 
 from src.trainer import Trainer
 from src.models import FullyConnectedModel, ConvolutionalModel
@@ -909,11 +911,18 @@ def test_trainer_with_sgd_optimizer(simple_model, tiny_dataloaders, temp_checkpo
 # Test Verbose Output
 # ============================================================================
 
-def test_fit_verbose_output(simple_model, tiny_dataloaders, temp_checkpoint_dir, capsys):
-    """Test that verbose output is printed when verbose=True."""
+def test_fit_verbose_output(simple_model, tiny_dataloaders, temp_checkpoint_dir):
+    """Test that verbose output is printed with Rich when verbose=True."""
     train_loader, val_loader = tiny_dataloaders
     optimizer = optim.Adam(simple_model.parameters(), lr=0.001)
     criterion = nn.CrossEntropyLoss()
+    output = StringIO()
+    console = Console(
+        file=output,
+        force_terminal=False,
+        color_system=None,
+        width=160,
+    )
     
     trainer = Trainer(
         model=simple_model,
@@ -921,15 +930,18 @@ def test_fit_verbose_output(simple_model, tiny_dataloaders, temp_checkpoint_dir,
         val_loader=val_loader,
         optimizer=optimizer,
         criterion=criterion,
-        checkpoint_dir=temp_checkpoint_dir
+        checkpoint_dir=temp_checkpoint_dir,
+        console=console,
     )
     
     trainer.fit(num_epochs=2, verbose=True)
     
-    captured = capsys.readouterr()
-    assert "Training for" in captured.out
-    assert "Epoch" in captured.out
-    assert "Train Loss" in captured.out
+    rendered = output.getvalue()
+    assert "Training Loop" in rendered
+    assert "Epoch 001/002 | train" in rendered
+    assert "acc" in rendered
+    assert "+-1" in rendered
+    assert "Training completed!" in rendered
 
 
 def test_fit_no_verbose_output(simple_model, tiny_dataloaders, temp_checkpoint_dir, capsys):
