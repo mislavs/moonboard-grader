@@ -467,7 +467,7 @@ class Trainer:
 - Batch Size: {config['training']['batch_size']}
 - Optimizer: {config['training'].get('optimizer', 'adam')}
 - Weight Decay: {config['training'].get('weight_decay', 0.001)}
-- Loss Type: {config['training'].get('loss_type', 'ce')}
+- Loss Type: {config['training'].get('loss_type', 'focal_ordinal')}
 - Label Smoothing: {config['training'].get('label_smoothing', 0.0)}
 - Early Stopping Patience: {config['training'].get('early_stopping_patience', 'None')}
 

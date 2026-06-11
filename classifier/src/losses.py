@@ -8,7 +8,7 @@ ordinal nature of climbing grades.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Optional
+from typing import Optional, Sequence
 
 
 class FocalLoss(nn.Module):
@@ -285,8 +285,129 @@ class LabelSmoothingCrossEntropy(nn.Module):
             return loss
 
 
+class OrdinalSmoothingCrossEntropy(nn.Module):
+    """
+    Cross-entropy with ordinal neighbor soft targets.
+
+    Instead of spreading smoothing mass uniformly across all grades, this loss
+    assigns target probability to nearby grade classes. The default kernel is a
+    mild five-class neighborhood: [0.025, 0.075, 0.8, 0.075, 0.025].
+
+    Args:
+        kernel: Odd-length smoothing kernel centered on the true class.
+                Values are normalized automatically.
+        class_weights: Optional per-class weights.
+        reduction: 'mean', 'sum', or 'none'
+    """
+
+    DEFAULT_KERNEL = (0.025, 0.075, 0.8, 0.075, 0.025)
+
+    def __init__(
+        self,
+        kernel: Optional[Sequence[float]] = None,
+        class_weights: Optional[torch.Tensor] = None,
+        reduction: str = 'mean'
+    ):
+        super().__init__()
+        self.reduction = reduction
+
+        kernel_tensor = torch.as_tensor(
+            self.DEFAULT_KERNEL if kernel is None else kernel,
+            dtype=torch.float32
+        )
+
+        if kernel_tensor.dim() != 1:
+            raise ValueError("kernel must be a one-dimensional sequence")
+        if kernel_tensor.numel() == 0 or kernel_tensor.numel() % 2 == 0:
+            raise ValueError("kernel must contain an odd number of values")
+        if torch.any(kernel_tensor < 0):
+            raise ValueError("kernel values must be non-negative")
+        kernel_sum = kernel_tensor.sum()
+        if kernel_sum <= 0:
+            raise ValueError("kernel must have positive total mass")
+        if reduction not in ['mean', 'sum', 'none']:
+            raise ValueError(f"reduction must be 'mean', 'sum', or 'none', got {reduction}")
+
+        self.register_buffer('kernel', kernel_tensor / kernel_sum)
+        if class_weights is not None:
+            if class_weights.dim() != 1:
+                raise ValueError("class_weights must be one-dimensional")
+            self.register_buffer('class_weights', class_weights.detach().float())
+        else:
+            self.class_weights = None
+
+    def build_soft_targets(
+        self,
+        targets: torch.Tensor,
+        num_classes: int,
+        device: Optional[torch.device] = None,
+        dtype: Optional[torch.dtype] = None
+    ) -> torch.Tensor:
+        """
+        Build ordinal soft targets and renormalize at grade boundaries.
+        """
+        if targets.dim() != 1:
+            raise ValueError("targets must be a one-dimensional tensor")
+        if num_classes <= 0:
+            raise ValueError("num_classes must be positive")
+        invalid_targets = (targets < 0) | (targets >= num_classes)
+        if targets.numel() > 0 and torch.any(invalid_targets).item():
+            raise ValueError("targets contain class indices outside the valid range")
+
+        device = device or targets.device
+        dtype = dtype or self.kernel.dtype
+        targets = targets.to(device=device)
+        kernel = self.kernel.to(device=device, dtype=dtype)
+        soft_targets = torch.zeros(
+            (targets.size(0), num_classes),
+            device=device,
+            dtype=dtype
+        )
+
+        radius = kernel.numel() // 2
+        for kernel_index, offset in enumerate(range(-radius, radius + 1)):
+            class_indices = targets + offset
+            valid = (class_indices >= 0) & (class_indices < num_classes)
+            if valid.any():
+                soft_targets[valid, class_indices[valid]] = kernel[kernel_index]
+
+        normalizer = soft_targets.sum(dim=1, keepdim=True)
+        return soft_targets / normalizer.clamp_min(torch.finfo(dtype).tiny)
+
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """
+        Compute ordinal-smoothed cross-entropy.
+        """
+        num_classes = inputs.size(-1)
+        log_probs = F.log_softmax(inputs, dim=-1)
+        soft_targets = self.build_soft_targets(
+            targets=targets,
+            num_classes=num_classes,
+            device=inputs.device,
+            dtype=log_probs.dtype
+        )
+
+        if self.class_weights is not None:
+            if self.class_weights.numel() != num_classes:
+                raise ValueError(
+                    f"class_weights must have {num_classes} values, "
+                    f"got {self.class_weights.numel()}"
+                )
+            weights = self.class_weights.to(device=inputs.device, dtype=log_probs.dtype)
+            loss = -torch.sum(soft_targets * log_probs * weights[None, :], dim=-1)
+        else:
+            loss = -torch.sum(soft_targets * log_probs, dim=-1)
+
+        if self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+        else:
+            return loss
+
+
 def create_loss_function(
-    loss_type: str = 'focal',
+    loss_type: str = 'focal_ordinal',
     num_classes: int = 19,
     class_weights: Optional[torch.Tensor] = None,
     **kwargs
@@ -301,6 +422,7 @@ def create_loss_function(
             - 'ordinal': Ordinal cross-entropy (for grade ordering)
             - 'focal_ordinal': Combined focal + ordinal
             - 'label_smoothing': Cross-entropy with label smoothing
+            - 'ordinal_smoothing': Cross-entropy with ordinal neighbor soft targets
         num_classes: Number of grade classes
         class_weights: Class weights tensor
         **kwargs: Additional arguments passed to loss constructor
@@ -354,10 +476,18 @@ def create_loss_function(
     elif loss_type == 'label_smoothing':
         smoothing = kwargs.get('smoothing', 0.1)
         return LabelSmoothingCrossEntropy(smoothing=smoothing)
+
+    elif loss_type == 'ordinal_smoothing':
+        kernel = kwargs.get('ordinal_smoothing_kernel', None)
+        return OrdinalSmoothingCrossEntropy(
+            kernel=kernel,
+            class_weights=class_weights
+        )
     
     else:
         raise ValueError(
             f"Unknown loss_type '{loss_type}'. "
-            f"Must be one of: 'ce', 'focal', 'ordinal', 'focal_ordinal', 'label_smoothing'"
+            f"Must be one of: 'ce', 'focal', 'ordinal', 'focal_ordinal', "
+            f"'label_smoothing', 'ordinal_smoothing'"
         )
 

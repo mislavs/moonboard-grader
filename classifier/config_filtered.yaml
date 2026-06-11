@@ -17,7 +17,11 @@ training:
   use_class_weights: true
   max_class_weight: 10.0  # Increased from 5.0 for better handling of imbalanced filtered data
   use_scheduler: true
-  label_smoothing: 0.1
+  loss_type: "focal_ordinal"
+  focal_gamma: 2.0
+  ordinal_weight: 0.5
+  ordinal_alpha: 2.0
+  label_smoothing: 0.0  # Only used by "ce" and "label_smoothing" loss types
   gradient_clip: 1.0
 
 # Data Configuration

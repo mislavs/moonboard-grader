@@ -399,7 +399,7 @@ def train_command(args):
         class_weight_summary = "off"
     
     # Create loss function (support advanced loss functions)
-    loss_type = config['training'].get('loss_type', 'ce')
+    loss_type = config['training'].get('loss_type', 'focal_ordinal')
     if loss_type != 'ce':
         from src.losses import create_loss_function
         criterion = create_loss_function(
@@ -409,6 +409,7 @@ def train_command(args):
             gamma=config['training'].get('focal_gamma', 2.0),
             ordinal_weight=config['training'].get('ordinal_weight', 0.5),
             ordinal_alpha=config['training'].get('ordinal_alpha', 2.0),
+            ordinal_smoothing_kernel=config['training'].get('ordinal_smoothing_kernel'),
             smoothing=label_smoothing
         )
         loss_notes = [f"Loss: {loss_type}"]
@@ -416,11 +417,16 @@ def train_command(args):
             loss_notes.append(f"Focal gamma: {config['training'].get('focal_gamma', 2.0)}")
         if loss_type in ['ordinal', 'focal_ordinal']:
             loss_notes.append(f"Ordinal alpha: {config['training'].get('ordinal_alpha', 2.0)}")
+        if loss_type == 'ordinal_smoothing':
+            loss_notes.append(
+                "Ordinal smoothing kernel: "
+                f"{config['training'].get('ordinal_smoothing_kernel', [0.025, 0.075, 0.8, 0.075, 0.025])}"
+            )
     else:
         criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)
         loss_notes = ["Loss: cross entropy"]
     
-    if label_smoothing > 0:
+    if label_smoothing > 0 and loss_type in ['ce', 'label_smoothing']:
         loss_notes.append(f"Label smoothing: {label_smoothing}")
     
     # Create learning rate scheduler

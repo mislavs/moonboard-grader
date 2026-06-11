@@ -342,7 +342,7 @@ training:
   use_scheduler: true
   scheduler_factor: 0.3
   scheduler_patience: 3
-  label_smoothing: 0.1
+  label_smoothing: 0.0
   gradient_clip: 1.0
   loss_type: "focal_ordinal"
   focal_gamma: 2.0
@@ -363,14 +363,19 @@ training:
 | `use_scheduler` | bool | `false` | Enable learning rate scheduler that reduces LR when validation loss plateaus |
 | `scheduler_factor` | float | `0.5` | Factor by which LR is reduced when scheduler triggers. New LR = old LR × factor |
 | `scheduler_patience` | int | `5` | Number of epochs to wait before reducing LR if no improvement |
-| `label_smoothing` | float | `0.0` | Label smoothing coefficient (0.0-1.0). Values like 0.1 help prevent overconfident predictions |
+| `label_smoothing` | float | `0.0` | Uniform label smoothing coefficient (0.0-1.0). Only used by `"ce"` and `"label_smoothing"` loss types |
 | `gradient_clip` | float | `null` | Maximum gradient norm for gradient clipping. Values like 1.0 help stabilize training |
-| `loss_type` | string | `"ce"` | Loss function type. Options: `"ce"` (cross-entropy), `"focal"` (focal loss for class imbalance), `"ordinal"` (ordinal regression), `"focal_ordinal"` (combined), `"label_smoothing"` |
+| `loss_type` | string | `"focal_ordinal"` | Loss function type. Options: `"ce"` (cross-entropy), `"focal"` (focal loss for class imbalance), `"ordinal"` (ordinal regression), `"focal_ordinal"` (combined), `"label_smoothing"`, `"ordinal_smoothing"` |
+| `ordinal_smoothing_kernel` | list[float] | `[0.025, 0.075, 0.8, 0.075, 0.025]` | Odd-length soft-target kernel centered on the true grade. Only used by `"ordinal_smoothing"` |
 | `focal_gamma` | float | `2.0` | Focusing parameter for focal loss. Higher values focus more on hard examples. Range: 1.5-3.0 |
 | `ordinal_weight` | float | `0.5` | Weight for the ordinal component when using combined losses. Range: 0.0-1.0 |
 | `ordinal_alpha` | float | `2.0` | Distance penalty for ordinal loss. Controls how much to penalize predictions far from the true grade |
 | `reproducibility_seed` | int | `null` | Seed all RNGs (Python, NumPy, PyTorch) for repeatable training runs. Omit to use default random state |
 | `deterministic` | bool | `false` | Force deterministic algorithms in PyTorch. May reduce performance. Only applies when `reproducibility_seed` is set |
+
+#### Loss Experiment Notes
+
+`ordinal_smoothing` was tested with `[0.025, 0.075, 0.8, 0.075, 0.025]` neighbor targets and produced worse validation results than the existing baseline runs. Keep it available for reproducibility, but treat it as a historical experiment rather than a recommended loss choice unless there is a new reason to revisit it.
 
 ### Data Configuration
 
@@ -537,4 +542,3 @@ device: "cuda"
 - Experiment with different model architectures
 - Try different hyperparameters (learning rate, batch size, etc.)
 - Analyze per-grade performance to identify which grades are hardest to predict
-

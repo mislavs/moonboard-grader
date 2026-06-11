@@ -79,6 +79,7 @@ from .losses import (
     OrdinalCrossEntropyLoss,
     FocalOrdinalLoss,
     LabelSmoothingCrossEntropy,
+    OrdinalSmoothingCrossEntropy,
     create_loss_function
 )
 
@@ -170,6 +171,7 @@ __all__ = [
     'OrdinalCrossEntropyLoss',
     'FocalOrdinalLoss',
     'LabelSmoothingCrossEntropy',
+    'OrdinalSmoothingCrossEntropy',
     'create_loss_function',
     # Trainer functions
     'Trainer',
