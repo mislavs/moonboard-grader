@@ -20,6 +20,7 @@ Moonboard Grader predicts Moonboard climbing problem difficulty on the Font scal
 
 - `docs/architecture.md` - stable codemap, API boundaries, architecture invariants, and cross-cutting concerns.
 - `docs/features.md` - shipped capabilities, planned capabilities, and user-facing workflows.
+- `docs/experiments-classifier.md` - classifier experiment findings, failed approaches, and lessons learned.
 - `docs/adr/` - accepted architecture decisions and long-lived trade-offs.
 - `docs/exec-plans/active/` - active implementation plans for unfinished work.
 - `docs/exec-plans/completed/` - historical plans kept for context.

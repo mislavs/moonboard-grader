@@ -15,5 +15,6 @@ Before or after larger feature work:
 - Move completed plans from `docs/exec-plans/active/` to `docs/exec-plans/completed/`.
 - Add an ADR for decisions that change ownership boundaries, dependency direction, persistence shape, or external integration behavior.
 - Update `docs/features.md` for new user-facing behavior.
+- Update `docs/experiments-classifier.md` after meaningful classifier training, evaluation, or data experiments.
 - Update `docs/architecture.md` only for new modules, boundaries, or invariants.
 - Prefer generated docs for exact schema, OpenAPI, enum, or metadata references.
