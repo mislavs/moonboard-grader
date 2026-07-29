@@ -35,8 +35,7 @@ include = ["app*"]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-# local package sources
 [tool.uv.sources]
-moonboard-classifier = { path = "../classifier", editable = true }
-moonboard-generator = { path = "../generator", editable = true }
+moonboard-classifier = { workspace = true }
+moonboard-generator = { workspace = true }
 

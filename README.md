@@ -56,6 +56,22 @@ Transformer-based grade classifier using move sequences from the Beta Solver.
 
 ## Quick Start
 
+The Python components are managed as a single `uv` workspace. Install or update
+their shared environment from the repository root:
+
+```powershell
+uv sync
+```
+
+The workspace uses the root `.venv` and `uv.lock`. Commands can be run from an
+individual Python component directory with `uv run`, without creating another
+virtual environment:
+
+```powershell
+cd classifier
+uv run pytest
+```
+
 See individual README files in each component directory for detailed setup instructions:
 - `classifier/README.md` - Train and evaluate grid-based models
 - `backend/README.md` - Run the API server

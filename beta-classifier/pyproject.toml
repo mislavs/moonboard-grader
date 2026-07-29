@@ -31,5 +31,5 @@ where = ["."]
 include = ["src*"]
 
 [tool.uv.sources]
-moonboard_core = { path = "../moonboard_core", editable = true }
+moonboard_core = { workspace = true }
 

@@ -19,5 +19,8 @@ desktop.ini
 *.tmp
 *.temp
 
+# Shared Python environment
+.venv/
+
 # Aspire CLI
 .aspire/

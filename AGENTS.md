@@ -29,19 +29,22 @@ Moonboard Grader predicts Moonboard climbing problem difficulty on the Font scal
 
 ## Build And Test
 
-Python projects use `uv` for dependency management. Use `py` instead of `python` when invoking Python commands.
+Python projects share the root `uv` workspace, `.venv`, and `uv.lock`. Synchronize
+the environment from the repository root. Use `py` instead of `python` when
+invoking Python commands directly.
 
 ```powershell
-# From a Python project directory
+# From the repository root
 uv sync
-py -m pytest
+
+# From a Python project directory
+uv run pytest
 ```
 
 ```powershell
 # Backend
 cd backend
-uv sync
-py -m uvicorn app.main:app --reload --host localhost --port 8000
+uv run uvicorn app.main:app --reload --host localhost --port 8000
 ```
 
 ```powershell
