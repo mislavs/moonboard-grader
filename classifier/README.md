@@ -71,6 +71,7 @@ py main.py cross-validate --config config.yaml --manifest manifests/moonboard-ma
 ```
 
 This requires a clean committed revision, performs five grouped folds for each seed in `[42, 43, 44]`, and never loads the locked test membership.
+The CLI configures `CUBLAS_WORKSPACE_CONFIG=:4096:8` before importing PyTorch so strict deterministic CUDA training works on CUDA 10.2 and newer.
 
 ### 3. Refit the Selected Candidate
 

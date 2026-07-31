@@ -10,6 +10,12 @@ Usage:
     py main.py predict --checkpoint models/refit.pth --input problem.json
 """
 
+import os
+
+# CuBLAS reads this before CUDA work begins. PyTorch requires it when strict
+# deterministic algorithms are enabled on CUDA 10.2 and newer.
+os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+
 import argparse
 import sys
 

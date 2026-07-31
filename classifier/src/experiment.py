@@ -14,6 +14,11 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
 import numpy as np
+
+# Also protect programmatic experiment usage that does not enter through
+# classifier/main.py. This must be set before the first CuBLAS operation.
+os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+
 import torch
 import yaml
 
@@ -272,6 +277,7 @@ def load_cohort(config: Mapping[str, Any], data_path: Path) -> Tuple[List[Proces
 def seed_everything(seed: int, deterministic: bool = True) -> torch.Generator:
     """Seed every RNG controlled by the experiment process."""
     os.environ["PYTHONHASHSEED"] = str(seed)
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)

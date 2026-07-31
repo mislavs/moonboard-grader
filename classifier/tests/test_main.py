@@ -163,6 +163,12 @@ class TestPredictCommand:
 
 
 class TestConfigAndMain:
+    def test_main_sets_cublas_determinism_before_cli_imports(self):
+        source = (Path(__file__).parent.parent / "main.py").read_text(encoding="utf-8")
+        setting = source.index('os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")')
+        command_import = source.index("from src.cli.commands import setup_parsers")
+        assert setting < command_import
+
     def test_config_uses_official_split_and_scheduler_schema(self):
         path = Path(__file__).parent.parent / "config.yaml"
         config = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -212,4 +218,3 @@ class TestCLIASCIISafety:
                     assert all(ord(character) < 128 for character in line), (
                         f"{path.name}:{line_number} contains non-ASCII output text"
                     )
-
