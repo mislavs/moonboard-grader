@@ -12,6 +12,7 @@ import shutil
 from moonboard_core.data_processor import (
     process_problem,
     load_dataset,
+    load_problem_records,
     get_dataset_stats,
     save_processed_dataset,
     load_processed_dataset
@@ -453,4 +454,67 @@ class TestSaveLoadProcessedDataset:
         """Test that loading non-existent file raises error"""
         with pytest.raises(FileNotFoundError):
             load_processed_dataset(self.temp_dir / "nonexistent.npz")
+
+
+class TestLoadProblemRecords:
+    """Identity-aware loading used by frozen experiment manifests."""
+
+    def _write(self, tmp_path, problems):
+        path = tmp_path / "problems.json"
+        path.write_text(json.dumps({"data": problems}), encoding="utf-8")
+        return path
+
+    def test_preserves_problem_id_and_repeats(self, tmp_path):
+        path = self._write(
+            tmp_path,
+            [
+                {
+                    "grade": "6B+",
+                    "repeats": 12,
+                    "moves": [
+                        {"problemId": 101, "description": "A1", "isStart": True, "isEnd": False},
+                        {"problemId": 101, "description": "K18", "isStart": False, "isEnd": True},
+                    ],
+                }
+            ],
+        )
+
+        records = load_problem_records(path)
+
+        assert len(records) == 1
+        assert records[0].problem_id == 101
+        assert records[0].repeats == 12
+        assert records[0].tensor.shape == (3, 18, 11)
+
+    def test_rejects_missing_or_inconsistent_move_ids(self, tmp_path):
+        missing = self._write(
+            tmp_path,
+            [{"grade": "6A", "moves": [{"description": "A1", "isStart": True, "isEnd": True}]}],
+        )
+        with pytest.raises(ValueError, match="problemId"):
+            load_problem_records(missing)
+
+        inconsistent = self._write(
+            tmp_path,
+            [
+                {
+                    "grade": "6A",
+                    "moves": [
+                        {"problemId": 1, "description": "A1", "isStart": True, "isEnd": False},
+                        {"problemId": 2, "description": "B2", "isStart": False, "isEnd": True},
+                    ],
+                }
+            ],
+        )
+        with pytest.raises(ValueError, match="same problemId"):
+            load_problem_records(inconsistent)
+
+    def test_rejects_duplicate_problem_ids(self, tmp_path):
+        problem = {
+            "grade": "6A",
+            "moves": [{"problemId": 7, "description": "A1", "isStart": True, "isEnd": True}],
+        }
+        path = self._write(tmp_path, [problem, problem])
+        with pytest.raises(ValueError, match="duplicate problemId"):
+            load_problem_records(path)
 

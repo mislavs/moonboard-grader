@@ -3,9 +3,11 @@
 Main CLI script for Moonboard Grade Prediction
 
 Usage:
-    python main.py train --config config.yaml
-    python main.py evaluate --checkpoint models/best_model.pth --data data/problems.json
-    python main.py predict --checkpoint models/best_model.pth --input problem.json
+    py main.py create-manifest --config config.yaml --output manifests/benchmark-v1.json
+    py main.py cross-validate --config config.yaml --manifest manifests/benchmark-v1.json
+    py main.py refit --config config.yaml --manifest manifests/benchmark-v1.json --cv-report report.json
+    py main.py evaluate --checkpoint models/refit.pth --manifest manifests/benchmark-v1.json
+    py main.py predict --checkpoint models/refit.pth --input problem.json
 """
 
 import argparse
@@ -28,14 +30,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Train a new model
-  python main.py train --config config.yaml
-  
-  # Evaluate a trained model
-  python main.py evaluate --checkpoint models/best_model.pth --data data/test.json
-  
+  # Freeze the cohort before experimentation
+  py main.py create-manifest --config config.yaml --output manifests/moonboard-masters-2017-all-v1.json
+
+  # Compare one candidate without touching the locked test set
+  py main.py cross-validate --config config.yaml --manifest manifests/moonboard-masters-2017-all-v1.json
+
   # Make predictions
-  python main.py predict --checkpoint models/best_model.pth --input problem.json
+  py main.py predict --checkpoint models/best_model.pth --input problem.json
         """
     )
     
@@ -45,14 +47,9 @@ Examples:
     # Parse arguments
     args = parser.parse_args()
     
-    # Execute command
+    # Execute the function registered by the selected subcommand.
     try:
-        if args.command == 'train':
-            train_command(args)
-        elif args.command == 'evaluate':
-            evaluate_command(args)
-        elif args.command == 'predict':
-            predict_command(args)
+        args.func(args)
     except KeyboardInterrupt:
         print("\n\n[WARN] Interrupted by user")
         sys.exit(1)

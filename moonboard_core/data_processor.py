@@ -8,11 +8,100 @@ and providing dataset statistics.
 
 import json
 import numpy as np
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple, Union, Optional
+from typing import Dict, List, Tuple, Union, Optional, Any
 
 from .grade_encoder import encode_grade
 from .grid_builder import create_grid_tensor
+
+
+@dataclass(frozen=True)
+class ProcessedProblem:
+    """Identity-preserving representation of a processed MoonBoard problem."""
+
+    problem_id: Union[int, str]
+    tensor: np.ndarray
+    label: int
+    repeats: int
+
+
+def _extract_problem_id(problem_dict: Dict[str, Any]) -> Union[int, str]:
+    """Return the stable problem ID, validating the IDs repeated on each move."""
+    moves = problem_dict.get("moves")
+    if not isinstance(moves, list) or not moves:
+        raise ValueError("problem must contain at least one move to determine problemId")
+
+    problem_ids = {move.get("problemId") for move in moves if isinstance(move, dict)}
+    if None in problem_ids:
+        raise ValueError("every move must contain problemId")
+    if len(problem_ids) != 1:
+        raise ValueError("all moves in a problem must contain the same problemId")
+
+    problem_id = next(iter(problem_ids))
+    if not isinstance(problem_id, (int, str)) or isinstance(problem_id, bool):
+        raise ValueError("problemId must be an integer or string")
+    return problem_id
+
+
+def load_problem_records(json_path: Union[str, Path]) -> List[ProcessedProblem]:
+    """Load problems without discarding source identity or repeat metadata.
+
+    Unlike :func:`load_dataset`, this strict API requires the stable MoonBoard
+    ``problemId`` repeated on every move. It is intended for reproducible split
+    manifests; the legacy tuple-loading API remains permissive and unchanged.
+    """
+    json_path = Path(json_path)
+    if not json_path.exists():
+        raise FileNotFoundError(f"JSON file not found: {json_path}")
+    if not json_path.is_file():
+        raise ValueError(f"Path is not a file: {json_path}")
+
+    try:
+        with open(json_path, "r", encoding="utf-8") as file:
+            document = json.load(file)
+    except json.JSONDecodeError:
+        raise
+    except Exception as exc:
+        raise ValueError(f"Error reading {json_path}: {exc}") from exc
+
+    if not isinstance(document, dict) or not isinstance(document.get("data"), list):
+        raise ValueError("JSON must be an object with a 'data' problem list")
+
+    records: List[ProcessedProblem] = []
+    seen_ids = set()
+    errors = []
+    for index, problem in enumerate(document["data"]):
+        try:
+            if not isinstance(problem, dict):
+                raise ValueError("problem must be an object")
+            problem_id = _extract_problem_id(problem)
+            normalized_id = str(problem_id)
+            if normalized_id in seen_ids:
+                raise ValueError(f"duplicate problemId {problem_id}")
+            tensor, label = process_problem(problem)
+            repeats = problem.get("repeats", 0)
+            if not isinstance(repeats, int) or isinstance(repeats, bool) or repeats < 0:
+                raise ValueError("repeats must be a non-negative integer")
+            seen_ids.add(normalized_id)
+            records.append(
+                ProcessedProblem(
+                    problem_id=problem_id,
+                    tensor=tensor,
+                    label=int(label),
+                    repeats=repeats,
+                )
+            )
+        except Exception as exc:
+            errors.append(f"Problem {index}: {exc}")
+
+    if errors:
+        message = f"Failed to process {len(errors)} problem(s):\n" + "\n".join(errors[:5])
+        if len(errors) > 5:
+            message += f"\n... and {len(errors) - 5} more errors"
+        raise ValueError(message)
+
+    return records
 
 
 def process_problem(problem_dict: Dict) -> Tuple[np.ndarray, int]:
@@ -425,4 +514,3 @@ def load_processed_dataset(load_path: Union[str, Path]) -> List[Tuple[np.ndarray
         dataset.append((tensor, label))
     
     return dataset
-

@@ -39,8 +39,10 @@ from .grid_to_moves import (
 )
 
 from .data_processor import (
+    ProcessedProblem,
     process_problem,
     load_dataset,
+    load_problem_records,
     get_dataset_stats,
     save_processed_dataset,
     load_processed_dataset,
@@ -72,11 +74,12 @@ __all__ = [
     "grid_to_moves",
     "validate_moves",
     # Data processing
+    "ProcessedProblem",
     "process_problem",
     "load_dataset",
+    "load_problem_records",
     "get_dataset_stats",
     "save_processed_dataset",
     "load_processed_dataset",
     "filter_dataset_by_grades",
 ]
-

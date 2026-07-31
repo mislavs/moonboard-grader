@@ -11,6 +11,8 @@ This project implements a deep learning system to predict the difficulty grade o
 - **Multi-channel representation**: Separates start holds, middle holds, and end holds
 - **Multiple model architectures**: Fully connected baseline and convolutional neural network
 - **Comprehensive evaluation**: Exact accuracy, tolerance-based accuracy, confusion matrices
+- **Frozen benchmark manifests**: Dataset hashes, filters, problem IDs, and split membership
+- **Repeated grouped validation**: Five layout-aware folds across three fixed seeds
 - **Production-ready inference**: Easy-to-use predictor interface for new problems
 - **CLI interface**: Command-line tools for training, evaluation, and prediction
 
@@ -49,21 +51,47 @@ uv sync
 
 Run the test suite to verify everything is installed correctly:
 ```bash
-pytest tests/
+uv run pytest
 ```
 
 ## Usage
 
-### Training a Model
+### 1. Freeze the Benchmark Cohort
 
 ```bash
-py main.py train --config config.yaml
+py main.py create-manifest --config config.yaml --output manifests/moonboard-masters-2017-all-v1.json
 ```
 
-### Evaluating a Model
+The manifest is immutable. Any dataset or filter change requires a new manifest version.
+
+### 2. Compare a Candidate
 
 ```bash
-py main.py evaluate --checkpoint models/best_model.pth --data ../data/problems.json
+py main.py cross-validate --config config.yaml --manifest manifests/moonboard-masters-2017-all-v1.json
+```
+
+This requires a clean committed revision, performs five grouped folds for each seed in `[42, 43, 44]`, and never loads the locked test membership.
+
+### 3. Refit the Selected Candidate
+
+Run this only after comparing validation reports and from a clean committed revision:
+
+```bash
+py main.py refit --config config.yaml --manifest manifests/moonboard-masters-2017-all-v1.json --cv-report models/experiments/<candidate>/cv/cv_report.json
+```
+
+The refit uses the complete development pool and the median CV-selected epoch.
+
+### 4. Evaluate the Promoted Refit
+
+```bash
+py main.py evaluate --checkpoint models/experiments/<candidate>/refit_<candidate>_seed-42.pth --manifest manifests/moonboard-masters-2017-all-v1.json
+```
+
+Official evaluation accepts only provenance-complete refit checkpoints. For arbitrary data, use the explicitly non-comparable diagnostic command:
+
+```bash
+py main.py evaluate-diagnostic --checkpoint models/legacy.pth --data ../data/external.json --output diagnostic.json
 ```
 
 ### Making Predictions
@@ -72,37 +100,22 @@ py main.py evaluate --checkpoint models/best_model.pth --data ../data/problems.j
 py main.py predict --checkpoint models/best_model.pth --input problem.json
 ```
 
-## Viewing Training Results
+## Experiment Artifacts
 
-Training metrics are logged to TensorBoard. To view them:
-
-1. Start TensorBoard:
-```bash
-py -m tensorboard.main --logdir=runs
-```
-
-2. Open your browser to http://localhost:6006
-
-You'll see:
-- Training and validation loss curves
-- Validation accuracy over time
-- Hyperparameter comparison across experiments
-- Confusion matrices
-- Learning rate schedules
-
-To compare multiple experiments, TensorBoard will automatically overlay their curves. Each training run is saved in a timestamped directory under `runs/`.
+CV writes one atomic checkpoint/result pair per seed and fold plus `cv_report.json`. Re-running the command resumes only hash-compatible completed folds. Refit checkpoints embed the resolved configuration, manifest membership, dataset/filter hashes, seeds, code revision, and runtime versions. Locked test metrics live only in a separate `.test.json` report and never in model filenames.
 
 ## Data Format
 
-Input problems should be in JSON format with the following structure:
+Manifest-backed datasets must include the same `problemId` on every move:
 
 ```json
 {
-  "Grade": "6B+",
-  "Moves": [
-    {"Description": "A5", "IsStart": true, "IsEnd": false},
-    {"Description": "F7", "IsStart": false, "IsEnd": false},
-    {"Description": "K12", "IsStart": false, "IsEnd": true}
+  "grade": "6B+",
+  "repeats": 10,
+  "moves": [
+    {"problemId": 123, "description": "A5", "isStart": true, "isEnd": false},
+    {"problemId": 123, "description": "F7", "isStart": false, "isEnd": false},
+    {"problemId": 123, "description": "K12", "isStart": false, "isEnd": true}
   ]
 }
 ```
@@ -113,17 +126,17 @@ Input problems should be in JSON format with the following structure:
 
 Run all tests:
 ```bash
-pytest tests/
+uv run pytest
 ```
 
 Run tests for a specific module:
 ```bash
-pytest tests/test_models.py
+uv run pytest tests/test_models.py
 ```
 
 Run with coverage:
 ```bash
-pytest --cov=src tests/
+uv run pytest --cov=src tests/
 ```
 
 ### Code Organization

@@ -16,22 +16,21 @@ training:
   weight_decay: 0.001
   use_class_weights: true
   max_class_weight: 10.0  # Increased from 5.0 for better handling of imbalanced filtered data
-  use_scheduler: true
+  scheduler:
+    type: "cosine"
+    horizon_epochs: 150
+    eta_min: 0.0000001
   loss_type: "focal_ordinal"
   focal_gamma: 2.0
   ordinal_weight: 0.5
   ordinal_alpha: 2.0
   label_smoothing: 0.0  # Only used by "ce" and "label_smoothing" loss types
   gradient_clip: 1.0
+  deterministic: true
 
 # Data Configuration
 data:
   path: "../data/problems.json"  # Path to training data JSON file
-  train_ratio: 0.7
-  val_ratio: 0.15
-  test_ratio: 0.15
-  random_seed: 123  # Changed to get better stratification for small classes
-  
   # Grade Filtering Configuration
   filter_grades: true
   min_grade_index: 2   # 6A+
@@ -41,6 +40,15 @@ data:
   filter_repeats: false  # Enable/disable repeats filtering
   min_repeats: 1         # Minimum number of repeats (0 = include all, 1 = exclude zero-repeat routes)
   group_by_layout: true  # Keep duplicate hold layouts in the same split
+
+# Frozen benchmark and repeated grouped validation
+experiment:
+  outer_test_ratio: 0.15
+  outer_seed: 42
+  cv_folds: 5
+  cv_seeds: [42, 43, 44]
+  refit_seed: 42
+  primary_metric: "tolerance_1_accuracy"
 
 # Checkpoint Configuration
 checkpoint:

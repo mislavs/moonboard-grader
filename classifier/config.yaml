@@ -16,25 +16,31 @@ training:
   weight_decay: 0.001
   use_class_weights: true
   max_class_weight: 5.0
-  use_scheduler: true
+  scheduler:
+    type: "cosine"
+    horizon_epochs: 150
+    eta_min: 0.0000001
   loss_type: "focal_ordinal"
   focal_gamma: 2.0
   ordinal_weight: 0.5
   ordinal_alpha: 2.0
   label_smoothing: 0.0  # Only used by "ce" and "label_smoothing" loss types
   gradient_clip: 1.0
-  # Reproducibility (optional)
-  # reproducibility_seed: 42   # Seed Python, NumPy, and PyTorch RNGs
-  # deterministic: false        # Use deterministic algorithms (may reduce perf)
+  deterministic: true
 
 # Data Configuration
 data:
   path: "../data/problems.json"  # Path to training data JSON file
-  train_ratio: 0.7
-  val_ratio: 0.15
-  test_ratio: 0.15
-  random_seed: 42  # For reproducible splits
   group_by_layout: true  # Keep duplicate hold layouts in the same split
+
+# Frozen benchmark and repeated grouped validation
+experiment:
+  outer_test_ratio: 0.15
+  outer_seed: 42
+  cv_folds: 5
+  cv_seeds: [42, 43, 44]
+  refit_seed: 42
+  primary_metric: "tolerance_1_accuracy"
 
 # Checkpoint Configuration
 checkpoint:

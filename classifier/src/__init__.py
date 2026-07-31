@@ -43,8 +43,10 @@ from moonboard_core.grid_builder import (
 )
 
 from moonboard_core.data_processor import (
+    ProcessedProblem,
     process_problem,
     load_dataset,
+    load_problem_records,
     get_dataset_stats,
     save_processed_dataset,
     load_processed_dataset,
@@ -141,7 +143,9 @@ __all__ = [
     'tensor_to_moves',
     # Data processor functions
     'process_problem',
+    'ProcessedProblem',
     'load_dataset',
+    'load_problem_records',
     'get_dataset_stats',
     'save_processed_dataset',
     'load_processed_dataset',
