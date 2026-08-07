@@ -16,7 +16,7 @@ from src.cli.commands import setup_parsers
 from src.cli.evaluate import evaluate_command
 from src.cli.evaluate_diagnostic import evaluate_diagnostic_command
 from src.cli.predict import predict_command
-from src.cli.train import deprecated_train_command, train_command
+from src.cli.train import train_command
 from src.cli.utils import load_config, setup_device
 
 
@@ -52,6 +52,15 @@ class TestCommandRegistry:
         parser = self._parser()
         commands = [
             ["create-manifest", "--output", "manifest.json"],
+            [
+                "train",
+                "--manifest",
+                "manifest.json",
+                "--seed",
+                "42",
+                "--fold",
+                "0",
+            ],
             ["cross-validate", "--manifest", "manifest.json"],
             ["refit", "--manifest", "manifest.json", "--cv-report", "report.json"],
             ["evaluate", "--checkpoint", "model.pth", "--manifest", "manifest.json"],
@@ -61,12 +70,25 @@ class TestCommandRegistry:
         for arguments in commands:
             assert callable(parser.parse_args(arguments).func)
 
-    def test_train_is_a_hard_deprecation(self):
-        args = self._parser().parse_args(["train", "--config", "config.yaml"])
-        assert args.func is deprecated_train_command
-        assert train_command is deprecated_train_command
-        with pytest.raises(RuntimeError, match="evaluated the test set on every run"):
-            args.func(args)
+    def test_train_is_the_single_run_diagnostic_command(self):
+        args = self._parser().parse_args(
+            ["train", "--manifest", "manifest.json", "--seed", "42", "--fold", "0"]
+        )
+        assert args.func is train_command
+
+    def test_train_once_name_is_not_registered(self):
+        with pytest.raises(SystemExit):
+            self._parser().parse_args(
+                [
+                    "train-once",
+                    "--manifest",
+                    "manifest.json",
+                    "--seed",
+                    "42",
+                    "--fold",
+                    "0",
+                ]
+            )
 
     def test_official_evaluate_does_not_accept_data(self):
         parser = self._parser()
@@ -95,6 +117,28 @@ class TestEvaluationBoundaries:
             output=None,
         )
         with pytest.raises(ValueError, match="schema v2"):
+            evaluate_command(args)
+
+    def test_locked_evaluate_rejects_diagnostic_train_checkpoint(self, tmp_path, monkeypatch):
+        from src.cli import evaluate as evaluate_module
+
+        monkeypatch.setattr(
+            evaluate_module,
+            "require_clean_revision",
+            lambda: {"commit": "abc", "dirty": False},
+        )
+        checkpoint = tmp_path / "diagnostic.pth"
+        torch.save(
+            {"checkpoint_schema_version": 2, "artifact_stage": "diagnostic"},
+            checkpoint,
+        )
+        args = MagicMock(
+            checkpoint=str(checkpoint),
+            manifest=str(tmp_path / "manifest.json"),
+            cpu=True,
+            output=None,
+        )
+        with pytest.raises(ValueError, match="stage=refit"):
             evaluate_command(args)
 
     def test_diagnostic_report_is_non_comparable(self, tmp_path):
@@ -193,7 +237,16 @@ class TestConfigAndMain:
         called = []
         monkeypatch.setattr(
             "sys.argv",
-            ["main.py", "train"],
+            [
+                "main.py",
+                "train",
+                "--manifest",
+                "missing.json",
+                "--seed",
+                "42",
+                "--fold",
+                "0",
+            ],
         )
         with pytest.raises(SystemExit) as error:
             main()

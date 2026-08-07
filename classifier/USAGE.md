@@ -14,6 +14,18 @@ py main.py create-manifest `
 
 The command validates stable `problemId` values, applies the configured grade/repeat filters, hashes the source, semantic cohort, and experiment source tree, freezes an approximately 15% grouped outer test set, and records five validation folds for seeds `42`, `43`, and `44`. Existing manifests are never overwritten.
 
+### Optional: train one diagnostic candidate
+
+```powershell
+py main.py train `
+  --config config.yaml `
+  --manifest manifests/moonboard-masters-2017-all-v1.json `
+  --seed 42 `
+  --fold 0
+```
+
+This is the fast iteration lane. It trains one fresh model using the chosen manifest fold, prints per-epoch training and validation progress, selects the best validation epoch, and never constructs a locked-test loader. Clean committed code is not required. Its checkpoint uses `artifact_stage: diagnostic`, and both checkpoint and report declare `comparable: false` and `promotion_eligible: false`. They support prediction and diagnostic evaluation but cannot enter official refit or locked evaluation. The default artifacts are written below `models/experiments/<candidate-id>/train/seed-<seed>/fold-<fold>/`; pass `--output-dir` to retain another run with the same identity.
+
 ### 2. Cross-validate a candidate
 
 ```powershell
@@ -47,7 +59,7 @@ The command accepts only schema-v2 `stage=refit` checkpoints whose manifest, con
 
 ## Non-comparable Diagnostics
 
-Use this only for smoke checks or genuinely external datasets:
+The `train` command above is the diagnostic training path. Use `evaluate-diagnostic` for smoke checks or genuinely external datasets:
 
 ```powershell
 py main.py evaluate-diagnostic `

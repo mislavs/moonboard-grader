@@ -38,6 +38,8 @@ def _load_cv_report(path: Path, config, manifest, current_revision):
         raise FileNotFoundError(f"CV report not found: {path}")
     with open(path, "r", encoding="utf-8") as file:
         report = json.load(file)
+    if report.get("evaluation_kind") == "diagnostic_validation":
+        raise ValueError("diagnostic train reports cannot be used for official refit")
     if report.get("report_schema_version") != 1:
         raise ValueError("unsupported CV report schema")
     if report.get("config_sha256") != config_hash(config):

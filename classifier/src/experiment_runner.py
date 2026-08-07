@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import os
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
@@ -185,6 +185,7 @@ def _base_checkpoint(
     history: Mapping[str, Any],
     selected_epoch: int,
     grade_offset: int,
+    revision: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     return {
         "checkpoint_schema_version": CHECKPOINT_SCHEMA_VERSION,
@@ -200,7 +201,7 @@ def _base_checkpoint(
         "filters": copy.deepcopy(manifest["cohort"]["filters"]),
         "split_membership": {name: list(values) for name, values in membership.items()},
         "seeds": copy.deepcopy(dict(seeds)),
-        "code_revision": code_revision(),
+        "code_revision": copy.deepcopy(dict(revision)) if revision is not None else code_revision(),
         "environment": environment_metadata(),
         "history": copy.deepcopy(dict(history)),
         "selected_epoch": int(selected_epoch),
@@ -221,7 +222,12 @@ def run_cv_fold(
     fold: int,
     device: torch.device,
     checkpoint_path: Path,
+    artifact_stage: str = "cv_fold",
+    revision: Optional[Mapping[str, Any]] = None,
+    progress_callback: Optional[Callable[[Mapping[str, Any]], None]] = None,
 ) -> Dict[str, Any]:
+    if artifact_stage not in ("cv_fold", "diagnostic"):
+        raise ValueError(f"unsupported validation artifact stage: {artifact_stage}")
     generator = seed_everything(seed, deterministic=True)
     grade_offset = int(config["data"]["min_grade_index"]) if config["data"]["filter_grades"] else 0
     train_dataset = records_to_dataset(train_records, grade_offset)
@@ -275,14 +281,29 @@ def run_cv_fold(
             stale_epochs = 0
         else:
             stale_epochs += 1
+        will_stop = patience is not None and stale_epochs >= int(patience)
+        if progress_callback is not None:
+            progress_callback(
+                {
+                    "epoch": epoch,
+                    "max_epochs": max_epochs,
+                    "learning_rate": learning_rate,
+                    "train_loss": train_loss,
+                    "metrics": comparable_metrics,
+                    "is_best": best_epoch == epoch,
+                    "stale_epochs": stale_epochs,
+                    "patience": patience,
+                    "will_stop": will_stop,
+                }
+            )
         scheduler.step()
-        if patience is not None and stale_epochs >= int(patience):
+        if will_stop:
             break
 
     assert best_state is not None and best_metrics is not None
     model.load_state_dict(best_state)
     checkpoint = _base_checkpoint(
-        "cv_fold",
+        artifact_stage,
         model,
         optimizer,
         scheduler,
@@ -293,8 +314,13 @@ def run_cv_fold(
         history,
         best_epoch,
         grade_offset,
+        revision,
     )
     checkpoint["validation_metrics"] = best_metrics
+    if artifact_stage == "diagnostic":
+        checkpoint["evaluation_kind"] = "diagnostic_validation"
+        checkpoint["comparable"] = False
+        checkpoint["promotion_eligible"] = False
     _atomic_torch_save(checkpoint, checkpoint_path)
     return {"selected_epoch": best_epoch, "metrics": best_metrics}
 

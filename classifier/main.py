@@ -4,6 +4,7 @@ Main CLI script for Moonboard Grade Prediction
 
 Usage:
     py main.py create-manifest --config config.yaml --output manifests/benchmark-v1.json
+    py main.py train --config config.yaml --manifest manifests/benchmark-v1.json --seed 42 --fold 0
     py main.py cross-validate --config config.yaml --manifest manifests/benchmark-v1.json
     py main.py refit --config config.yaml --manifest manifests/benchmark-v1.json --cv-report report.json
     py main.py evaluate --checkpoint models/refit.pth --manifest manifests/benchmark-v1.json
@@ -41,6 +42,9 @@ Examples:
 
   # Compare one candidate without touching the locked test set
   py main.py cross-validate --config config.yaml --manifest manifests/moonboard-masters-2017-all-v1.json
+
+  # Train one quick, non-promotable diagnostic candidate
+  py main.py train --config config.yaml --manifest manifests/moonboard-masters-2017-all-v1.json --seed 42 --fold 0
 
   # Make predictions
   py main.py predict --checkpoint models/best_model.pth --input problem.json

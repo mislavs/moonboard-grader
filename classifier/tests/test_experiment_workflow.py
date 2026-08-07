@@ -17,7 +17,7 @@ from src.experiment_manifest import (
     manifest_digest,
     validate_manifest_structure,
 )
-from src.experiment_runner import run_refit
+from src.experiment_runner import run_cv_fold, run_refit
 
 
 def _config(num_classes=3):
@@ -217,18 +217,212 @@ def test_refit_checkpoint_contains_provenance_and_no_validation(tmp_path):
     assert checkpoint["source_cv_report_sha256"] == "c" * 64
 
 
-def test_cli_exposes_strict_workflow_and_deprecates_train():
+def test_diagnostic_fold_checkpoint_is_non_promotable(tmp_path):
+    config = _config(num_classes=2)
+    config["training"]["num_epochs"] = 1
+    config["training"]["scheduler"]["horizon_epochs"] = 1
+    records = _records(classes=2, groups_per_class=5)
+    train_records = records[:3] + records[5:8]
+    validation_records = records[3:5] + records[8:]
+    train_ids = [str(record.problem_id) for record in train_records]
+    validation_ids = [str(record.problem_id) for record in validation_records]
+    revision = {
+        "commit": "abc123",
+        "dirty": True,
+        "source_tree_sha256": "d" * 64,
+    }
+    manifest = {
+        "manifest_id": "fixture-v1",
+        "manifest_sha256": "b" * 64,
+        "dataset": _identity(config, records),
+        "cohort": {"filters": _identity(config, records)["filters"]},
+    }
+    output = tmp_path / "diagnostic.pth"
+    progress = []
+
+    run_cv_fold(
+        train_records,
+        validation_records,
+        config,
+        manifest,
+        {
+            "train_ids": train_ids,
+            "validation_ids": validation_ids,
+            "locked_test_ids": ["locked-1"],
+        },
+        42,
+        0,
+        torch.device("cpu"),
+        output,
+        artifact_stage="diagnostic",
+        revision=revision,
+        progress_callback=progress.append,
+    )
+
+    checkpoint = torch.load(output, map_location="cpu")
+    assert checkpoint["checkpoint_schema_version"] == 2
+    assert checkpoint["artifact_stage"] == "diagnostic"
+    assert checkpoint["evaluation_kind"] == "diagnostic_validation"
+    assert checkpoint["comparable"] is False
+    assert checkpoint["promotion_eligible"] is False
+    assert checkpoint["code_revision"] == revision
+    assert checkpoint["split_membership"]["train_ids"] == train_ids
+    assert checkpoint["split_membership"]["validation_ids"] == validation_ids
+    assert checkpoint["split_membership"]["locked_test_ids"] == ["locked-1"]
+    assert "validation_metrics" in checkpoint
+    assert len(progress) == 1
+    assert progress[0]["epoch"] == 1
+    assert progress[0]["max_epochs"] == 1
+    assert progress[0]["is_best"] is True
+    assert progress[0]["will_stop"] is False
+    assert progress[0]["metrics"] == checkpoint["validation_metrics"]
+
+
+def test_train_uses_only_selected_development_fold(tmp_path, monkeypatch, capsys):
+    from src.cli import train as train_module
+
+    config = _config(num_classes=2)
+    records = _records(classes=2, groups_per_class=3)
+    ids = [str(record.problem_id) for record in records]
+    manifest = {
+        "manifest_id": "fixture-v1",
+        "manifest_sha256": "b" * 64,
+        "split": {
+            "development_ids": ids[:5],
+            "test_ids": [ids[5]],
+        },
+        "inner_cv": {
+            "seeds": [42],
+            "repetitions": [
+                {
+                    "seed": 42,
+                    "folds": [{"fold": 0, "validation_ids": ids[3:5]}],
+                }
+            ],
+        },
+    }
+    revision = {"commit": "abc", "dirty": True, "source_tree_sha256": "c" * 64}
+    captured = {}
+
+    monkeypatch.setattr(
+        train_module,
+        "resolve_experiment_config",
+        lambda _: (config, tmp_path / "problems.json"),
+    )
+    monkeypatch.setattr(train_module, "load_manifest", lambda _: manifest)
+    monkeypatch.setattr(
+        train_module,
+        "validate_manifest_for_config",
+        lambda *_: records,
+    )
+    monkeypatch.setattr(train_module, "code_revision", lambda: revision)
+    monkeypatch.setattr(train_module, "setup_device", lambda _: ("cpu", "cpu"))
+    monkeypatch.setattr(train_module, "environment_metadata", lambda: {"python": "test"})
+
+    def fake_run(train_records, validation_records, *args, **kwargs):
+        captured["train_ids"] = [str(record.problem_id) for record in train_records]
+        captured["validation_ids"] = [str(record.problem_id) for record in validation_records]
+        captured["membership"] = args[2]
+        captured["artifact_stage"] = kwargs["artifact_stage"]
+        captured["revision"] = kwargs["revision"]
+        checkpoint_path = args[6]
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint_path.write_bytes(b"diagnostic checkpoint")
+        kwargs["progress_callback"](
+            {
+                "epoch": 2,
+                "max_epochs": 10,
+                "train_loss": 2.5,
+                "metrics": {
+                    "avg_loss": 1.2,
+                    "exact_accuracy": 40.0,
+                    "tolerance_1_accuracy": 75.0,
+                    "mean_absolute_error": 0.9,
+                },
+                "is_best": True,
+                "stale_epochs": 8,
+                "patience": 8,
+                "will_stop": True,
+            }
+        )
+        return {
+            "selected_epoch": 2,
+            "metrics": {
+                "exact_accuracy": 40.0,
+                "tolerance_1_accuracy": 75.0,
+                "mean_absolute_error": 0.9,
+            },
+        }
+
+    monkeypatch.setattr(train_module, "run_cv_fold", fake_run)
+    output_dir = tmp_path / "train"
+    args = type(
+        "Args",
+        (),
+        {
+            "config": "config.yaml",
+            "manifest": "manifest.json",
+            "seed": 42,
+            "fold": 0,
+            "output_dir": str(output_dir),
+        },
+    )()
+
+    train_module.train_command(args)
+
+    assert captured["train_ids"] == sorted(ids[:3])
+    assert captured["validation_ids"] == sorted(ids[3:5])
+    assert ids[5] not in captured["train_ids"]
+    assert ids[5] not in captured["validation_ids"]
+    assert captured["membership"]["locked_test_ids"] == [ids[5]]
+    assert captured["artifact_stage"] == "diagnostic"
+    assert captured["revision"] == revision
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert report["evaluation_kind"] == "diagnostic_validation"
+    assert report["comparable"] is False
+    assert report["promotion_eligible"] is False
+    assert report["metrics"]["tolerance_1_accuracy"] == 75.0
+    output = capsys.readouterr().out
+    assert "Epoch 2/10" in output
+    assert "train loss 2.5000" in output
+    assert "val loss 1.2000" in output
+    assert "exact 40.00%" in output
+    assert "+-1 75.00%" in output
+    assert "MAE 0.900" in output
+    assert "| best" in output
+    assert "Early stopping after epoch 2" in output
+
+
+def test_refit_rejects_diagnostic_train_report(tmp_path):
+    from src.cli.refit import _load_cv_report
+
+    report = tmp_path / "diagnostic.json"
+    report.write_text(
+        json.dumps(
+            {
+                "report_schema_version": 1,
+                "evaluation_kind": "diagnostic_validation",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="cannot be used for official refit"):
+        _load_cv_report(report, {}, {}, {})
+
+
+def test_cli_exposes_diagnostic_train_and_strict_official_workflow():
     import argparse
 
     from src.cli.commands import setup_parsers
-    from src.cli.train import deprecated_train_command
+    from src.cli.train import train_command
 
     parser = argparse.ArgumentParser()
     setup_parsers(parser)
-    train_args = parser.parse_args(["train"])
-    assert train_args.func is deprecated_train_command
-    with pytest.raises(RuntimeError, match="legacy train command is disabled"):
-        train_args.func(train_args)
+    train_args = parser.parse_args(
+        ["train", "--manifest", "benchmark.json", "--seed", "42", "--fold", "0"]
+    )
+    assert train_args.func is train_command
 
     evaluate_args = parser.parse_args(
         ["evaluate", "--checkpoint", "model.pth", "--manifest", "benchmark.json"]

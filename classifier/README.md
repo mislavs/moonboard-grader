@@ -64,6 +64,16 @@ py main.py create-manifest --config config.yaml --output manifests/moonboard-mas
 
 The manifest is immutable. Any dataset or filter change requires a new manifest version.
 
+### Optional: Train One Candidate
+
+Use single-run training for quick iteration before spending time on all 15 official CV fits:
+
+```bash
+py main.py train --config config.yaml --manifest manifests/moonboard-masters-2017-all-v1.json --seed 42 --fold 0
+```
+
+This trains one fresh model on the selected manifest fold and prints training loss, validation loss, exact accuracy, ±1 accuracy, MAE, best-epoch markers, and early stopping progress without loading the locked test set. It may run from a dirty revision, but its checkpoint and report are marked `comparable=false` and `promotion_eligible=false`. Prediction and `evaluate-diagnostic` accept the checkpoint; official refit and locked evaluation reject it. Use `--output-dir` to keep multiple runs with the same configuration, seed, and fold.
+
 ### 2. Compare a Candidate
 
 ```bash
@@ -103,7 +113,7 @@ py main.py predict --checkpoint models/best_model.pth --input problem.json
 
 ## Experiment Artifacts
 
-CV writes one atomic checkpoint/result pair per seed and fold plus `cv_report.json`. Re-running the command resumes only hash-compatible completed folds. Refit checkpoints embed the resolved configuration, manifest membership, dataset/filter hashes, seeds, code revision, and runtime versions. Locked test metrics live only in a separate `.test.json` report and never in model filenames.
+Diagnostic training writes `checkpoint.pth` and `report.json` under `models/experiments/<candidate>/train/seed-<seed>/fold-<fold>/`. CV writes one atomic checkpoint/result pair per seed and fold plus `cv_report.json`. Re-running CV resumes only hash-compatible completed folds. Refit checkpoints embed the resolved configuration, manifest membership, dataset/filter hashes, seeds, code revision, and runtime versions. Locked test metrics live only in a separate `.test.json` report and never in model filenames.
 
 ## Data Format
 

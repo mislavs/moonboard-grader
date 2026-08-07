@@ -134,6 +134,7 @@ def cross_validate_command(args):
                 fold,
                 torch.device(device),
                 checkpoint_path,
+                revision=revision,
             )
             fold_result = {
                 "seed": seed,
