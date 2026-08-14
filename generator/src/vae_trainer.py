@@ -105,7 +105,7 @@ class VAETrainer:
         self.log_interval = config.get('log_interval', 100)
         
         # Optimizer
-        self.optimizer = optim.Adam(
+        self.optimizer = optim.AdamW(
             self.model.parameters(),
             lr=self.learning_rate,
             weight_decay=self.weight_decay,
