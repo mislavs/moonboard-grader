@@ -54,25 +54,27 @@ class ConditionalVAE(nn.Module):
 
         # Grade embedding layer
         self.grade_embedding = nn.Embedding(num_grades, grade_embedding_dim)
+        with torch.no_grad():
+            self.grade_embedding.weight.mul_(0.25)
 
         # Encoder: 3x18x11 -> latent_dim*2 (mu and logvar)
         self.encoder = nn.Sequential(
             # Input: 3x18x11
             nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
+            nn.BatchNorm2d(32, momentum=0.2),
+            nn.SiLU(),
             # 32x18x11
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
+            nn.BatchNorm2d(64, momentum=0.2),
+            nn.SiLU(),
             # 64x9x6
             nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
+            nn.BatchNorm2d(128, momentum=0.2),
+            nn.SiLU(),
             # 128x5x3
             nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(),
+            nn.BatchNorm2d(256, momentum=0.2),
+            nn.SiLU(),
             # 256x3x2
         )
 
@@ -82,7 +84,7 @@ class ConditionalVAE(nn.Module):
         # Feature-map dropout modules are kept outside Sequential blocks to preserve
         # stable state_dict key numbering for checkpoint compatibility.
         self.encoder_dropout = nn.Dropout2d(p=self.dropout_rate)
-        self.decoder_dropout = nn.Dropout2d(p=self.dropout_rate)
+        self.decoder_dropout = nn.Dropout2d(p=0.25 * self.dropout_rate)
 
         # Latent space layers: encoder features + grade embedding
         encoder_conditioned_size = self.encoder_output_size + grade_embedding_dim
@@ -100,22 +102,25 @@ class ConditionalVAE(nn.Module):
             nn.ConvTranspose2d(
                 256, 128, kernel_size=4, stride=3, padding=1, output_padding=1
             ),
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
+            nn.BatchNorm2d(128, momentum=0.2),
+            nn.SiLU(),
             # 128x9x6
             nn.ConvTranspose2d(
                 128, 64, kernel_size=3, stride=2, padding=1, output_padding=(1, 0)
             ),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
+            nn.BatchNorm2d(64, momentum=0.2),
+            nn.SiLU(),
             # 64x18x11
             nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
+            nn.BatchNorm2d(32, momentum=0.2),
+            nn.SiLU(),
             # 32x18x11
             nn.Conv2d(32, 3, kernel_size=1, stride=1, padding=0),
             # 3x18x11
         )
+        # Start sparse-grid probabilities near their expected low base rate
+        # instead of the sigmoid midpoint (50% occupied).
+        nn.init.constant_(self.decoder[-1].bias, -3.0)
 
     def encode(self, x, grade_labels):
         """
@@ -151,7 +156,7 @@ class ConditionalVAE(nn.Module):
         """
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
-        z = mu + eps * std
+        z = mu + 0.75 * eps * std
         return z
 
     def decode(self, z, grade_labels):
@@ -280,8 +285,15 @@ def vae_loss(x_recon, x, mu, logvar, kl_weight=1.0):
         recon_loss: Reconstruction loss (BCE)
         kl_loss: KL divergence loss
     """
-    # Reconstruction loss (Binary Cross Entropy)
-    recon_loss = F.binary_cross_entropy_with_logits(x_recon, x, reduction="sum")
+    # Missing a real hold is more damaging than predicting one extra candidate
+    # on these sparse grids. A modest positive-class weight avoids the
+    # all-background bias without overwhelming the KL objective.
+    recon_loss = F.binary_cross_entropy_with_logits(
+        x_recon,
+        x,
+        pos_weight=x_recon.new_tensor(4.25),
+        reduction="sum",
+    )
 
     # KL divergence loss
     # -0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
