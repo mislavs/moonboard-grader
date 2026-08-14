@@ -21,7 +21,7 @@ training:
   learning_rate: 0.001
   weight_decay: 1.0e-5
   max_grad_norm: 1.0  # Clip global gradient norm before optimizer step
-  kl_weight: 0.5  
+  kl_weight: 0.75  
   kl_annealing: true  # Gradually increase KL weight from 0.01 to kl_weight
   kl_annealing_epochs: 10  # Longer annealing to reduce early objective drift
   early_stopping_patience: 25  # More room before stopping while objective is still settling
