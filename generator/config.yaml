@@ -11,7 +11,7 @@ data:
 
 # Model architecture
 model:
-  latent_dim: 128
+  latent_dim: 64
   grade_embedding_dim: 32
   dropout_rate: 0.1
 
