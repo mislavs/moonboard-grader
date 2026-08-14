@@ -205,6 +205,10 @@ class ConditionalVAE(nn.Module):
         """
         mu, logvar = self.encode(x, grade_labels)
         z = self.reparameterize(mu, logvar)
+        # Prevent the posterior sample from carrying every reconstruction detail,
+        # which would let the decoder ignore the requested grade. Standard latent
+        # dropout is training-only; prior sampling remains unchanged.
+        z = F.dropout(z, p=self.dropout_rate, training=self.training)
         x_recon = self.decode(z, grade_labels)
         return x_recon, mu, logvar
 
